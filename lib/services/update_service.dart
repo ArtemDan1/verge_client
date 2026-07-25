@@ -20,7 +20,7 @@ class UpdateService {
   UpdateService({
     http.Client? client,
     this.owner = 'ArtemDan1',
-    this.repo = 'singbox_flutter',
+    this.repo = 'verge_client',
   }) : _client = client ?? http.Client();
 
   final http.Client _client;

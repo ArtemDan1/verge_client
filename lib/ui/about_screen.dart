@@ -40,7 +40,7 @@ class AboutScreen extends StatelessWidget {
                   _UpdateBlock(controller: c),
                   const SizedBox(height: 12),
                   const SelectableText(
-                      'https://github.com/ArtemDan1/singbox_flutter'),
+                      'https://github.com/ArtemDan1/verge_client'),
                 ],
               ),
             ),
