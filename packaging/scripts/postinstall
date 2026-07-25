@@ -1,0 +1,18 @@
+#!/bin/bash
+# Запускается от root после распаковки payload. Ставит права на привилегированный
+# helper и LaunchDaemon-плист и (пере)загружает демона в launchd.
+set -e
+
+PLIST=/Library/LaunchDaemons/com.singboxclient.helper.plist
+BIN=/Library/PrivilegedHelperTools/com.singboxclient.helper
+
+chown root:wheel "$BIN"
+chmod 755 "$BIN"
+chown root:wheel "$PLIST"
+chmod 644 "$PLIST"
+
+# bootout на случай апгрейда (демон уже загружен). Ошибку игнорируем.
+launchctl bootout system "$PLIST" 2>/dev/null || true
+launchctl bootstrap system "$PLIST"
+
+exit 0
