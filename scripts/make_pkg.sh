@@ -57,7 +57,14 @@ cat > "$WORK/distribution.xml" <<XML
 <installer-gui-script minSpecVersion="1">
   <title>Verge</title>
   <options customize="never" require-scripts="false"/>
-  <pkg-ref id="com.singboxclient.app"/>
+  <!-- Installer сам потребует закрыть запущенную копию: перезапись бандла под
+       живым процессом даёт SIGKILL по невалидной подписи, а bootout демона в
+       postinstall рвёт активный туннель. -->
+  <pkg-ref id="com.singboxclient.app">
+    <must-close>
+      <app id="com.singboxclient.singboxFlutter"/>
+    </must-close>
+  </pkg-ref>
   <pkg-ref id="com.singboxclient.helper"/>
   <choices-outline>
     <line choice="default">

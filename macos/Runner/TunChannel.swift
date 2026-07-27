@@ -31,13 +31,6 @@ final class TunChannel: NSObject, FlutterStreamHandler {
         self.start(configJSON: cfg, service: service, result: result)
       case "stop":
         self.stop(result: result)
-      case "openPath":
-        if let path = call.arguments as? String {
-          NSWorkspace.shared.open(URL(fileURLWithPath: path))
-          result(nil)
-        } else {
-          result(FlutterError(code: "ARG", message: "no path", details: nil))
-        }
       default:
         result(FlutterMethodNotImplemented)
       }

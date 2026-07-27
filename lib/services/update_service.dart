@@ -65,6 +65,10 @@ class UpdateService {
     }
     final total = resp.contentLength ?? 0;
     final dir = targetDir ?? await getTemporaryDirectory();
+    // getTemporaryDirectory() на macOS отдаёт ~/Library/Caches/<bundle-id> и не
+    // создаёт её: вне сэндбокса папки может не быть, и openWrite падает
+    // PathNotFoundException.
+    await dir.create(recursive: true);
     final file = File('${dir.path}/SingboxFlutter-update.pkg');
     final sink = file.openWrite();
     var received = 0;

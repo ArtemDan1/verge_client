@@ -54,4 +54,17 @@ void main() {
     expect(File(path).readAsStringSync(), 'PKGDATA');
     expect(progress.last, 1.0);
   });
+
+  // getTemporaryDirectory() на macOS отдаёт ~/Library/Caches/<bundle-id>, но вне
+  // сэндбокса эта папка не существует — без mkdir запись падает PathNotFound.
+  test('downloadPkg создаёт целевую папку, если её нет', () async {
+    final svc = UpdateService(
+        client: MockClient((_) async => http.Response('PKGDATA', 200,
+            headers: {'content-length': '7'})));
+    final missing = Directory(
+        '${Directory.systemTemp.createTempSync().path}/nope/deeper');
+    expect(missing.existsSync(), isFalse);
+    final path = await svc.downloadPkg('https://gh/x.pkg', targetDir: missing);
+    expect(File(path).readAsStringSync(), 'PKGDATA');
+  });
 }

@@ -1,5 +1,6 @@
 import FlutterMacOS
 import Foundation
+import AppKit
 
 /// Связывает MethodChannel singbox/tunnel с процессом, системным прокси и инфо о платформе.
 final class TunnelChannel: NSObject, FlutterStreamHandler {
@@ -46,8 +47,55 @@ final class TunnelChannel: NSObject, FlutterStreamHandler {
         result(self.listNetworkServices())
       case "defaultService":
         result(self.defaultService())
+      case "installUpdate":
+        guard let path = call.arguments as? String else {
+          result(FlutterError(code: "ARG", message: "no path", details: nil))
+          return
+        }
+        self.installUpdate(path: path, result: result)
       default:
         result(FlutterMethodNotImplemented)
+      }
+    }
+  }
+
+  /// Открывает скачанный .pkg в Installer.app и выходит из приложения.
+  ///
+  /// Выйти обязательно: установщик перезаписывает бандл в /Applications под
+  /// работающим процессом (ad-hoc подпись → SIGKILL по невалидной подписи), а
+  /// postinstall выгружает демона. Если нас убьют вместо штатного выхода,
+  /// системный прокси и DNS останутся переопределёнными.
+  private func installUpdate(path: String, result: @escaping FlutterResult) {
+    // Страховка на случай, если Dart-сторона не успела погасить туннель.
+    SystemProxy.disableAll()
+    currentService = nil
+    singbox.stop()
+
+    guard FileManager.default.fileExists(atPath: path) else {
+      result(FlutterError(code: "OPEN", message: "файл не найден: \(path)",
+                          details: nil))
+      return
+    }
+
+    // Открываем дефолтным обработчиком .pkg. Путь к Installer.app не
+    // захардкожен: он отличается между версиями macOS (в 15.x —
+    // /System/Library/CoreServices, не /System/Applications/Utilities).
+    NSWorkspace.shared.open(
+      URL(fileURLWithPath: path),
+      configuration: NSWorkspace.OpenConfiguration()
+    ) { _, error in
+      DispatchQueue.main.async {
+        if let error = error {
+          result(FlutterError(code: "OPEN", message: error.localizedDescription,
+                              details: nil))
+          return
+        }
+        result(nil)
+        // Installer уже запущен и держит файл сам — можно уходить. Небольшая
+        // задержка, чтобы result успел уехать в Flutter до терминации.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+          NSApp.terminate(nil)
+        }
       }
     }
   }

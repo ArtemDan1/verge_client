@@ -518,7 +518,14 @@ class AppController extends ChangeNotifier {
         updateDownloadProgress = p;
         notifyListeners();
       });
-      await _platform.openPath(path);
+      // Гасим туннель ДО установщика: postinstall делает bootout демона, и
+      // оборванный на полпути туннель оставит переопределённый DNS/системный
+      // прокси в системе.
+      if (_status == TunnelStatus.connected ||
+          _status == TunnelStatus.connecting) {
+        await disconnect();
+      }
+      await _platform.installUpdate(path);
     } catch (e) {
       _alertCtrl.add('Не удалось загрузить обновление: $e');
     } finally {

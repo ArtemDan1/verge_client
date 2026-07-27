@@ -71,8 +71,17 @@ class FakePlatformInfo extends PlatformInfo {
   Future<String> appVersion() async => '1.0.0+1';
 
   String? openedPath;
+  /// Статус туннеля на момент запуска установщика — установщик перезапишет
+  /// бандл и выгрузит демона, поэтому туннель должен быть уже погашен.
+  bool tunnelActiveOnInstall = false;
+  AppController? observed;
   @override
-  Future<void> openPath(String path) async => openedPath = path;
+  Future<void> installUpdate(String path) async {
+    openedPath = path;
+    final s = observed?.status;
+    tunnelActiveOnInstall =
+        s == TunnelStatus.connected || s == TunnelStatus.connecting;
+  }
 }
 
 class FakeUpdateService extends UpdateService {
@@ -820,6 +829,25 @@ void main() {
       await app.downloadAndInstallUpdate();
       expect(svc.downloadedFrom, 'https://gh/x.pkg');
       expect(platform.openedPath, '/tmp/SingboxFlutter-update.pkg');
+    });
+
+    test('перед запуском установщика туннель гасится', () async {
+      final platform = FakePlatformInfo();
+      final svc = FakeUpdateService(
+          info: const UpdateInfo(
+              version: 'v1.0.1', pkgUrl: 'https://gh/x.pkg', releaseUrl: 'r'));
+      final app = build(updateService: svc, platform: platform);
+      platform.observed = app;
+      await app.init();
+      await app.addProfile('Sub', 'https://x');
+      await app.selectNode(app.profiles.first.id, 0);
+      await app.checkForUpdate();
+      await app.connect();
+      expect(app.status, TunnelStatus.connected);
+      await app.downloadAndInstallUpdate();
+      expect(platform.openedPath, isNotNull);
+      expect(platform.tunnelActiveOnInstall, isFalse);
+      expect(app.status, TunnelStatus.disconnected);
     });
   });
 

@@ -15,4 +15,17 @@ chmod 644 "$PLIST"
 launchctl bootout system "$PLIST" 2>/dev/null || true
 launchctl bootstrap system "$PLIST"
 
+# Перезапуск приложения после апдейта: мы root, поэтому уходим в сессию
+# залогиненного пользователя, иначе окно откроется не у него (или вообще
+# не откроется). Любая ошибка здесь не должна валить установку.
+APP=/Applications/Verge.app
+CONSOLE_USER="$(stat -f '%Su' /dev/console 2>/dev/null || true)"
+if [ -d "$APP" ] && [ -n "$CONSOLE_USER" ] && [ "$CONSOLE_USER" != "root" ]; then
+  CONSOLE_UID="$(id -u "$CONSOLE_USER" 2>/dev/null || true)"
+  if [ -n "$CONSOLE_UID" ]; then
+    launchctl asuser "$CONSOLE_UID" sudo -u "$CONSOLE_USER" \
+      open -a "$APP" 2>/dev/null || true
+  fi
+fi
+
 exit 0
