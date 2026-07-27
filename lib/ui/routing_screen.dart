@@ -146,7 +146,9 @@ class RoutingScreen extends StatelessWidget {
 
   String _summary(RoutingProfile p) {
     final d = p.directRules.length, x = p.proxyRules.length, b = p.blockRules.length;
-    return 'direct $d · proxy $x · block $b · final ${p.finalAction.name}';
+    final a = p.allowRules.length;
+    final allow = a > 0 ? 'исключений $a · ' : '';
+    return '${allow}direct $d · proxy $x · block $b · final ${p.finalAction.name}';
   }
 
   void _openEditor(BuildContext context, RoutingProfile p) {
@@ -196,6 +198,30 @@ class _RoutingEditor extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
+                          _bucket(
+                              context,
+                              theme,
+                              'Исключения (перекрывают Block)',
+                              p.allowRules,
+                              (rules) => controller.updateRoutingProfile(
+                                  p.copyWith(allowRules: rules))),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text('Исключения через прокси',
+                                    style: theme.textTheme.muted),
+                              ),
+                              ShadSwitch(
+                                value: p.allowAction == RoutingFinal.proxy,
+                                onChanged: (v) => controller
+                                    .updateRoutingProfile(p.copyWith(
+                                        allowAction: v
+                                            ? RoutingFinal.proxy
+                                            : RoutingFinal.direct)),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
                           _bucket(context, theme, 'Direct (напрямую)',
                               p.directRules,
                               (rules) => controller.updateRoutingProfile(

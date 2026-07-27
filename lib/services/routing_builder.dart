@@ -80,6 +80,11 @@ class RoutingBuilder {
       if (domains.isNotEmpty) rules.add({...base(), 'domain_suffix': domains});
     }
 
+    // Исключения — раньше блоклиста: пользовательское правило должно
+    // перекрывать грубый гео-набор, а не наоборот.
+    final allowTag =
+        profile.allowAction == RoutingFinal.direct ? 'direct' : 'proxy';
+    emit(profile.allowRules, () => {'outbound': allowTag});
     emit(profile.blockRules, () => {'action': 'reject'});
     emit(profile.directRules, () => {'outbound': 'direct'});
     emit(profile.proxyRules, () => {'outbound': 'proxy'});
@@ -87,17 +92,33 @@ class RoutingBuilder {
     final finalTag =
         profile.finalAction == RoutingFinal.direct ? 'direct' : 'proxy';
 
-    // Гео-наборы из direct-корзины резолвим напрямую (RU-домены — мимо прокси).
-    final directGeo = profile.directRules
+    // Всё, что идёт direct, должно и резолвиться напрямую: иначе прокси вернёт
+    // «свой» IP и исключение поедет не туда.
+    final directBuckets = [
+      profile.directRules,
+      if (profile.allowAction == RoutingFinal.direct) profile.allowRules,
+    ].expand((b) => b).toList();
+
+    final directGeo = directBuckets
         .where((r) => r.kind == RoutingRuleKind.geo)
         .map((r) => geoCategoryByTag(r.value)?.tag)
         .whereType<String>()
+        .toSet()
         .toList();
-    final dnsRules = directGeo.isEmpty
-        ? const <Map<String, dynamic>>[]
-        : [
-            {'rule_set': directGeo, 'server': 'direct-dns'}
-          ];
+    // Домены — только из allow: direct-корзина исторически задаётся гео-наборами,
+    // а точечное исключение без своего DNS-правила работать не будет.
+    final allowDomains = profile.allowAction == RoutingFinal.direct
+        ? profile.allowRules
+            .where((r) => r.kind == RoutingRuleKind.domain)
+            .map((r) => r.value)
+            .toList()
+        : const <String>[];
+
+    final dnsRules = <Map<String, dynamic>>[
+      if (allowDomains.isNotEmpty)
+        {'domain_suffix': allowDomains, 'server': 'direct-dns'},
+      if (directGeo.isNotEmpty) {'rule_set': directGeo, 'server': 'direct-dns'},
+    ];
 
     return RoutingFragment(rules, ruleSets.values.toList(), finalTag,
         dnsRules: dnsRules);

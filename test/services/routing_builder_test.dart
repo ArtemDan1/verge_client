@@ -7,13 +7,16 @@ void main() {
   const builder = RoutingBuilder();
 
   RoutingProfile profile({
+    List<RoutingRule> allow = const [],
     List<RoutingRule> direct = const [],
     List<RoutingRule> proxy = const [],
     List<RoutingRule> block = const [],
     RoutingFinal fin = RoutingFinal.proxy,
+    RoutingFinal allowAction = RoutingFinal.direct,
   }) =>
       RoutingProfile(
         id: 'p', name: 'p', isBuiltIn: false,
+        allowRules: allow, allowAction: allowAction,
         directRules: direct, proxyRules: proxy, blockRules: block,
         finalAction: fin,
       );
@@ -42,6 +45,70 @@ void main() {
     expect(f.rules[1]['outbound'], 'direct');
     expect(f.rules[2]['domain_suffix'], ['x.com']);
     expect(f.rules[2]['outbound'], 'proxy');
+  });
+
+  test('allow перекрывает block: исключение из ads-листа уходит direct', () {
+    final f = builder.build(profile(
+      allow: const [
+        RoutingRule(
+            kind: RoutingRuleKind.domain, value: 'advert-api.wildberries.ru')
+      ],
+      block: const [
+        RoutingRule(
+            kind: RoutingRuleKind.geo, value: 'geosite-category-ads-all')
+      ],
+    ));
+    expect(f.rules.first['domain_suffix'], ['advert-api.wildberries.ru']);
+    expect(f.rules.first['outbound'], 'direct');
+    expect(f.rules[1]['action'], 'reject');
+  });
+
+  test('allowAction=proxy направляет исключение в прокси', () {
+    final f = builder.build(profile(
+      allow: const [RoutingRule(kind: RoutingRuleKind.domain, value: 'x.com')],
+      allowAction: RoutingFinal.proxy,
+    ));
+    expect(f.rules.first['outbound'], 'proxy');
+  });
+
+  test('в tun серверный IP и приватные сети идут раньше allow', () {
+    final f = builder.build(
+      profile(
+          allow: const [
+            RoutingRule(kind: RoutingRuleKind.domain, value: 'x.com')
+          ]),
+      tun: true,
+      serverIp: '1.2.3.4',
+    );
+    expect(f.rules[0]['ip_cidr'], contains('1.2.3.4/32'));
+    expect(f.rules[1]['ip_is_private'], isTrue);
+    expect(f.rules[2]['domain_suffix'], ['x.com']);
+  });
+
+  test('allow с direct резолвится через direct-dns (домены и geo)', () {
+    final f = builder.build(profile(
+      allow: const [
+        RoutingRule(
+            kind: RoutingRuleKind.domain, value: 'advert-api.wildberries.ru'),
+        RoutingRule(kind: RoutingRuleKind.geo, value: 'geosite-category-ru'),
+      ],
+    ));
+    final domainDns = f.dnsRules.firstWhere((r) => r['domain_suffix'] != null);
+    expect(domainDns['domain_suffix'], ['advert-api.wildberries.ru']);
+    expect(domainDns['server'], 'direct-dns');
+    final geoDns = f.dnsRules.firstWhere((r) => r['rule_set'] != null);
+    expect(geoDns['rule_set'], contains('geosite-category-ru'));
+  });
+
+  test('allowAction=proxy не добавляет direct-dns правил', () {
+    final f = builder.build(profile(
+      allow: const [
+        RoutingRule(
+            kind: RoutingRuleKind.domain, value: 'advert-api.wildberries.ru')
+      ],
+      allowAction: RoutingFinal.proxy,
+    ));
+    expect(f.dnsRules, isEmpty);
   });
 
   test('domain и ip правила в одной корзине дают раздельные записи', () {

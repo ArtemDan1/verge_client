@@ -399,6 +399,8 @@ class AppController extends ChangeNotifier {
       id: _uuid.v4(),
       name: '${src.name} (копия)',
       isBuiltIn: false,
+      allowRules: List.of(src.allowRules),
+      allowAction: src.allowAction,
       directRules: List.of(src.directRules),
       proxyRules: List.of(src.proxyRules),
       blockRules: List.of(src.blockRules),
