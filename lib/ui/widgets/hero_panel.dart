@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../app/app_controller.dart';
@@ -19,6 +21,9 @@ class _HeroPanelState extends State<HeroPanel>
   bool _switchingTun = false;
   bool _pressed = false;
   late final AnimationController _pulse;
+  // Тикающий раз в секунду таймер перерисовки аптайма. Сам момент
+  // подключения хранится в AppController и переживает смену экранов.
+  Timer? _uptimeTimer;
 
   @override
   void initState() {
@@ -28,12 +33,53 @@ class _HeroPanelState extends State<HeroPanel>
       vsync: this,
       duration: const Duration(milliseconds: 1800),
     )..repeat();
+    widget.controller.addListener(_onStatusChanged);
+    _onStatusChanged();
+  }
+
+  @override
+  void didUpdateWidget(HeroPanel old) {
+    super.didUpdateWidget(old);
+    if (old.controller != widget.controller) {
+      old.controller.removeListener(_onStatusChanged);
+      widget.controller.addListener(_onStatusChanged);
+      _onStatusChanged();
+    }
   }
 
   @override
   void dispose() {
+    widget.controller.removeListener(_onStatusChanged);
+    _uptimeTimer?.cancel();
     _pulse.dispose();
     super.dispose();
+  }
+
+  void _onStatusChanged() {
+    final running = widget.controller.status == TunnelStatus.connected;
+    if (running && _uptimeTimer == null) {
+      _uptimeTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() {});
+      });
+    } else if (!running && _uptimeTimer != null) {
+      _uptimeTimer!.cancel();
+      _uptimeTimer = null;
+    }
+  }
+
+  /// «MM:SS», «H:MM:SS», «Dд H:MM:SS» — без ведущих нулей у старшего разряда.
+  static String _formatUptime(Duration d) {
+    final s = d.inSeconds < 0 ? 0 : d.inSeconds;
+    final days = s ~/ 86400;
+    final hours = (s % 86400) ~/ 3600;
+    final minutes = (s % 3600) ~/ 60;
+    final seconds = s % 60;
+    final mm = minutes.toString().padLeft(2, '0');
+    final ss = seconds.toString().padLeft(2, '0');
+    // ignore: unnecessary_brace_in_string_interps — скобки нужны: «д» слипается.
+    if (days > 0) return '${days}д $hours:$mm:$ss';
+    if (hours > 0) return '$hours:$mm:$ss';
+    return '$mm:$ss';
   }
 
   Future<void> _togglePower() async {
@@ -89,7 +135,8 @@ class _HeroPanelState extends State<HeroPanel>
         ShadBadge(
           backgroundColor: running ? activeGreen : null,
           child: Text(running
-              ? 'VPN активен'
+              ? _formatUptime(
+                  DateTime.now().difference(c.connectedAt ?? DateTime.now()))
               : connecting
                   ? 'Подключение…'
                   : 'VPN отключён'),

@@ -163,6 +163,13 @@ class AppController extends ChangeNotifier {
   void _onStatus(TunnelController src, TunnelStatus s) {
     if (src != _activeTunnel) return;
     _status = s;
+    // Момент подключения живёт в контроллере, а не в виджете: иначе аптайм
+    // сбрасывался бы при каждом переходе между экранами.
+    if (s == TunnelStatus.connected) {
+      _connectedAt ??= DateTime.now();
+    } else if (s == TunnelStatus.disconnected || s == TunnelStatus.error) {
+      _connectedAt = null;
+    }
     // Аварийное завершение sing-box — показываем причину пользователю.
     if (s == TunnelStatus.error) {
       _error = src.lastError ?? 'sing-box завершился аварийно';
@@ -199,6 +206,10 @@ class AppController extends ChangeNotifier {
 
   PersistedState _state = const PersistedState();
   TunnelStatus _status = TunnelStatus.disconnected;
+
+  /// Момент установления соединения; null, когда VPN не активен.
+  DateTime? _connectedAt;
+  DateTime? get connectedAt => _connectedAt;
   final Map<String, PingResult> _pings = {};
   final Set<String> _pinging = {};
   static String _pingKey(NodeConfig n) => '${n.host}:${n.port}';
