@@ -7,6 +7,10 @@ class PlatformInfo {
   Future<String> singboxVersion() async =>
       (await _channel.invokeMethod<String>('singboxVersion')) ?? 'unknown';
 
+  /// Версия бандленного Xray — второго движка (hysteria2, vless+xhttp).
+  Future<String> xrayVersion() async =>
+      (await _channel.invokeMethod<String>('xrayVersion')) ?? 'unknown';
+
   Future<List<String>> listNetworkServices() async {
     final res = await _channel.invokeMethod<List<dynamic>>('listNetworkServices');
     return (res ?? const []).map((e) => '$e').toList();

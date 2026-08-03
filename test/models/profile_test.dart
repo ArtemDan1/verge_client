@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:singbox_client/models/profile.dart';
 import 'package:singbox_client/models/node_config.dart';
+import 'package:singbox_client/models/node_engine.dart';
 
 void main() {
   const node = NodeConfig(name: 'n', protocol: NodeProtocol.naive, host: 'h', port: 443, params: {});
@@ -47,5 +48,53 @@ void main() {
     final dt = DateTime.utc(2026, 6, 4);
     const p = Profile(id: 'i', name: 'n', url: 'u', nodes: [], selectedNodeIndex: null);
     expect(p.copyWith(lastRefreshedAt: dt).lastRefreshedAt, equals(dt));
+  });
+
+  test('override переживает замену списка нод при обновлении подписки', () {
+    const node = NodeConfig(
+      name: 'A', protocol: NodeProtocol.hysteria2,
+      host: 'h.example', port: 443, params: {},
+    );
+    final p = Profile(
+      id: 'p', name: 'P', url: 'u', nodes: const [node], selectedNodeIndex: 0,
+    ).withEngineChoice(node, EngineChoice.singbox);
+
+    expect(p.engineChoiceFor(node), EngineChoice.singbox);
+
+    // Подписка обновилась: нода та же по адресу, но объект новый (имя поменялось).
+    const renamed = NodeConfig(
+      name: 'A (new)', protocol: NodeProtocol.hysteria2,
+      host: 'h.example', port: 443, params: {},
+    );
+    final refreshed = p.copyWith(nodes: const [renamed]);
+    expect(refreshed.engineChoiceFor(renamed), EngineChoice.singbox);
+  });
+
+  test('выбор auto удаляет запись, а не хранит её', () {
+    const node = NodeConfig(
+      name: 'A', protocol: NodeProtocol.vless, host: 'h', port: 443, params: {},
+    );
+    final p = Profile(id: 'p', name: 'P', url: 'u', nodes: const [node],
+            selectedNodeIndex: 0)
+        .withEngineChoice(node, EngineChoice.xray)
+        .withEngineChoice(node, EngineChoice.auto);
+    expect(p.engineOverrides, isEmpty);
+    expect(p.engineChoiceFor(node), EngineChoice.auto);
+  });
+
+  test('engineOverrides переживают сериализацию', () {
+    const node = NodeConfig(
+      name: 'A', protocol: NodeProtocol.vless, host: 'h', port: 443, params: {},
+    );
+    final p = Profile(id: 'p', name: 'P', url: 'u', nodes: const [node],
+        selectedNodeIndex: 0).withEngineChoice(node, EngineChoice.xray);
+    expect(Profile.fromJson(p.toJson()).engineChoiceFor(node), EngineChoice.xray);
+  });
+
+  test('старый persisted-state без engineOverrides читается', () {
+    final p = Profile.fromJson({
+      'id': 'p', 'name': 'P', 'url': 'u', 'nodes': [], 'selectedNodeIndex': null,
+    });
+    expect(p.engineOverrides, isEmpty);
   });
 }

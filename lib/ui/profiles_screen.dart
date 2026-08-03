@@ -3,8 +3,11 @@ import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../app/app_controller.dart';
 import '../models/node_config.dart';
+import '../models/node_engine.dart';
 import '../models/profile.dart';
 import '../models/subscription_info.dart';
+import '../services/engine_selector.dart';
+import 'widgets/engine_badge.dart';
 import 'widgets/hero_panel.dart';
 import 'widgets/ping_badge.dart';
 import 'add_profile_dialog.dart';
@@ -230,11 +233,37 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
               onTap: () => c.selectNode(profileId, i),
               onPing: () => c.pingNode(nodes[i]),
               pingBadge: _pingBadge(c, nodes[i]),
+              choice: p.engineChoiceFor(nodes[i]),
+              engine: _engineFor(c, p, nodes[i]),
+              fellBack: _fellBack(c, p, nodes[i]),
+              onEngineChoice: (choice) =>
+                  c.setNodeEngineChoice(profileId, nodes[i], choice),
             ),
           ),
       ],
     );
   }
+
+  /// Активная ли это нода на живом подключении. Только у неё бейдж показывает
+  /// ФАКТ (движок, на котором реально работаем), у остальных — план.
+  bool _isLiveNode(AppController c, Profile p, NodeConfig node) {
+    final active = c.selectedNode;
+    return active != null &&
+        p.id == c.activeProfileId &&
+        nodeEngineKey(active) == nodeEngineKey(node) &&
+        c.activeEngine != null;
+  }
+
+  NodeEngine _engineFor(AppController c, Profile p, NodeConfig node) =>
+      _isLiveNode(c, p, node)
+          ? c.activeEngine!
+          : resolveEngine(node, p.engineChoiceFor(node));
+
+  /// Планировали Xray, а работаем на sing-box — сработал автофолбэк.
+  bool _fellBack(AppController c, Profile p, NodeConfig node) =>
+      _isLiveNode(c, p, node) &&
+      resolveEngine(node, p.engineChoiceFor(node)) == NodeEngine.xray &&
+      c.activeEngine == NodeEngine.singbox;
 }
 
 /// Строка ноды: тёмный кружок-галочка у активной, имя жирным, под ним
@@ -246,6 +275,10 @@ class _NodeRow extends StatelessWidget {
     required this.onTap,
     required this.onPing,
     required this.pingBadge,
+    required this.choice,
+    required this.engine,
+    required this.fellBack,
+    required this.onEngineChoice,
   });
 
   final NodeConfig node;
@@ -253,6 +286,14 @@ class _NodeRow extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onPing;
   final Widget pingBadge;
+
+  /// Что выбрал пользователь; auto — движок определяет автоматика.
+  final EngineChoice choice;
+
+  /// Что показываем в бейдже: план для неактивных нод, факт для активной.
+  final NodeEngine engine;
+  final bool fellBack;
+  final ValueChanged<EngineChoice> onEngineChoice;
 
   @override
   Widget build(BuildContext context) {
@@ -298,16 +339,105 @@ class _NodeRow extends StatelessWidget {
               ),
             ),
             pingBadge,
-            const SizedBox(width: 4),
-            ShadButton.ghost(
-              width: 32,
-              height: 32,
-              padding: EdgeInsets.zero,
-              onPressed: onPing,
-              child: const Icon(LucideIcons.radar, size: 16),
+            const SizedBox(width: 6),
+            EngineBadge(
+              engine: engine,
+              manual: choice != EngineChoice.auto,
+              fellBack: fellBack,
+            ),
+            const SizedBox(width: 2),
+            _NodeMenu(
+              choice: choice,
+              autoEngine:
+                  preferXray(node) ? NodeEngine.xray : NodeEngine.singbox,
+              onEngineChoice: onEngineChoice,
+              onPing: onPing,
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Меню ноды: выбор движка и пинг. Точка роста для будущих настроек ноды.
+class _NodeMenu extends StatefulWidget {
+  const _NodeMenu({
+    required this.choice,
+    required this.autoEngine,
+    required this.onEngineChoice,
+    required this.onPing,
+  });
+
+  final EngineChoice choice;
+
+  /// Что выбрала бы автоматика — показываем в подписи пункта «Авто».
+  final NodeEngine autoEngine;
+  final ValueChanged<EngineChoice> onEngineChoice;
+  final VoidCallback onPing;
+
+  @override
+  State<_NodeMenu> createState() => _NodeMenuState();
+}
+
+class _NodeMenuState extends State<_NodeMenu> {
+  final _menu = ShadPopoverController();
+
+  @override
+  void dispose() {
+    _menu.dispose();
+    super.dispose();
+  }
+
+  String get _autoLabel =>
+      'Авто (${widget.autoEngine == NodeEngine.xray ? 'Xray' : 'sing-box'})';
+
+  @override
+  Widget build(BuildContext context) {
+    void act(VoidCallback f) {
+      _menu.hide();
+      f();
+    }
+
+    ShadContextMenuItem engineItem(String label, EngineChoice value) =>
+        ShadContextMenuItem(
+          leading: Icon(
+            LucideIcons.check,
+            size: 16,
+            // Галочку держим всегда, но у невыбранных прячем прозрачностью:
+            // так пункты меню не «прыгают» по горизонтали.
+            color: widget.choice == value ? null : const Color(0x00000000),
+          ),
+          onPressed: () => act(() => widget.onEngineChoice(value)),
+          child: Text(label),
+        );
+
+    return ShadContextMenu(
+      controller: _menu,
+      anchor: const ShadAnchor(
+        childAlignment: Alignment.bottomRight,
+        overlayAlignment: Alignment.topRight,
+      ),
+      items: [
+        engineItem(_autoLabel, EngineChoice.auto),
+        engineItem('Xray', EngineChoice.xray),
+        engineItem('sing-box', EngineChoice.singbox),
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 4),
+          child: ShadSeparator.horizontal(margin: EdgeInsets.zero),
+        ),
+        ShadContextMenuItem(
+          leading: const Icon(LucideIcons.radar, size: 16),
+          onPressed: () => act(widget.onPing),
+          child: const Text('Пинг'),
+        ),
+      ],
+      child: ShadButton.ghost(
+        width: 32,
+        height: 32,
+        padding: EdgeInsets.zero,
+        onPressed: _menu.toggle,
+        child: const Icon(LucideIcons.ellipsis, size: 18),
       ),
     );
   }

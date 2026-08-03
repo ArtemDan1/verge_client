@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
 import '../models/node_config.dart';
+import '../models/node_engine.dart';
 import '../models/profile.dart';
 import '../models/app_settings.dart';
 import '../models/persisted_state.dart';
@@ -10,6 +12,9 @@ import '../models/routing_profile.dart';
 import '../models/log_entry.dart';
 import '../services/subscription_service.dart';
 import '../services/config_builder.dart';
+import '../services/engine_selector.dart';
+import '../services/xray_config_builder.dart';
+import '../tunnel/xray_process.dart';
 import '../services/geo_updater.dart';
 import '../services/routing_presets.dart';
 import '../storage/state_repository.dart';
@@ -38,6 +43,27 @@ class AppController extends ChangeNotifier {
   /// Клиент Clash API живёт на уровне контроллера, а не экрана: badge в
   /// сайдбаре и счётчики трафика обновляются при любом открытом экране.
   final ClashApiClient _clashApi;
+
+  /// Фабрика дочернего процесса Xray. Процесс создаётся лениво, при первой
+  /// ноде, которой нужен второй движок: конструктор XrayProcess подписывается
+  /// на платформенный канал, и в чисто sing-box-сценариях это лишнее.
+  final XrayProcess Function() _xrayFactory;
+  XrayProcess? _xrayInstance;
+  StreamSubscription<String>? _xrayLogSub;
+
+  XrayProcess get _xray {
+    final existing = _xrayInstance;
+    if (existing != null) return existing;
+    final created = _xrayFactory();
+    _xrayInstance = created;
+    _xrayLogSub = created.logs.listen(_appendLog);
+    return created;
+  }
+
+  /// Выбор свободного порта и проба socks — параметры, чтобы тесты могли
+  /// подменить работу с реальными сокетами.
+  final Future<int> Function() _pickPort;
+  final Future<bool> Function(int port) _probeSocks;
 
   /// Доступное обновление (после успешной проверки) или null.
   UpdateInfo? availableUpdate;
@@ -110,7 +136,13 @@ class AppController extends ChangeNotifier {
     HelperService? helper,
     UpdateService? updateService,
     ClashApiClient? clashApi,
-  })  : _ping = pingService ?? PingService(),
+    XrayProcess Function()? xrayFactory,
+    Future<int> Function()? pickPort,
+    Future<bool> Function(int port)? probeSocks,
+  })  : _xrayFactory = xrayFactory ?? XrayProcess.new,
+        _pickPort = pickPort ?? pickFreePort,
+        _probeSocks = probeSocks ?? _defaultProbeSocks,
+        _ping = pingService ?? PingService(),
         _helper = helper ?? HelperService(),
         _update = updateService ?? UpdateService(),
         _clashApi = clashApi ?? ClashApiClient(),
@@ -148,6 +180,10 @@ class AppController extends ChangeNotifier {
       updateGeoAssets().ignore();
     }
   }
+
+  /// Обёртка над top-level probeSocks: одноимённый параметр конструктора его
+  /// затеняет, поэтому ссылаемся через неё.
+  static Future<bool> _defaultProbeSocks(int port) => probeSocks(port);
 
   static Future<String?> _dnsLookup(String host) async {
     try {
@@ -382,6 +418,29 @@ class AppController extends ChangeNotifier {
     }
   }
 
+  /// Смена движка ноды. Если это активная нода на живом туннеле — переподключаем,
+  /// иначе выбор вступит в силу при следующем подключении.
+  Future<void> setNodeEngineChoice(
+      String profileId, NodeConfig node, EngineChoice choice) async {
+    final idx = _state.profiles.indexWhere((p) => p.id == profileId);
+    if (idx < 0) return;
+    final updated = _state.profiles[idx].withEngineChoice(node, choice);
+    final list = [..._state.profiles]..[idx] = updated;
+    _state = _state.copyWith(profiles: list);
+    await _persist();
+
+    final active = selectedNode;
+    final isActive = active != null &&
+        _state.activeProfileId == profileId &&
+        nodeEngineKey(active) == nodeEngineKey(node) &&
+        (_status == TunnelStatus.connected ||
+            _status == TunnelStatus.connecting);
+    if (isActive) {
+      await disconnect();
+      await connect();
+    }
+  }
+
   Future<void> selectRoutingProfile(String id) async {
     if (!_state.routingProfiles.any((p) => p.id == id)) return;
     _state = _state.copyWith(activeRoutingProfileId: id);
@@ -575,11 +634,40 @@ class AppController extends ChangeNotifier {
     await pingNodes(all);
   }
 
+  /// Фактический движок текущего подключения. null — не подключены.
+  NodeEngine? get activeEngine => _activeEngine;
+  NodeEngine? _activeEngine;
+
   Future<void> connect() async {
     final node = selectedNode;
     if (node == null) return;
     _status = TunnelStatus.connecting;
     notifyListeners();
+
+    final choice = activeProfile?.engineChoiceFor(node) ?? EngineChoice.auto;
+    var engine = resolveEngine(node, choice);
+    int? socksPort;
+
+    if (engine == NodeEngine.xray) {
+      socksPort = await _startXray(node);
+      if (socksPort == null) {
+        if (choice == EngineChoice.auto) {
+          // Автовыбор ошибся — молча откатываемся, нода важнее движка.
+          _appendLog('Xray не запустился, откат на sing-box');
+          engine = NodeEngine.singbox;
+        } else {
+          // Движок зафиксирован руками — уважаем выбор и показываем ошибку.
+          _appendLog('Xray не запустился, движок выбран вручную — отката нет');
+          _error = 'Xray не запустился';
+          _status = TunnelStatus.error;
+          _alertCtrl.add('VPN не подключён: Xray не запустился');
+          notifyListeners();
+          return;
+        }
+      }
+    }
+    _activeEngine = engine;
+
     final port = _state.settings.localPort;
     final api = await ClashApiCredentials.generate();
     final builder = ConfigBuilder(
@@ -594,19 +682,67 @@ class AppController extends ChangeNotifier {
       // Сервис нужен, чтобы на старте TUN переопределить системный DNS (иначе
       // запросы к LAN-роутеру минуют туннель и hijack-dns не срабатывает).
       final service = await _resolveService();
-      final config = builder.build(node, mode: TunnelMode.tun, serverIp: ip, routing: routing);
+      final config = builder.build(node,
+          mode: TunnelMode.tun,
+          serverIp: ip,
+          routing: routing,
+          xraySocksPort: socksPort);
       await _tunTunnel.start(config, port: port, service: service);
     } else {
       final service = await _resolveService();
-      final config = builder.build(node, routing: routing);
+      final config =
+          builder.build(node, routing: routing, xraySocksPort: socksPort);
       await _proxyTunnel.start(config, port: port, service: service);
     }
     _clashApi.start(api);
+    notifyListeners();
+  }
+
+  /// Поднимает Xray и возвращает порт его socks-inbound, либо null, если не
+  /// удалось. Критерий успеха: процесс жив после startup-grace И порт отвечает.
+  Future<int?> _startXray(NodeConfig node) async {
+    final port = await _pickPort();
+    final config = buildXrayConfig(node, socksPort: port);
+    if (config == null) {
+      _appendLog('для этой ноды Xray-конфиг не собирается');
+      return null;
+    }
+    try {
+      await _xray.start(config);
+    } on PlatformException catch (e) {
+      _appendLog('Xray не стартовал: ${e.message}');
+      return null;
+    } on MissingPluginException {
+      // Канал не зарегистрирован (не macOS или тестовая среда).
+      _appendLog('Xray недоступен на этой платформе');
+      return null;
+    }
+    if (!await _probeSocks(port)) {
+      _appendLog('Xray стартовал, но socks-порт $port не отвечает');
+      await _stopXray();
+      return null;
+    }
+    return port;
+  }
+
+  Future<void> _stopXray() async {
+    final xray = _xrayInstance;
+    if (xray == null) return;
+    try {
+      await xray.stop();
+    } on MissingPluginException {
+      // Нечего останавливать: канала нет.
+    }
   }
 
   Future<void> disconnect() async {
     await _clashApi.stop();
+    // Порядок обязателен: сначала sing-box, иначе его последние соединения
+    // повиснут на уже мёртвом Xray.
     await _activeTunnel.stop();
+    await _stopXray();
+    _activeEngine = null;
+    notifyListeners();
   }
 
   Future<String> _resolveService() async {
@@ -632,6 +768,8 @@ class AppController extends ChangeNotifier {
     _tunSub.cancel();
     _proxyLogSub.cancel();
     _tunLogSub.cancel();
+    _xrayLogSub?.cancel();
+    _xrayInstance?.dispose();
     _alertCtrl.close();
     _clashApi.dispose();
     super.dispose();

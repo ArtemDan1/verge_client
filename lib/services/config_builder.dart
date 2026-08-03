@@ -2,6 +2,7 @@ import '../models/app_settings.dart';
 import '../models/node_config.dart';
 import '../models/routing_profile.dart';
 import 'routing_builder.dart';
+import 'singbox_outbound_converter.dart';
 
 class ConfigBuilder {
   final int localPort;
@@ -39,14 +40,28 @@ class ConfigBuilder {
   Map<String, dynamic> build(NodeConfig node,
       {TunnelMode mode = TunnelMode.systemProxy,
       String? serverIp,
-      RoutingProfile? routing}) {
-    final frag = routing == null
+      RoutingProfile? routing,
+      int? xraySocksPort}) {
+    // Без routing-профиля TUN-bypass'ы (серверный IP, приватные сети,
+    // process_name: xray) собирать некому — RoutingBuilder не вызывается вовсе.
+    // В TUN это не косметика, а защита от петли sing-box → Xray → sing-box,
+    // поэтому подставляем пустой профиль вместо того, чтобы пропускать сборку.
+    final effectiveRouting = routing ??
+        (mode == TunnelMode.tun
+            ? const RoutingProfile(
+                id: '_implicit', name: '', isBuiltIn: true,
+                directRules: [], proxyRules: [], blockRules: [],
+                finalAction: RoutingFinal.proxy,
+              )
+            : null);
+    final frag = effectiveRouting == null
         ? const RoutingFragment([], [], 'proxy')
-        : _routing.build(routing,
+        : _routing.build(effectiveRouting,
             serverIp: serverIp,
             tun: mode == TunnelMode.tun,
             geoAssetDir: geoAssetDir);
-    if (mode == TunnelMode.tun) return _buildTun(node, serverIp, frag);
+    final proxyOut = _proxyOutbound(node, xraySocksPort: xraySocksPort);
+    if (mode == TunnelMode.tun) return _buildTun(node, serverIp, frag, proxyOut);
     return _withClashApi(_withRuleSets({
       'log': {'level': 'info', 'timestamp': true},
       'dns': _dns(frag),
@@ -54,7 +69,7 @@ class ConfigBuilder {
         {'type': 'mixed', 'tag': 'mixed-in', 'listen': '127.0.0.1', 'listen_port': localPort}
       ],
       'outbounds': [
-        _outboundFor(node),
+        proxyOut,
         {'type': 'direct', 'tag': 'direct'},
       ],
       'route': {
@@ -99,7 +114,7 @@ class ConfigBuilder {
   static bool _isTcpOnly(NodeProtocol p) => p == NodeProtocol.naive;
 
   Map<String, dynamic> _buildTun(
-      NodeConfig node, String? serverIp, RoutingFragment frag) {
+      NodeConfig node, String? serverIp, RoutingFragment frag, Map<String, dynamic> proxyOut) {
     // naive — это HTTP/2 CONNECT, UDP он не умеет. В системном прокси браузер
     // сам шлёт в HTTP-прокси только TCP, а в TUN перехватываются сырые пакеты,
     // включая QUIC (UDP/443). Без reject QUIC уходит в naive и дропается, сайты
@@ -148,7 +163,7 @@ class ConfigBuilder {
         }
       ],
       'outbounds': [
-        _outboundFor(node),
+        proxyOut,
         {'type': 'direct', 'tag': 'direct'},
       ],
       'route': {
@@ -239,13 +254,38 @@ class ConfigBuilder {
     return cfg;
   }
 
-  /// Outbound либо из готового конфига (rawOutbound), либо собранный из params.
+  /// Outbound на прокси: либо socks5 в локальный Xray, либо из готового
+  /// оригинала (конвертируя, если он в схеме Xray), либо собранный из params.
+  Map<String, dynamic> _proxyOutbound(NodeConfig n, {int? xraySocksPort}) {
+    if (xraySocksPort != null) {
+      // sing-box заворачивает весь трафик в Xray-процесс через loopback socks.
+      // udp_over_tcp выключен: hysteria2 поверх QUIC не должен упаковываться в TCP.
+      return {
+        'type': 'socks',
+        'tag': 'proxy',
+        'server': '127.0.0.1',
+        'server_port': xraySocksPort,
+        'version': '5',
+        'udp_over_tcp': false,
+      };
+    }
+    return _outboundFor(n);
+  }
+
+  /// Outbound: из готового оригинала (конвертируя, если он в схеме Xray) либо
+  /// собранный из params.
   Map<String, dynamic> _outboundFor(NodeConfig n) {
     final raw = n.rawOutbound;
-    final out = raw != null
-        // Берём исходный outbound как есть, нормализуя тег на 'proxy'.
-        ? {...raw, 'tag': 'proxy'}
-        : _outbound(n);
+    final Map<String, dynamic> out;
+    if (raw == null) {
+      out = _outbound(n);
+    } else if (n.rawSchema == RawSchema.xray) {
+      // Оригинал в схеме Xray — конвертируем. Если протокол не поддержан
+      // sing-box'ом, падать нельзя: собираем из params как обычную ноду.
+      out = xrayOutboundToSingbox(raw) ?? _outbound(n);
+    } else {
+      out = {...raw, 'tag': 'proxy'};
+    }
     // Адрес прокси-сервера резолвим напрямую — иначе bootstrap-петля
     // (proxy-dns ходит через ещё не поднятый прокси).
     out['domain_resolver'] = 'direct-dns';

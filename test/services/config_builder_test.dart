@@ -43,6 +43,70 @@ void main() {
     expect(out['tls']['enabled'], true);
   });
 
+  test('нода из Xray-подписки конвертируется при сборке', () {
+    const node = NodeConfig(
+      name: 'A', protocol: NodeProtocol.hysteria2,
+      host: 'h.example', port: 443, params: {},
+      rawSchema: RawSchema.xray,
+      rawOutbound: {
+        'protocol': 'hysteria', 'tag': 'proxy',
+        'settings': {'address': 'h.example', 'port': 443, 'version': 2},
+        'streamSettings': {
+          'network': 'hysteria', 'security': 'tls',
+          'hysteriaSettings': {'version': 2, 'auth': 'AUTH'},
+          'tlsSettings': {'serverName': 'sni.example', 'alpn': ['h3']},
+        },
+      },
+    );
+    final out = const ConfigBuilder(localPort: 2080).build(node)['outbounds'][0];
+    expect(out['type'], 'hysteria2');
+    expect(out['tag'], 'proxy');
+    expect(out['password'], 'AUTH');
+    expect(out['tls']['server_name'], 'sni.example');
+    expect(out['domain_resolver'], 'direct-dns');
+  });
+
+  test('xraySocksPort → proxy становится socks на loopback', () {
+    const node = NodeConfig(
+      name: 'A', protocol: NodeProtocol.hysteria2, host: 'h', port: 443,
+      params: {'password': 'p'},
+    );
+    final out = const ConfigBuilder(localPort: 2080)
+        .build(node, xraySocksPort: 11080)['outbounds'][0];
+    expect(out['type'], 'socks');
+    expect(out['tag'], 'proxy');
+    expect(out['server'], '127.0.0.1');
+    expect(out['server_port'], 11080);
+    expect(out['version'], '5');
+    // udp_over_tcp выключен: иначе UDP hysteria2 обернётся в TCP и потеряет смысл.
+    expect(out['udp_over_tcp'], false);
+    // domain_resolver не нужен: 127.0.0.1 резолвить нечего.
+    expect(out.containsKey('domain_resolver'), isFalse);
+  });
+
+  test('TUN без routing-профиля всё равно даёт bypass xray и серверного IP', () {
+    // Защита от петли sing-box → Xray → sing-box не должна зависеть от того,
+    // выбран ли пользователем routing-профиль.
+    const node = NodeConfig(
+      name: 'A', protocol: NodeProtocol.hysteria2, host: 'h', port: 443,
+      params: {'password': 'p'},
+    );
+    final cfg = builder.build(node,
+        mode: TunnelMode.tun, serverIp: '1.2.3.4', xraySocksPort: 11080);
+    final rules = (cfg['route']['rules'] as List).cast<Map<String, dynamic>>();
+    expect(
+        rules.any((r) =>
+            (r['process_name'] as List?)?.contains('xray') == true &&
+            r['outbound'] == 'direct'),
+        isTrue,
+        reason: 'нет bypass процесса xray');
+    expect(
+        rules.any((r) =>
+            (r['ip_cidr'] as List?)?.contains('1.2.3.4/32') == true),
+        isTrue,
+        reason: 'нет bypass серверного IP');
+  });
+
   test('TUN-режим: tun inbound + bypass сервера + dns', () {
     const node = NodeConfig(
       name: 'A', protocol: NodeProtocol.vless, host: 'example.com', port: 443,
@@ -59,7 +123,7 @@ void main() {
     final inbound = cfg['inbounds'][0];
     expect(inbound['type'], 'tun');
     expect(inbound['auto_route'], true);
-    expect(inbound['strict_route'], true);
+    expect(inbound['strict_route'], false);
     expect(inbound['stack'], 'gvisor');
     // Имя интерфейса не задаём: macOS требует формат utunN, sing-box выберет сам.
     expect(inbound.containsKey('interface_name'), false);
