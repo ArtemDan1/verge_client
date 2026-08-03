@@ -48,6 +48,9 @@ class RoutingBuilder {
 
     // TUN bypass идёт первым.
     if (tun) {
+      // Трафик самого Xray-процесса не должен уходить в прокси: иначе
+      // sing-box → Xray → sing-box → петля. find_process даёт process_name.
+      rules.add({'process_name': ['xray'], 'outbound': 'direct'});
       if (serverIp != null && serverIp.isNotEmpty) {
         rules.add({'ip_cidr': ['$serverIp/32'], 'outbound': 'direct'});
       }

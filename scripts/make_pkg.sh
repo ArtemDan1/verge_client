@@ -17,6 +17,16 @@ WORK="$(mktemp -d)"
 OUT="dist"
 mkdir -p "$OUT"
 
+# Оба движка обязаны быть в бандле: sing-box владеет туннелем, xray поднимается
+# для hysteria2 и vless+xhttp. Проверяем здесь, иначе отсутствие вылезет только
+# при подключении к ноде у пользователя.
+for BIN in sing-box xray; do
+  if [ ! -x "$APP/Contents/Resources/$BIN" ]; then
+    echo "ERROR: в бандле нет исполняемого $BIN — прогони scripts/build_release.sh" >&2
+    exit 1
+  fi
+done
+
 # --- Компонент 1: приложение в /Applications ---
 APP_ROOT="$WORK/app_root/Applications"
 mkdir -p "$APP_ROOT"

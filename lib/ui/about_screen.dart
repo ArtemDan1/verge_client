@@ -36,6 +36,12 @@ class AboutScreen extends StatelessWidget {
                     builder: (context, snap) =>
                         Text('Версия sing-box: ${snap.data ?? '…'}'),
                   ),
+                  const SizedBox(height: 8),
+                  FutureBuilder<String>(
+                    future: c.platform.xrayVersion(),
+                    builder: (context, snap) =>
+                        Text('Версия Xray: ${snap.data ?? '…'}'),
+                  ),
                   const SizedBox(height: 12),
                   _UpdateBlock(controller: c),
                   const SizedBox(height: 12),

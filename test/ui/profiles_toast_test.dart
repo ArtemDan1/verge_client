@@ -25,6 +25,9 @@ class FakePlatformInfo extends PlatformInfo {
   Future<String?> defaultService() async => 'Wi-Fi';
   @override
   Future<String> singboxVersion() async => '1.13.12';
+
+  @override
+  Future<String> xrayVersion() async => '26.3.27';
   @override
   Future<String> appVersion() async => '1.0.0+1';
 }
