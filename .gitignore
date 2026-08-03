@@ -53,3 +53,5 @@ app.*.map.json
 cache.db
 cache-tun.db
 test_output.txt
+
+/docs/superpowers/**

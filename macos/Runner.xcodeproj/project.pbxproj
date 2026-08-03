@@ -34,11 +34,14 @@
 		3A69E35B2FD5D19F00D413D8 /* com.singboxclient.helper in CopyFiles */ = {isa = PBXBuildFile; fileRef = 3A3D52BC2FD0958B00C12FF5 /* com.singboxclient.helper */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		3A69E35E2FD5D20400D413D8 /* com.singboxclient.helper.plist in CopyFiles */ = {isa = PBXBuildFile; fileRef = 3A69E35D2FD5D20400D413D8 /* com.singboxclient.helper.plist */; };
 		7851938C4C934C44565296C7 /* sing-box in Resources */ = {isa = PBXBuildFile; fileRef = AE197E5516EE6B06C2355E62 /* sing-box */; };
+		AE001001000000000000AAB0 /* xray in Resources */ = {isa = PBXBuildFile; fileRef = AE001001000000000000BBB0 /* xray */; };
 		78A318202AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 78A3181F2AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage */; };
 		AE001001000000000000AAA1 /* SystemProxy.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE001001000000000000BBB1 /* SystemProxy.swift */; };
 		AE001001000000000000AAA4 /* SystemDNS.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE001001000000000000BBB4 /* SystemDNS.swift */; };
 		AE001001000000000000AAA2 /* SingboxProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE001001000000000000BBB2 /* SingboxProcess.swift */; };
 		AE001001000000000000AAA3 /* TunnelChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE001001000000000000BBB3 /* TunnelChannel.swift */; };
+		AE001001000000000000AAA5 /* XrayProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE001001000000000000BBB5 /* XrayProcess.swift */; };
+		AE001001000000000000AAA6 /* XrayChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE001001000000000000BBB6 /* XrayChannel.swift */; };
 		05EA0514801788EB8C6DFE23 /* DeepLinkChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D064585083E3D94527903AE0 /* DeepLinkChannel.swift */; };
 /* End PBXBuildFile section */
 
@@ -137,8 +140,11 @@
 		AE001001000000000000BBB4 /* SystemDNS.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemDNS.swift; sourceTree = "<group>"; };
 		AE001001000000000000BBB2 /* SingboxProcess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SingboxProcess.swift; sourceTree = "<group>"; };
 		AE001001000000000000BBB3 /* TunnelChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TunnelChannel.swift; sourceTree = "<group>"; };
+		AE001001000000000000BBB5 /* XrayProcess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XrayProcess.swift; sourceTree = "<group>"; };
+		AE001001000000000000BBB6 /* XrayChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XrayChannel.swift; sourceTree = "<group>"; };
 		D064585083E3D94527903AE0 /* DeepLinkChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeepLinkChannel.swift; sourceTree = "<group>"; };
 		AE197E5516EE6B06C2355E62 /* sing-box */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = "compiled.mach-o.executable"; name = "sing-box"; path = "Resources/sing-box"; sourceTree = "<group>"; };
+		AE001001000000000000BBB0 /* xray */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = "compiled.mach-o.executable"; name = "xray"; path = "Resources/xray"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -248,12 +254,15 @@
 				AE001001000000000000BBB4 /* SystemDNS.swift */,
 				AE001001000000000000BBB2 /* SingboxProcess.swift */,
 				AE001001000000000000BBB3 /* TunnelChannel.swift */,
+				AE001001000000000000BBB5 /* XrayProcess.swift */,
+				AE001001000000000000BBB6 /* XrayChannel.swift */,
 				D064585083E3D94527903AE0 /* DeepLinkChannel.swift */,
 				33E51913231747F40026EE4D /* DebugProfile.entitlements */,
 				33E51914231749380026EE4D /* Release.entitlements */,
 				33CC11242044D66E0003C045 /* Resources */,
 				33BA886A226E78AF003329D5 /* Configs */,
 				AE197E5516EE6B06C2355E62 /* sing-box */,
+				AE001001000000000000BBB0 /* xray */,
 			);
 			path = Runner;
 			sourceTree = "<group>";
@@ -408,6 +417,7 @@
 				33CC10F32044A3C60003C045 /* Assets.xcassets in Resources */,
 				33CC10F62044A3C60003C045 /* MainMenu.xib in Resources */,
 				7851938C4C934C44565296C7 /* sing-box in Resources */,
+				AE001001000000000000AAB0 /* xray in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -427,7 +437,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -e\nBIN=\"$CODESIGNING_FOLDER_PATH/Contents/Resources/sing-box\"\nif [ -n \"$EXPANDED_CODE_SIGN_IDENTITY\" ] && [ \"$EXPANDED_CODE_SIGN_IDENTITY\" != \"-\" ]; then\n  codesign --force --options runtime --timestamp=none --sign \"$EXPANDED_CODE_SIGN_IDENTITY\" \"$BIN\"\nelse\n  codesign --force --sign - \"$BIN\"\nfi\n";
+			shellScript = "set -e\nfor NAME in sing-box xray; do\n  BIN=\"$CODESIGNING_FOLDER_PATH/Contents/Resources/$NAME\"\n  if [ -n \"$EXPANDED_CODE_SIGN_IDENTITY\" ] && [ \"$EXPANDED_CODE_SIGN_IDENTITY\" != \"-\" ]; then\n    codesign --force --options runtime --timestamp=none --sign \"$EXPANDED_CODE_SIGN_IDENTITY\" \"$BIN\"\n  else\n    codesign --force --sign - \"$BIN\"\n  fi\ndone\n";
 		};
 		3399D490228B24CF009A79C7 /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -492,6 +502,8 @@
 				AE001001000000000000AAA4 /* SystemDNS.swift in Sources */,
 				AE001001000000000000AAA2 /* SingboxProcess.swift in Sources */,
 				AE001001000000000000AAA3 /* TunnelChannel.swift in Sources */,
+				AE001001000000000000AAA5 /* XrayProcess.swift in Sources */,
+				AE001001000000000000AAA6 /* XrayChannel.swift in Sources */,
 				05EA0514801788EB8C6DFE23 /* DeepLinkChannel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

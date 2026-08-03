@@ -1,5 +1,6 @@
 #!/bin/bash
-# Собирает release-сборку Flutter macOS и ad-hoc подписывает app, helper и sing-box.
+# Собирает release-сборку Flutter macOS и ad-hoc подписывает app, helper и
+# оба движка (sing-box и xray).
 # Ad-hoc (codesign -s -) не требует аккаунта и даёт стабильную подпись для XPC/launchd.
 set -euo pipefail
 
@@ -11,8 +12,16 @@ HELPER="build/macos/Build/Products/Release/com.singboxclient.helper"
 echo "==> flutter build macos --release"
 flutter build macos --release
 
-echo "==> ad-hoc sign sing-box"
-codesign --force --sign - "$APP/Contents/Resources/sing-box"
+# xray бандлится наравне с sing-box: он запускается для hysteria2 и vless+xhttp.
+for BIN in sing-box xray; do
+  echo "==> ad-hoc sign $BIN"
+  if [ -f "$APP/Contents/Resources/$BIN" ]; then
+    codesign --force --sign - "$APP/Contents/Resources/$BIN"
+  else
+    echo "ERROR: $BIN не попал в бандл ($APP/Contents/Resources/$BIN)" >&2
+    exit 1
+  fi
+done
 
 echo "==> ad-hoc sign helper"
 if [ -f "$HELPER" ]; then

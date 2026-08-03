@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:singbox_client/app/app_controller.dart';
+import 'package:singbox_client/models/node_engine.dart';
+import 'package:singbox_client/tunnel/xray_process.dart';
 import 'package:singbox_client/services/update_service.dart';
 import 'package:singbox_client/models/app_settings.dart';
 import 'package:singbox_client/models/persisted_state.dart';
-import 'package:singbox_client/models/routing_profile.dart';
 import 'package:singbox_client/services/subscription_service.dart';
 import 'package:singbox_client/services/config_builder.dart';
 import 'package:singbox_client/storage/state_repository.dart';
@@ -34,11 +36,43 @@ class FakeTunnel extends TunnelController {
     lastService = service;
     emit(TunnelStatus.connected);
   }
+  /// Хук для проверки порядка остановки sing-box и Xray.
+  void Function()? onStop;
   @override
   Future<void> stop() async {
     stopCallCount++;
+    onStop?.call();
     emit(TunnelStatus.disconnected);
   }
+}
+
+class FakeXray implements XrayProcess {
+  FakeXray({this.failStart = false, this.onStop});
+  final bool failStart;
+  final void Function()? onStop;
+  int startCalls = 0;
+  int stopCalls = 0;
+  final _logs = StreamController<String>.broadcast();
+
+  @override
+  Stream<String> get logs => _logs.stream;
+
+  @override
+  Future<void> start(Map<String, dynamic> config) async {
+    startCalls++;
+    if (failStart) {
+      throw PlatformException(code: 'START', message: 'не поднялся');
+    }
+  }
+
+  @override
+  Future<void> stop() async {
+    stopCalls++;
+    onStop?.call();
+  }
+
+  @override
+  void dispose() => _logs.close();
 }
 
 class FakePlatformInfo extends PlatformInfo {
@@ -66,6 +100,9 @@ class FakePlatformInfo extends PlatformInfo {
 
   @override
   Future<String> singboxVersion() async => '1.13.12';
+
+  @override
+  Future<String> xrayVersion() async => '26.3.27';
 
   @override
   Future<String> appVersion() async => '1.0.0+1';
@@ -869,5 +906,129 @@ void main() {
     expect(client.isRunning, isTrue);
     await app.disconnect();
     expect(client.isRunning, isFalse);
+  });
+
+  group('движки', () {
+    // hysteria2 — зона Xray, naive/vless без xhttp — зона sing-box.
+    const hySub = 'hysteria2://AUTH@h.example:443#HY';
+
+    AppController buildWithXray({
+      required FakeXray xray,
+      bool probeOk = true,
+      String sub = hySub,
+      StateRepository? repo,
+    }) =>
+        AppController(
+          subscription:
+              SubscriptionService(fetcher: (_) async => FetchResult(sub, const {})),
+          builder: const ConfigBuilder(),
+          proxyTunnel: proxyTunnel,
+          tunTunnel: tunTunnel,
+          repo: repo ?? InMemoryStateRepository(),
+          platform: FakePlatformInfo(),
+          resolveHost: (_) async => '9.9.9.9',
+          xrayFactory: () => xray,
+          pickPort: () async => 11080,
+          probeSocks: (_) async => probeOk,
+        );
+
+    test('hysteria2 идёт через Xray: socks-outbound на его порт', () async {
+      final xray = FakeXray();
+      final app = buildWithXray(xray: xray);
+      await app.init();
+      await app.addProfile('Sub', 'https://x');
+      await app.selectNode(app.profiles.first.id, 0);
+      await app.connect();
+
+      expect(app.activeEngine, NodeEngine.xray);
+      expect(xray.startCalls, 1);
+      final out = proxyTunnel.lastConfig!['outbounds'][0];
+      expect(out['type'], 'socks');
+      expect(out['server_port'], 11080);
+    });
+
+    test('auto: неудачный старт Xray откатывается на sing-box', () async {
+      final xray = FakeXray(failStart: true);
+      final app = buildWithXray(xray: xray);
+      await app.init();
+      await app.addProfile('Sub', 'https://x');
+      await app.selectNode(app.profiles.first.id, 0);
+      await app.connect();
+
+      expect(app.activeEngine, NodeEngine.singbox);
+      expect(app.status, TunnelStatus.connected);
+      expect(proxyTunnel.lastConfig!['outbounds'][0]['type'], 'hysteria2');
+    });
+
+    test('auto: мёртвый socks-порт тоже откатывается', () async {
+      final xray = FakeXray();
+      final app = buildWithXray(xray: xray, probeOk: false);
+      await app.init();
+      await app.addProfile('Sub', 'https://x');
+      await app.selectNode(app.profiles.first.id, 0);
+      await app.connect();
+
+      expect(app.activeEngine, NodeEngine.singbox);
+      // Не оставляем висеть процесс, который не отвечает.
+      expect(xray.stopCalls, greaterThan(0));
+    });
+
+    test('ручной выбор Xray: неудача — это ошибка, а не откат', () async {
+      final xray = FakeXray(failStart: true);
+      final app = buildWithXray(xray: xray);
+      await app.init();
+      await app.addProfile('Sub', 'https://x');
+      final profileId = app.profiles.first.id;
+      await app.selectNode(profileId, 0);
+      await app.setNodeEngineChoice(
+          profileId, app.selectedNode!, EngineChoice.xray);
+      await app.connect();
+
+      expect(app.status, TunnelStatus.error);
+      expect(proxyTunnel.startCallCount, 0);
+    });
+
+    test('ручной sing-box поверх hysteria2: Xray не запускается вовсе', () async {
+      final xray = FakeXray();
+      final app = buildWithXray(xray: xray);
+      await app.init();
+      await app.addProfile('Sub', 'https://x');
+      final profileId = app.profiles.first.id;
+      await app.selectNode(profileId, 0);
+      await app.setNodeEngineChoice(
+          profileId, app.selectedNode!, EngineChoice.singbox);
+      await app.connect();
+
+      expect(app.activeEngine, NodeEngine.singbox);
+      expect(xray.startCalls, 0);
+      expect(proxyTunnel.lastConfig!['outbounds'][0]['type'], 'hysteria2');
+    });
+
+    test('disconnect гасит sing-box раньше Xray', () async {
+      final order = <String>[];
+      final xray = FakeXray(onStop: () => order.add('xray'));
+      proxyTunnel.onStop = () => order.add('singbox');
+      final app = buildWithXray(xray: xray);
+      await app.init();
+      await app.addProfile('Sub', 'https://x');
+      await app.selectNode(app.profiles.first.id, 0);
+      await app.connect();
+      await app.disconnect();
+
+      expect(order, ['singbox', 'xray']);
+      expect(app.activeEngine, isNull);
+    });
+
+    test('vless без xhttp остаётся на sing-box', () async {
+      final xray = FakeXray();
+      final app = buildWithXray(xray: xray, sub: fakeSub);
+      await app.init();
+      await app.addProfile('Sub', 'https://x');
+      await app.selectNode(app.profiles.first.id, 0);
+      await app.connect();
+
+      expect(app.activeEngine, NodeEngine.singbox);
+      expect(xray.startCalls, 0);
+    });
   });
 }

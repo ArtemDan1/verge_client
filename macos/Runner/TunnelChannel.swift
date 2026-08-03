@@ -43,6 +43,8 @@ final class TunnelChannel: NSObject, FlutterStreamHandler {
         result(nil)
       case "singboxVersion":
         result(self.singboxVersion())
+      case "xrayVersion":
+        result(self.xrayVersion())
       case "listNetworkServices":
         result(self.listNetworkServices())
       case "defaultService":
@@ -137,6 +139,27 @@ final class TunnelChannel: NSObject, FlutterStreamHandler {
     let first = out.split(separator: "\n").first.map(String.init) ?? out
     return first.replacingOccurrences(of: "sing-box version ", with: "")
         .trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  /// Версия бандленного Xray. Вывод вида
+  /// "Xray 26.3.27 (Xray, Penetrates Everything.) d2758a0 (go1.26.1 darwin/arm64)" —
+  /// берём второе слово первой строки.
+  private func xrayVersion() -> String {
+    guard let bin = Bundle.main.url(forResource: "xray", withExtension: nil)
+    else { return "unknown" }
+    let p = Process()
+    p.executableURL = bin
+    p.arguments = ["version"]
+    let pipe = Pipe()
+    p.standardOutput = pipe
+    do { try p.run() } catch { return "unknown" }
+    // Читаем ДО waitUntilExit: на заполненном пайпе процесс иначе блокируется.
+    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+    p.waitUntilExit()
+    let out = String(data: data, encoding: .utf8) ?? ""
+    guard let first = out.split(separator: "\n").first else { return "unknown" }
+    let parts = first.split(separator: " ")
+    return parts.count >= 2 ? String(parts[1]) : "unknown"
   }
 
   private func runNetworksetup(_ args: [String]) -> String {
