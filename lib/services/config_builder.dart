@@ -286,11 +286,22 @@ class ConfigBuilder {
       // sing-box outbound TLS fragment (с 1.12.0): режет хендшейк, чтобы
       // обойти файрволы с плоским matching по байтам ClientHello. Xray этот
       // параметр не читает — фрагментация работает только под sing-box.
+      // Явно выставляем/снимаем ключи по текущим network-настройкам, а не
+      // только добавляем: `raw` (rawOutbound ноды) может уже нести старое
+      // значение fragment/record_fragment из подписки или JSON-редактора,
+      // и без else-ветки оно переживает выключение настройки.
       if (network.tlsFragmentEnabled) {
         tls['fragment'] = true;
         tls['fragment_fallback_delay'] = network.tlsFragmentFallbackDelay;
+      } else {
+        tls.remove('fragment');
+        tls.remove('fragment_fallback_delay');
       }
-      if (network.tlsRecordFragment) tls['record_fragment'] = true;
+      if (network.tlsRecordFragment) {
+        tls['record_fragment'] = true;
+      } else {
+        tls.remove('record_fragment');
+      }
     }
     return out;
   }
