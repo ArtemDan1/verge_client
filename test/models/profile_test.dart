@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:singbox_client/models/profile.dart';
 import 'package:singbox_client/models/node_config.dart';
 import 'package:singbox_client/models/node_engine.dart';
+import 'package:singbox_client/models/subscription_meta.dart';
 
 void main() {
   const node = NodeConfig(name: 'n', protocol: NodeProtocol.naive, host: 'h', port: 443, params: {});
@@ -96,5 +97,32 @@ void main() {
       'id': 'p', 'name': 'P', 'url': 'u', 'nodes': [], 'selectedNodeIndex': null,
     });
     expect(p.engineOverrides, isEmpty);
+  });
+
+  test('nameIsCustom по умолчанию false и переживает JSON', () {
+    final p = Profile(
+      id: '1', name: 'X', url: 'u', nodes: const [], selectedNodeIndex: null,
+    );
+    expect(p.nameIsCustom, false);
+    expect(Profile.fromJson(p.copyWith(nameIsCustom: true).toJson()).nameIsCustom,
+        true);
+  });
+
+  test('старый state без nameIsCustom читается как ручное имя', () {
+    final json = {
+      'id': '1', 'name': 'X', 'url': 'u', 'nodes': <dynamic>[],
+      'selectedNodeIndex': null,
+    };
+    expect(Profile.fromJson(json).nameIsCustom, true);
+  });
+
+  test('subscriptionMeta переживает JSON', () {
+    final p = Profile(
+      id: '1', name: 'X', url: 'u', nodes: const [], selectedNodeIndex: null,
+      subscriptionMeta: const SubscriptionMeta(title: 'T', announce: 'A'),
+    );
+    final round = Profile.fromJson(p.toJson());
+    expect(round.subscriptionMeta?.title, 'T');
+    expect(round.subscriptionMeta?.announce, 'A');
   });
 }

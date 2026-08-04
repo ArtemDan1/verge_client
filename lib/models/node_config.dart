@@ -34,20 +34,67 @@ class NodeConfig {
     this.rawSchema = RawSchema.singbox,
   });
 
-  /// Транспорт ноды в терминах Xray: 'xhttp', 'ws', 'grpc', 'hysteria'.
-  /// null — транспорта нет (голый TCP). Используется автовыбором движка.
+  /// Транспорт ноды в терминах Xray: 'xhttp', 'ws', 'grpc'. null — транспорта
+  /// нет: это либо голый TCP ('tcp'/'raw' — не транспорт, а его отсутствие),
+  /// либо поле не задано. Используется автовыбором движка и подписью в UI.
   String? get transport {
     final raw = rawOutbound;
+    final String? value;
     if (raw != null) {
       if (rawSchema == RawSchema.xray) {
         final stream = (raw['streamSettings'] as Map?)?.cast<String, dynamic>();
-        return stream?['network'] as String?;
+        value = stream?['network'] as String?;
+      } else {
+        final t = (raw['transport'] as Map?)?.cast<String, dynamic>();
+        value = t?['type'] as String?;
       }
-      final t = (raw['transport'] as Map?)?.cast<String, dynamic>();
-      return t?['type'] as String?;
+    } else {
+      value = params['type'];
     }
-    final type = params['type'];
-    return (type == null || type.isEmpty) ? null : type;
+    return _meaningful(value, const {'tcp', 'raw'});
+  }
+
+  /// Реальное имя протокола для показа пользователю. Enum [protocol] для этого
+  /// не годится: парсеры мапят в него всё неизвестное как vless, потому что
+  /// такие ноды всё равно собираются напрямую из [rawOutbound].
+  String get displayProtocol {
+    final raw = rawOutbound;
+    final name = raw == null
+        ? null
+        : (rawSchema == RawSchema.xray
+            ? raw['protocol'] as String?
+            : raw['type'] as String?);
+    final value =
+        (name == null || name.isEmpty) ? protocol.name : name.toLowerCase();
+    return switch (value) {
+      'hysteria' => 'hysteria2',
+      'shadowsocks' => 'ss',
+      _ => value,
+    };
+  }
+
+  /// Слой шифрования поверх транспорта: 'reality' или 'tls'. null — ничего,
+  /// в том числе явное security=none.
+  String? get security {
+    final raw = rawOutbound;
+    if (raw == null) return _meaningful(params['security'], const {});
+    if (rawSchema == RawSchema.xray) {
+      final stream = (raw['streamSettings'] as Map?)?.cast<String, dynamic>();
+      return _meaningful(stream?['security'] as String?, const {});
+    }
+    final tls = (raw['tls'] as Map?)?.cast<String, dynamic>();
+    if (tls == null || tls['enabled'] != true) return null;
+    final reality = (tls['reality'] as Map?)?.cast<String, dynamic>();
+    return reality?['enabled'] == true ? 'reality' : 'tls';
+  }
+
+  /// Пустое значение, 'none' и перечисленные [empties] считаем отсутствием.
+  static String? _meaningful(String? value, Set<String> empties) {
+    final v = value?.trim().toLowerCase();
+    if (v == null || v.isEmpty || v == 'none' || empties.contains(v)) {
+      return null;
+    }
+    return v;
   }
 
   Map<String, dynamic> toJson() => {

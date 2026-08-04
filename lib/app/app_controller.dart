@@ -341,13 +341,17 @@ class AppController extends ChangeNotifier {
   Future<void> addProfile(String name, String url) async {
     final res = await _subscription.loadWithInfo(url);
     final nodes = res.nodes;
+    // Имя из подписки важнее выведенного из ссылки, но пользователь его
+    // ещё не выбирал — значит имя автоматическое (nameIsCustom = false).
+    final title = res.meta?.title;
     final profile = Profile(
       id: _uuid.v4(),
-      name: name,
+      name: (title == null || title.isEmpty) ? name : title,
       url: url,
       nodes: nodes,
       selectedNodeIndex: nodes.isEmpty ? null : 0,
       subscriptionInfo: res.info,
+      subscriptionMeta: res.meta,
     );
     _state = _state.copyWith(
       profiles: [..._state.profiles, profile],
@@ -367,11 +371,17 @@ class AppController extends ChangeNotifier {
           (old.selectedNodeIndex != null && old.selectedNodeIndex! < nodes.length)
               ? old.selectedNodeIndex
               : (nodes.isEmpty ? null : 0);
+      final title = res.meta?.title;
       final updated = old.copyWith(
         nodes: nodes,
         selectedNodeIndex: keepIndex,
         lastRefreshedAt: DateTime.now(),
         subscriptionInfo: res.info ?? old.subscriptionInfo,
+        subscriptionMeta: res.meta ?? old.subscriptionMeta,
+        // Ручное имя провайдер не перебивает.
+        name: (!old.nameIsCustom && title != null && title.isNotEmpty)
+            ? title
+            : null,
       );
       final list = [..._state.profiles]..[idx] = updated;
       _state = _state.copyWith(profiles: list);
@@ -415,6 +425,22 @@ class AppController extends ChangeNotifier {
     await _persist();
   }
 
+  /// Ручное переименование: с этого момента profile-title из подписки имя
+  /// больше не перетирает.
+  Future<void> renameProfile(String id, String name) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return;
+    final idx = _state.profiles.indexWhere((p) => p.id == id);
+    if (idx < 0) return;
+    final list = [..._state.profiles]
+      ..[idx] = _state.profiles[idx].copyWith(
+        name: trimmed,
+        nameIsCustom: true,
+      );
+    _state = _state.copyWith(profiles: list);
+    await _persist();
+  }
+
   Future<void> selectNode(String profileId, int index) async {
     final idx = _state.profiles.indexWhere((p) => p.id == profileId);
     if (idx < 0) return;
@@ -427,6 +453,20 @@ class AppController extends ChangeNotifier {
       await disconnect();
       await connect();
     }
+  }
+
+  /// Заменяет ноду в профиле отредактированной. Правки живут до следующего
+  /// обновления подписки — она перезаписывает список нод целиком.
+  Future<void> updateNode(
+      String profileId, int index, NodeConfig node) async {
+    final pi = _state.profiles.indexWhere((p) => p.id == profileId);
+    if (pi < 0) return;
+    final profile = _state.profiles[pi];
+    if (index < 0 || index >= profile.nodes.length) return;
+    final nodes = [...profile.nodes]..[index] = node;
+    final list = [..._state.profiles]..[pi] = profile.copyWith(nodes: nodes);
+    _state = _state.copyWith(profiles: list);
+    await _persist();
   }
 
   /// Смена движка ноды. Если это активная нода на живом туннеле — переподключаем,

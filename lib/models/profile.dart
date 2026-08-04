@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'node_config.dart';
 import 'node_engine.dart';
 import 'subscription_info.dart';
+import 'subscription_meta.dart';
 
 /// Ключ ноды для привязки настроек, переживающих обновление подписки.
 /// Имя ноды в ключ НЕ входит: провайдеры регулярно переименовывают ноды
@@ -18,6 +19,11 @@ class Profile {
   final int? selectedNodeIndex;
   final DateTime? lastRefreshedAt;
   final SubscriptionInfo? subscriptionInfo;
+  final SubscriptionMeta? subscriptionMeta;
+
+  /// Пользователь переименовал профиль вручную — profile-title из подписки
+  /// больше не перетирает имя при обновлении.
+  final bool nameIsCustom;
 
   /// Ручной выбор движка по ключу ноды. Переживает обновление подписки,
   /// потому что ключ построен по адресу, а не по имени.
@@ -31,6 +37,8 @@ class Profile {
     required this.selectedNodeIndex,
     this.lastRefreshedAt,
     this.subscriptionInfo,
+    this.subscriptionMeta,
+    this.nameIsCustom = false,
     this.engineOverrides = const {},
   });
 
@@ -63,6 +71,8 @@ class Profile {
     bool clearSelection = false,
     DateTime? lastRefreshedAt,
     SubscriptionInfo? subscriptionInfo,
+    SubscriptionMeta? subscriptionMeta,
+    bool? nameIsCustom,
     Map<String, EngineChoice>? engineOverrides,
   }) =>
       Profile(
@@ -74,6 +84,8 @@ class Profile {
             clearSelection ? null : (selectedNodeIndex ?? this.selectedNodeIndex),
         lastRefreshedAt: lastRefreshedAt ?? this.lastRefreshedAt,
         subscriptionInfo: subscriptionInfo ?? this.subscriptionInfo,
+        subscriptionMeta: subscriptionMeta ?? this.subscriptionMeta,
+        nameIsCustom: nameIsCustom ?? this.nameIsCustom,
         engineOverrides: engineOverrides ?? this.engineOverrides,
       );
 
@@ -85,6 +97,8 @@ class Profile {
         'selectedNodeIndex': selectedNodeIndex,
         'lastRefreshedAt': lastRefreshedAt?.toUtc().toIso8601String(),
         'subscriptionInfo': subscriptionInfo?.toJson(),
+        'subscriptionMeta': subscriptionMeta?.toJson(),
+        'nameIsCustom': nameIsCustom,
         'engineOverrides':
             engineOverrides.map((k, v) => MapEntry(k, v.name)),
       };
@@ -104,6 +118,13 @@ class Profile {
             ? null
             : SubscriptionInfo.fromJson(
                 (json['subscriptionInfo'] as Map).cast<String, dynamic>()),
+        subscriptionMeta: json['subscriptionMeta'] == null
+            ? null
+            : SubscriptionMeta.fromJson(
+                (json['subscriptionMeta'] as Map).cast<String, dynamic>()),
+        // Отсутствие ключа = state, записанный до появления поля. Считаем имя
+        // ручным, чтобы не перетереть то, что пользователь уже настроил.
+        nameIsCustom: json['nameIsCustom'] as bool? ?? true,
         engineOverrides: (json['engineOverrides'] as Map?)?.map(
               (k, v) => MapEntry('$k', EngineChoice.values.byName('$v')),
             ) ??
@@ -120,9 +141,11 @@ class Profile {
       other.selectedNodeIndex == selectedNodeIndex &&
       other.lastRefreshedAt == lastRefreshedAt &&
       other.subscriptionInfo == subscriptionInfo &&
+      other.subscriptionMeta == subscriptionMeta &&
+      other.nameIsCustom == nameIsCustom &&
       mapEquals(other.engineOverrides, engineOverrides);
 
   @override
   int get hashCode => Object.hash(id, name, url, selectedNodeIndex, lastRefreshedAt,
-      subscriptionInfo, Object.hashAll(nodes), Object.hashAllUnordered(engineOverrides.entries));
+      subscriptionInfo, subscriptionMeta, nameIsCustom, Object.hashAll(nodes), Object.hashAllUnordered(engineOverrides.entries));
 }

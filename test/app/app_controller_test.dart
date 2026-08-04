@@ -719,6 +719,99 @@ void main() {
     expect(app.pingFor(nodes[1])?.latencyMs, 42);
   });
 
+  test('profile-title становится именем профиля при добавлении', () async {
+    final app = build(
+      sub: SubscriptionService(
+        fetcher: (_) async =>
+            FetchResult(fakeSub, const {'profile-title': 'Мой VPN'}),
+      ),
+    );
+    await app.addProfile('sub.example.com', 'https://example.com/sub');
+    expect(app.profiles.single.name, 'Мой VPN');
+    expect(app.profiles.single.nameIsCustom, false);
+    expect(app.profiles.single.subscriptionMeta?.title, 'Мой VPN');
+  });
+
+  test('без profile-title остаётся имя, выведенное из ссылки', () async {
+    final app = build(
+      sub: SubscriptionService(
+        fetcher: (_) async => FetchResult(fakeSub, const {}),
+      ),
+    );
+    await app.addProfile('sub.example.com', 'https://example.com/sub');
+    expect(app.profiles.single.name, 'sub.example.com');
+  });
+
+  test('refresh обновляет автоматическое имя', () async {
+    var title = 'Старое';
+    final app = build(
+      sub: SubscriptionService(
+        fetcher: (_) async => FetchResult(fakeSub, {'profile-title': title}),
+      ),
+    );
+    await app.addProfile('fallback', 'https://example.com/sub');
+    title = 'Новое';
+    await app.refreshProfile(app.profiles.single.id);
+    expect(app.profiles.single.name, 'Новое');
+  });
+
+  test('refresh не трогает имя, заданное вручную', () async {
+    final app = build(
+      sub: SubscriptionService(
+        fetcher: (_) async =>
+            FetchResult(fakeSub, const {'profile-title': 'От провайдера'}),
+      ),
+    );
+    await app.addProfile('fallback', 'https://example.com/sub');
+    final id = app.profiles.single.id;
+    await app.renameProfile(id, 'Как я хочу');
+    expect(app.profiles.single.nameIsCustom, true);
+    await app.refreshProfile(id);
+    expect(app.profiles.single.name, 'Как я хочу');
+  });
+
+  test('мета обновляется при refresh даже когда имя ручное', () async {
+    var announce = 'A1';
+    final app = build(
+      sub: SubscriptionService(
+        fetcher: (_) async => FetchResult(fakeSub, {'announce': announce}),
+      ),
+    );
+    await app.addProfile('fallback', 'https://example.com/sub');
+    final id = app.profiles.single.id;
+    await app.renameProfile(id, 'Своё');
+    announce = 'A2';
+    await app.refreshProfile(id);
+    expect(app.profiles.single.subscriptionMeta?.announce, 'A2');
+  });
+
+  test('updateNode заменяет ноду и не сбрасывает выбор', () async {
+    final app = build();
+    await app.addProfile('P', 'https://example.com/sub');
+    final p = app.profiles.single;
+    await app.selectNode(p.id, 1);
+
+    final old = p.nodes[0];
+    final edited = NodeConfig(
+      name: 'Переименованная', protocol: old.protocol, host: old.host,
+      port: old.port, params: old.params,
+      rawSchema: old.rawSchema, rawOutbound: old.rawOutbound,
+    );
+    await app.updateNode(p.id, 0, edited);
+
+    expect(app.profiles.single.nodes[0].name, 'Переименованная');
+    expect(app.profiles.single.nodes.length, p.nodes.length);
+    expect(app.profiles.single.selectedNodeIndex, 1);
+  });
+
+  test('updateNode с индексом вне диапазона ничего не делает', () async {
+    final app = build();
+    await app.addProfile('P', 'https://example.com/sub');
+    final p = app.profiles.single;
+    await app.updateNode(p.id, 99, p.nodes[0]);
+    expect(app.profiles.single.nodes.length, p.nodes.length);
+  });
+
   group('auto-reconnect', () {
     test('selectNode во время connected → disconnect + reconnect', () async {
       final app = build();

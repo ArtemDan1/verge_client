@@ -152,4 +152,28 @@ void main() {
     final nodes = await svc.load('https://x');
     expect(nodes, hasLength(2));
   });
+
+  test('мета подписки читается из заголовков ответа', () async {
+    final svc = SubscriptionService(
+      fetcher: (_) async => FetchResult(
+        'vless://uid@h:443#A',
+        const {
+          'subscription-userinfo': 'upload=1; download=2; total=100',
+          'profile-title': 'Мой VPN',
+          'announce': 'Акция',
+        },
+      ),
+    );
+    final res = await svc.loadWithInfo('https://example.com/sub');
+    expect(res.meta?.title, 'Мой VPN');
+    expect(res.meta?.announce, 'Акция');
+    expect(res.info?.total, 100);
+  });
+
+  test('без мета-заголовков meta = null', () async {
+    final svc = SubscriptionService(
+      fetcher: (_) async => FetchResult('vless://uid@h:443#A', const {}),
+    );
+    expect((await svc.loadWithInfo('https://example.com/sub')).meta, isNull);
+  });
 }

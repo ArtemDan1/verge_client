@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/node_config.dart';
 import '../models/subscription_info.dart';
+import '../models/subscription_meta.dart';
 import 'share_link_parser.dart';
 import 'xray_config_parser.dart';
 
@@ -16,7 +17,8 @@ typedef Fetcher = Future<FetchResult> Function(String url);
 class LoadResult {
   final List<NodeConfig> nodes;
   final SubscriptionInfo? info;
-  const LoadResult(this.nodes, this.info);
+  final SubscriptionMeta? meta;
+  const LoadResult(this.nodes, this.info, this.meta);
 }
 
 class SubscriptionException implements Exception {
@@ -84,7 +86,8 @@ class SubscriptionService {
     }
     final info = SubscriptionInfo.parseHeader(
         fetched.headers['subscription-userinfo']);
-    return LoadResult(nodes, info);
+    final meta = SubscriptionMeta.parseHeaders(fetched.headers);
+    return LoadResult(nodes, info, meta);
   }
 
   List<NodeConfig> _parseShareLinks(String text) => const LineSplitter()
