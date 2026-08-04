@@ -1,3 +1,4 @@
+import '../models/network_settings.dart';
 import '../models/node_config.dart';
 import 'xray_outbound_builder.dart';
 
@@ -7,8 +8,9 @@ import 'xray_outbound_builder.dart';
 ///
 /// null — из ноды не собирается Xray-outbound, движок для неё недоступен.
 Map<String, dynamic>? buildXrayConfig(NodeConfig node,
-    {required int socksPort}) {
-  final outbound = buildXrayOutbound(node);
+    {required int socksPort,
+    NetworkSettings network = const NetworkSettings()}) {
+  final outbound = buildXrayOutbound(node, network: network);
   if (outbound == null) return null;
   return {
     'log': {'loglevel': 'warning'},

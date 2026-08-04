@@ -1,4 +1,5 @@
 import '../models/app_settings.dart';
+import '../models/network_settings.dart';
 import '../models/node_config.dart';
 import '../models/routing_profile.dart';
 import 'routing_builder.dart';
@@ -16,24 +17,25 @@ class ConfigBuilder {
   final int? clashApiPort;
   final String? clashApiSecret;
 
+  /// Параметры сборки конфига, настраиваемые пользователем. Дефолт в точности
+  /// повторяет значения, которые раньше были захардкожены здесь же.
+  final NetworkSettings network;
+
   const ConfigBuilder({
     this.localPort = 2080,
     this.geoAssetDir,
     this.clashApiPort,
     this.clashApiSecret,
+    this.network = const NetworkSettings(),
   });
 
   static const _routing = RoutingBuilder();
 
-  /// Адрес bootstrap-DNS, который резолвит RU-домены и адрес прокси-сервера
-  /// напрямую (без прохода через прокси).
-  static const _directDnsServer = '77.88.8.8';
-
   /// Правило, которое уводит соединение к самому direct-dns серверу в direct.
-  /// Без него запрос к [_directDnsServer] идёт по route.final → через ещё не
-  /// поднятый прокси, и получается bootstrap-петля.
-  static Map<String, dynamic> get _directDnsRule => {
-        'ip_cidr': ['$_directDnsServer/32'],
+  /// Без него запрос к [NetworkSettings.directDnsServer] идёт по route.final →
+  /// через ещё не поднятый прокси, и получается bootstrap-петля.
+  Map<String, dynamic> get _directDnsRule => {
+        'ip_cidr': ['${network.directDnsServer}/32'],
         'outbound': 'direct',
       };
 
@@ -90,7 +92,7 @@ class ConfigBuilder {
           {
             'type': 'https',
             'tag': 'proxy-dns',
-            'server': '1.1.1.1',
+            'server': network.proxyDnsServer,
             'detour': 'proxy',
             'domain_resolver': 'direct-dns',
           },
@@ -100,13 +102,13 @@ class ConfigBuilder {
             // серверу обеспечивает route-правило _directDnsRule.
             'type': 'https',
             'tag': 'direct-dns',
-            'server': _directDnsServer,
+            'server': network.directDnsServer,
             'tls': {'server_name': 'common.dot.dns.yandex.net'},
           },
         ],
         if (frag.dnsRules.isNotEmpty) 'rules': frag.dnsRules,
         'final': 'proxy-dns',
-        'strategy': 'ipv4_only',
+        'strategy': network.ipv6Enabled ? 'prefer_ipv4' : 'ipv4_only',
       };
 
   /// Протоколы, которые не переносят UDP (только TCP). Для них в TUN нужно
@@ -140,26 +142,13 @@ class ConfigBuilder {
           // ('utun-singbox') ядро отвергает с "bad tun name". Не задаём —
           // sing-box сам берёт свободный utunN.
           //
-          // Адрес TUN — из диапазона RFC 2544 (198.18.0.0/15, benchmarking),
-          // а НЕ из 172.16.0.0/12. Docker раздаёт bridge-сети именно в
-          // 172.16.0.0/12 (172.17.x — default bridge, 172.18/172.19 — compose),
-          // и адрес шлюза docker-сети = первый IP подсети (172.19.0.1). Прежний
-          // '172.19.0.1/30' в точности совпадал с этим шлюзом и лежал внутри
-          // docker-подсети → при поднятии TUN хост забирал 172.19.0.1/.2/.3 на
-          // utun, ломая маршрутизацию контейнеров (redis-клиент упирался в
-          // 172.19.0.3 = prometheus, Error 111). 198.18.x не используется ни
-          // Docker, ни LAN, ни VPN — коллизий нет.
-          'address': ['198.18.0.1/30', 'fdfe:dcba:9876::1/126'],
-          'auto_route': true,
-          'strict_route': false,
-          // MTU 4064, а НЕ дефолтные 9000. При 9000 server-first протоколы
-          // (SSH, MySQL) вставали: TCP-хендшейк проходил, но как только шёл
-          // крупный пакет (SSH KEX, MySQL handshake), соединение стопорилось —
-          // сервер закрывал, DBeaver ловил link failure. Мелкие запросы (веб)
-          // проскакивали. Рабочий Karing на той же ноде использует mtu 4064 +
-          // strict_route false + gvisor — приводим к тому же.
-          'mtu': 4064,
-          'stack': 'gvisor',
+          // Обоснование значений адреса, MTU и stack — в комментариях к полям
+          // NetworkSettings. Менять их вслепую нельзя.
+          'address': [network.tunAddressV4, network.tunAddressV6],
+          'auto_route': network.tunAutoRoute,
+          'strict_route': network.tunStrictRoute,
+          'mtu': network.tunMtu,
+          'stack': network.tunStack.name,
         }
       ],
       'outbounds': [
@@ -174,7 +163,7 @@ class ConfigBuilder {
         // (Дополнительно приложение переопределяет системный DNS на TUN, иначе
         // запрос к роутеру вообще не входит в туннель и перехватывать нечего.)
         'rules': [
-          {'action': 'hijack-dns', 'port': 53},
+          if (network.dnsHijack) {'action': 'hijack-dns', 'port': 53},
           // Отклоняем весь IPv6: upstream (naive и т.п.) ходят только по IPv4, а
           // браузер по Happy-Eyeballs/HTTPS-подсказкам (ipv6hint) лезет в IPv6
           // даже при ipv4_only DNS — такие соединения зависают в naive, и сайты
@@ -183,7 +172,7 @@ class ConfigBuilder {
           // ipv6-reject стоит ПОСЛЕ sniff, IPv6-соединение держится открытым до
           // ClientHello, браузер по Happy-Eyeballs коммитится на IPv6 и шлёт
           // запрос — и только потом reject → ERR_CONNECTION_CLOSED без отката.
-          {'ip_version': 6, 'action': 'reject'},
+          if (!network.ipv6Enabled) {'ip_version': 6, 'action': 'reject'},
           // QUIC-reject тоже до sniff: рубим UDP/443 мгновенно, не дожидаясь sniff.
           ...quicReject,
           // sniff извлекает домен из TLS/HTTP для доменного роутинга (geosite/
@@ -289,6 +278,20 @@ class ConfigBuilder {
     // Адрес прокси-сервера резолвим напрямую — иначе bootstrap-петля
     // (proxy-dns ходит через ещё не поднятый прокси).
     out['domain_resolver'] = 'direct-dns';
+    if (out['tls'] is Map) {
+      final tls = out['tls'] as Map<String, dynamic>;
+      // Пропуск проверки сертификата — осознанное понижение безопасности,
+      // поэтому пишем ключ только когда он явно включён.
+      if (network.tlsSkipCertVerify) tls['insecure'] = true;
+      // sing-box outbound TLS fragment (с 1.12.0): режет хендшейк, чтобы
+      // обойти файрволы с плоским matching по байтам ClientHello. Xray этот
+      // параметр не читает — фрагментация работает только под sing-box.
+      if (network.tlsFragmentEnabled) {
+        tls['fragment'] = true;
+        tls['fragment_fallback_delay'] = network.tlsFragmentFallbackDelay;
+      }
+      if (network.tlsRecordFragment) tls['record_fragment'] = true;
+    }
     return out;
   }
 

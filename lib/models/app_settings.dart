@@ -11,8 +11,14 @@ class AppSettings {
   final String networkService;
   final bool autostart;
   final TunnelMode tunnelMode;
-  final bool autoRefreshEnabled;
-  final int autoRefreshIntervalMinutes;
+
+  /// Когда последний раз ходили в GitHub Releases. Пишется независимо от
+  /// результата, чтобы неудачные проверки не долбили API при каждом запуске.
+  final DateTime? lastUpdateCheckAt;
+
+  /// Версия, про которую пользователь нажал «Пропустить». Баннер и бейдж по
+  /// ней не показываются; следующая версия покажется снова.
+  final String? skippedVersion;
 
   const AppSettings({
     this.themeMode = AppThemeMode.system,
@@ -20,8 +26,8 @@ class AppSettings {
     this.networkService = 'auto',
     this.autostart = false,
     this.tunnelMode = TunnelMode.systemProxy,
-    this.autoRefreshEnabled = false,
-    this.autoRefreshIntervalMinutes = 360,
+    this.lastUpdateCheckAt,
+    this.skippedVersion,
   });
 
   AppSettings copyWith({
@@ -30,8 +36,8 @@ class AppSettings {
     String? networkService,
     bool? autostart,
     TunnelMode? tunnelMode,
-    bool? autoRefreshEnabled,
-    int? autoRefreshIntervalMinutes,
+    DateTime? lastUpdateCheckAt,
+    String? skippedVersion,
   }) =>
       AppSettings(
         themeMode: themeMode ?? this.themeMode,
@@ -39,9 +45,8 @@ class AppSettings {
         networkService: networkService ?? this.networkService,
         autostart: autostart ?? this.autostart,
         tunnelMode: tunnelMode ?? this.tunnelMode,
-        autoRefreshEnabled: autoRefreshEnabled ?? this.autoRefreshEnabled,
-        autoRefreshIntervalMinutes:
-            autoRefreshIntervalMinutes ?? this.autoRefreshIntervalMinutes,
+        lastUpdateCheckAt: lastUpdateCheckAt ?? this.lastUpdateCheckAt,
+        skippedVersion: skippedVersion ?? this.skippedVersion,
       );
 
   Map<String, dynamic> toJson() => {
@@ -50,8 +55,8 @@ class AppSettings {
         'networkService': networkService,
         'autostart': autostart,
         'tunnelMode': tunnelMode.name,
-        'autoRefreshEnabled': autoRefreshEnabled,
-        'autoRefreshIntervalMinutes': autoRefreshIntervalMinutes,
+        'lastUpdateCheckAt': lastUpdateCheckAt?.toUtc().toIso8601String(),
+        'skippedVersion': skippedVersion,
       };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -61,9 +66,10 @@ class AppSettings {
         autostart: json['autostart'] as bool,
         tunnelMode: TunnelMode.values
             .byName(json['tunnelMode'] as String? ?? 'systemProxy'),
-        autoRefreshEnabled: json['autoRefreshEnabled'] as bool? ?? false,
-        autoRefreshIntervalMinutes:
-            (json['autoRefreshIntervalMinutes'] as num?)?.toInt() ?? 360,
+        lastUpdateCheckAt: json['lastUpdateCheckAt'] == null
+            ? null
+            : DateTime.parse(json['lastUpdateCheckAt'] as String),
+        skippedVersion: json['skippedVersion'] as String?,
       );
 
   @override
@@ -74,10 +80,10 @@ class AppSettings {
       other.networkService == networkService &&
       other.autostart == autostart &&
       other.tunnelMode == tunnelMode &&
-      other.autoRefreshEnabled == autoRefreshEnabled &&
-      other.autoRefreshIntervalMinutes == autoRefreshIntervalMinutes;
+      other.lastUpdateCheckAt == lastUpdateCheckAt &&
+      other.skippedVersion == skippedVersion;
 
   @override
   int get hashCode => Object.hash(themeMode, localPort, networkService,
-      autostart, tunnelMode, autoRefreshEnabled, autoRefreshIntervalMinutes);
+      autostart, tunnelMode, lastUpdateCheckAt, skippedVersion);
 }

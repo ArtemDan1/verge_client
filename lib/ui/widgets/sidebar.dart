@@ -34,11 +34,13 @@ class Sidebar extends StatelessWidget {
     required this.onSelect,
     required this.connectionCount,
     required this.traffic,
+    required this.hasUpdate,
   });
   final int index;
   final ValueChanged<int> onSelect;
   final int connectionCount;
   final TrafficStats traffic;
+  final bool hasUpdate;
 
   @override
   Widget build(BuildContext context) {
@@ -64,13 +66,14 @@ class Sidebar extends StatelessWidget {
             ),
           const Spacer(),
           TrafficWidget(stats: traffic),
-          _navButton(theme, aboutIndex, aboutItem),
+          _navButton(theme, aboutIndex, aboutItem, dot: hasUpdate),
         ],
       ),
     );
   }
 
-  Widget _navButton(ShadThemeData theme, int i, SidebarItem item, {int? badge}) {
+  Widget _navButton(ShadThemeData theme, int i, SidebarItem item,
+      {int? badge, bool dot = false}) {
     return ShadButton.ghost(
       onPressed: () => onSelect(i),
       backgroundColor: i == index ? theme.colorScheme.accent : null,
@@ -96,6 +99,19 @@ class Sidebar extends StatelessWidget {
           if (badge != null && badge > 0) ...[
             const SizedBox(width: 6),
             ShadBadge(child: Text('$badge')),
+          ],
+          // Точка, а не число: количество обновлений всегда одно, важен факт.
+          if (dot) ...[
+            const SizedBox(width: 6),
+            Container(
+              key: const Key('update-dot'),
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary,
+                shape: BoxShape.circle,
+              ),
+            ),
           ],
         ],
       ),

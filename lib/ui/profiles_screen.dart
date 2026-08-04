@@ -7,10 +7,42 @@ import '../models/node_engine.dart';
 import '../models/profile.dart';
 import '../models/subscription_info.dart';
 import '../services/engine_selector.dart';
+import '../services/link_opener.dart';
+import '../services/node_display.dart';
 import 'widgets/engine_badge.dart';
 import 'widgets/hero_panel.dart';
 import 'widgets/ping_badge.dart';
 import 'add_profile_dialog.dart';
+import 'edit_node_dialog.dart';
+
+/// Диалог переименования профиля. После него имя считается ручным и больше
+/// не перетирается profile-title из подписки.
+void _showRenameDialog(BuildContext context, AppController c, Profile p) {
+  final controller = TextEditingController(text: p.name);
+  showShadDialog(
+    context: context,
+    builder: (ctx) => ShadDialog(
+      title: const Text('Переименовать профиль'),
+      actions: [
+        ShadButton.outline(
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: const Text('Отмена'),
+        ),
+        ShadButton(
+          onPressed: () {
+            c.renameProfile(p.id, controller.text);
+            Navigator.of(ctx).pop();
+          },
+          child: const Text('Сохранить'),
+        ),
+      ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: ShadInput(controller: controller, autofocus: true),
+      ),
+    ),
+  ).then((_) => controller.dispose());
+}
 
 class ProfilesScreen extends StatefulWidget {
   final AppController controller;
@@ -47,6 +79,9 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
   void _onControllerChanged() {
     if (!mounted) return;
     final c = widget.controller;
+    // Любое изменение состояния контроллера может влиять на отображение
+    // профилей (интервал, имя, ноды) — перестраиваемся.
+    setState(() {});
     // Завершение обновления подписок → уведомление.
     if (_wasRefreshing && !c.isRefreshingAll) {
       _wasRefreshing = false;
@@ -154,13 +189,33 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                 : _ScrollFadeShadow(
                     color: theme.colorScheme.background,
                     child: SingleChildScrollView(
-                      child: ShadAccordion<String>.multiple(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           for (final p in c.profiles)
-                            ShadAccordionItem<String>(
-                              value: p.id,
-                              title: _profileHeader(c, theme, p),
-                              child: _profileBody(context, c, theme, p),
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                      color: theme.colorScheme.border),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 2),
+                                child: ShadAccordion<String>.multiple(
+                                  children: [
+                                    ShadAccordionItem<String>(
+                                      value: p.id,
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 10),
+                                      separator: const SizedBox.shrink(),
+                                      title: _profileHeader(c, theme, p),
+                                      child: _profileBody(context, c, theme, p),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                         ],
                       ),
@@ -174,6 +229,7 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
 
   Widget _profileHeader(AppController c, ShadThemeData theme, Profile p) {
     final isActive = p.id == c.activeProfileId;
+    final announce = p.subscriptionMeta?.announce;
     // Мета одной строкой: кол-во нод · трафик · срок (как в макете).
     final meta = <String>['${p.nodes.length} нод'];
     final traffic = _trafficLine(p.subscriptionInfo);
@@ -204,6 +260,13 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                 style: theme.textTheme.muted,
                 overflow: TextOverflow.ellipsis,
               ),
+              if (announce != null && announce.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(announce,
+                    style: theme.textTheme.muted,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis),
+              ],
             ],
           ),
         ),
@@ -238,6 +301,13 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
               fellBack: _fellBack(c, p, nodes[i]),
               onEngineChoice: (choice) =>
                   c.setNodeEngineChoice(profileId, nodes[i], choice),
+              onEdit: () => showEditNodeDialog(
+                context,
+                c,
+                profileId,
+                i,
+                nodes[i],
+              ),
             ),
           ),
       ],
@@ -279,6 +349,7 @@ class _NodeRow extends StatelessWidget {
     required this.engine,
     required this.fellBack,
     required this.onEngineChoice,
+    required this.onEdit,
   });
 
   final NodeConfig node;
@@ -294,6 +365,7 @@ class _NodeRow extends StatelessWidget {
   final NodeEngine engine;
   final bool fellBack;
   final ValueChanged<EngineChoice> onEngineChoice;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -332,8 +404,9 @@ class _NodeRow extends StatelessWidget {
                       style: const TextStyle(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 1),
                   Text(
-                    '${node.protocol.name} · ${node.host}:${node.port}',
+                    nodeSubtitle(node),
                     style: theme.textTheme.muted,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
@@ -352,6 +425,7 @@ class _NodeRow extends StatelessWidget {
                   preferXray(node) ? NodeEngine.xray : NodeEngine.singbox,
               onEngineChoice: onEngineChoice,
               onPing: onPing,
+              onEdit: onEdit,
             ),
           ],
         ),
@@ -367,6 +441,7 @@ class _NodeMenu extends StatefulWidget {
     required this.autoEngine,
     required this.onEngineChoice,
     required this.onPing,
+    required this.onEdit,
   });
 
   final EngineChoice choice;
@@ -375,6 +450,7 @@ class _NodeMenu extends StatefulWidget {
   final NodeEngine autoEngine;
   final ValueChanged<EngineChoice> onEngineChoice;
   final VoidCallback onPing;
+  final VoidCallback onEdit;
 
   @override
   State<_NodeMenu> createState() => _NodeMenuState();
@@ -425,6 +501,11 @@ class _NodeMenuState extends State<_NodeMenu> {
         const Padding(
           padding: EdgeInsets.symmetric(vertical: 4),
           child: ShadSeparator.horizontal(margin: EdgeInsets.zero),
+        ),
+        ShadContextMenuItem(
+          leading: const Icon(LucideIcons.pencil, size: 16),
+          onPressed: () => act(widget.onEdit),
+          child: const Text('Редактировать'),
         ),
         ShadContextMenuItem(
           leading: const Icon(LucideIcons.radar, size: 16),
@@ -503,6 +584,31 @@ class _ProfileMenuState extends State<_ProfileMenu> {
           }),
           child: const Text('Подписка'),
         ),
+        if (p.subscriptionMeta?.webPageUrl != null)
+          ShadContextMenuItem(
+            leading: const Icon(LucideIcons.externalLink, size: 16),
+            onPressed: () =>
+                act(() => openLink(p.subscriptionMeta!.webPageUrl!)),
+            child: const Text('Личный кабинет'),
+          ),
+        if (p.subscriptionMeta?.supportUrl != null)
+          ShadContextMenuItem(
+            leading: const Icon(LucideIcons.lifeBuoy, size: 16),
+            onPressed: () =>
+                act(() => openLink(p.subscriptionMeta!.supportUrl!)),
+            child: const Text('Поддержка'),
+          ),
+        ShadContextMenuItem(
+          leading: const Icon(LucideIcons.timer, size: 16),
+          onPressed: () => act(() => _editRefreshInterval(context, c, p)),
+          trailing: Text(_refreshLabel(p), style: theme.textTheme.muted),
+          child: const Text('Автообновление'),
+        ),
+        ShadContextMenuItem(
+          leading: const Icon(LucideIcons.pencil, size: 16),
+          onPressed: () => act(() => _showRenameDialog(context, c, p)),
+          child: const Text('Переименовать'),
+        ),
         const Padding(
           padding: EdgeInsets.symmetric(vertical: 4),
           child: ShadSeparator.horizontal(margin: EdgeInsets.zero),
@@ -563,4 +669,69 @@ class _ScrollFadeShadow extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Человекочитаемое состояние автообновления профиля. Единица измерения —
+/// часы: провайдеры присылают интервал именно в часах, и минуты здесь дают
+/// ложную точность.
+String _refreshLabel(Profile p) {
+  final own = p.refreshIntervalMinutesOverride;
+  if (own != null && own > 0) return 'Своё: ${_asHours(own)} ч';
+  final hours = p.subscriptionMeta?.updateIntervalHours;
+  if (hours != null && hours > 0) return 'По подписке: $hours ч';
+  return 'Выключено';
+}
+
+/// Хранение в минутах, показ в часах. Округляем вверх, чтобы интервал,
+/// записанный старой версией приложения, не превратился в «0 ч».
+int _asHours(int minutes) => (minutes / 60).ceil().clamp(1, 1 << 30);
+
+/// Диалог выбора интервала в часах. Пустое поле = снять оверрайд.
+Future<void> _editRefreshInterval(
+    BuildContext context, AppController c, Profile p) async {
+  final own = p.refreshIntervalMinutesOverride;
+  final ctrl = TextEditingController(
+    text: (own != null && own > 0) ? '${_asHours(own)}' : '',
+  );
+  final result = await showShadDialog<String?>(
+    context: context,
+    builder: (ctx) => ShadDialog(
+      title: const Text('Интервал автообновления'),
+      constraints: const BoxConstraints(maxWidth: 380),
+      actions: [
+        ShadButton.outline(
+          onPressed: () => Navigator.of(ctx).pop(null),
+          child: const Text('Отмена'),
+        ),
+        ShadButton(
+          onPressed: () => Navigator.of(ctx).pop(ctrl.text.trim()),
+          child: const Text('Сохранить'),
+        ),
+      ],
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ShadInput(
+            controller: ctrl,
+            placeholder: const Text('Часы'),
+            keyboardType: TextInputType.number,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            p.subscriptionMeta?.updateIntervalHours != null
+                ? 'Пусто — использовать интервал из подписки '
+                    '(${p.subscriptionMeta!.updateIntervalHours} ч)'
+                : 'Пусто — не обновлять автоматически',
+            style: ShadTheme.of(ctx).textTheme.muted,
+          ),
+        ],
+      ),
+    ),
+  );
+  if (result == null) return;
+  final hours = result.isEmpty ? null : int.tryParse(result);
+  // Мусор в поле трактуем как «не менять»: молча ставить null было бы хуже.
+  if (result.isNotEmpty && (hours == null || hours < 1)) return;
+  await c.setProfileRefreshInterval(p.id, hours == null ? null : hours * 60);
 }

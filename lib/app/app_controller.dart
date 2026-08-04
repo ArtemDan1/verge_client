@@ -7,6 +7,7 @@ import '../models/node_config.dart';
 import '../models/node_engine.dart';
 import '../models/profile.dart';
 import '../models/app_settings.dart';
+import '../models/network_settings.dart';
 import '../models/persisted_state.dart';
 import '../models/routing_profile.dart';
 import '../models/log_entry.dart';
@@ -70,6 +71,14 @@ class AppController extends ChangeNotifier {
   bool isCheckingUpdate = false;
   double? updateDownloadProgress;
 
+  /// «Позже»: скрывает баннер до следующего запуска. Намеренно не в
+  /// persisted-state — пользователь должен снова увидеть предложение,
+  /// а не потерять его навсегда одним случайным кликом.
+  bool _updateBannerDismissed = false;
+
+  /// Как часто ходим в GitHub Releases в фоне.
+  static const _updateCheckPeriod = Duration(hours: 24);
+
   /// Папка с распакованными .srs; если задана — rule-set подключаются локально.
   final String? geoAssetDir;
 
@@ -120,6 +129,11 @@ class AppController extends ChangeNotifier {
   Timer? _refreshTimer;
   bool _refreshingAll = false;
   String? _refreshError;
+
+  /// Профили, обновление которых уже в полёте. Без этого медленная сеть
+  /// приводила бы к нескольким параллельным запросам одного и того же URL:
+  /// тик идёт раз в минуту и не ждёт завершения предыдущего.
+  final Set<String> _refreshingProfileIds = {};
 
   AppController({
     required SubscriptionService subscription,
@@ -223,7 +237,9 @@ class AppController extends ChangeNotifier {
   List<Profile> get profiles => _state.profiles;
   String? get activeProfileId => _state.activeProfileId;
   AppSettings get settings => _state.settings;
+  NetworkSettings get networkSettings => _state.networkSettings;
   TunnelStatus get status => _status;
+  bool get isConnected => _status == TunnelStatus.connected;
   String? get error => _error;
   PlatformInfo get platform => _platform;
   bool get isRefreshingAll => _refreshingAll;
@@ -306,15 +322,34 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Тик раз в минуту, независимо от настроек. Расписание считается не от
+  /// момента запуска таймера, а от lastRefreshedAt каждого профиля — так
+  /// просроченные профили догоняются после сна машины и после перезапуска.
   void _scheduleAutoRefresh() {
     _refreshTimer?.cancel();
-    _refreshTimer = null;
-    final s = _state.settings;
-    if (!s.autoRefreshEnabled) return;
     _refreshTimer = _timerFactory(
-      Duration(minutes: s.autoRefreshIntervalMinutes),
-      (_) => refreshAllProfiles().ignore(),
+      const Duration(minutes: 1),
+      (_) => _onRefreshTick(),
     );
+  }
+
+  void _onRefreshTick() {
+    final now = DateTime.now();
+    for (final p in List.of(_state.profiles)) {
+      final interval = p.effectiveRefreshIntervalMinutes;
+      if (interval == null) continue;
+      if (_refreshingProfileIds.contains(p.id)) continue;
+      final last = p.lastRefreshedAt;
+      // Профиль, который никогда не обновлялся, считаем просроченным.
+      if (last != null &&
+          now.difference(last) < Duration(minutes: interval)) {
+        continue;
+      }
+      _refreshingProfileIds.add(p.id);
+      refreshProfile(p.id)
+          .whenComplete(() => _refreshingProfileIds.remove(p.id))
+          .ignore();
+    }
   }
 
   Future<void> init() async {
@@ -333,21 +368,23 @@ class AppController extends ChangeNotifier {
       await connect();
     }
     _scheduleAutoRefresh();
-    if (_state.settings.autoRefreshEnabled) {
-      refreshAllProfiles().ignore();
-    }
+    checkForUpdateSilently().ignore();
   }
 
   Future<void> addProfile(String name, String url) async {
     final res = await _subscription.loadWithInfo(url);
     final nodes = res.nodes;
+    // Имя из подписки важнее выведенного из ссылки, но пользователь его
+    // ещё не выбирал — значит имя автоматическое (nameIsCustom = false).
+    final title = res.meta?.title;
     final profile = Profile(
       id: _uuid.v4(),
-      name: name,
+      name: (title == null || title.isEmpty) ? name : title,
       url: url,
       nodes: nodes,
       selectedNodeIndex: nodes.isEmpty ? null : 0,
       subscriptionInfo: res.info,
+      subscriptionMeta: res.meta,
     );
     _state = _state.copyWith(
       profiles: [..._state.profiles, profile],
@@ -367,11 +404,17 @@ class AppController extends ChangeNotifier {
           (old.selectedNodeIndex != null && old.selectedNodeIndex! < nodes.length)
               ? old.selectedNodeIndex
               : (nodes.isEmpty ? null : 0);
+      final title = res.meta?.title;
       final updated = old.copyWith(
         nodes: nodes,
         selectedNodeIndex: keepIndex,
         lastRefreshedAt: DateTime.now(),
         subscriptionInfo: res.info ?? old.subscriptionInfo,
+        subscriptionMeta: res.meta ?? old.subscriptionMeta,
+        // Ручное имя провайдер не перебивает.
+        name: (!old.nameIsCustom && title != null && title.isNotEmpty)
+            ? title
+            : null,
       );
       final list = [..._state.profiles]..[idx] = updated;
       _state = _state.copyWith(profiles: list);
@@ -415,6 +458,22 @@ class AppController extends ChangeNotifier {
     await _persist();
   }
 
+  /// Ручное переименование: с этого момента profile-title из подписки имя
+  /// больше не перетирает.
+  Future<void> renameProfile(String id, String name) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return;
+    final idx = _state.profiles.indexWhere((p) => p.id == id);
+    if (idx < 0) return;
+    final list = [..._state.profiles]
+      ..[idx] = _state.profiles[idx].copyWith(
+        name: trimmed,
+        nameIsCustom: true,
+      );
+    _state = _state.copyWith(profiles: list);
+    await _persist();
+  }
+
   Future<void> selectNode(String profileId, int index) async {
     final idx = _state.profiles.indexWhere((p) => p.id == profileId);
     if (idx < 0) return;
@@ -427,6 +486,33 @@ class AppController extends ChangeNotifier {
       await disconnect();
       await connect();
     }
+  }
+
+  /// Заменяет ноду в профиле отредактированной. Правки живут до следующего
+  /// обновления подписки — она перезаписывает список нод целиком.
+  Future<void> updateNode(
+      String profileId, int index, NodeConfig node) async {
+    final pi = _state.profiles.indexWhere((p) => p.id == profileId);
+    if (pi < 0) return;
+    final profile = _state.profiles[pi];
+    if (index < 0 || index >= profile.nodes.length) return;
+    final nodes = [...profile.nodes]..[index] = node;
+    final list = [..._state.profiles]..[pi] = profile.copyWith(nodes: nodes);
+    _state = _state.copyWith(profiles: list);
+    await _persist();
+  }
+
+  /// Свой интервал автообновления профиля. null снимает оверрайд — дальше
+  /// действует интервал из подписки, а если его нет, профиль не обновляется.
+  Future<void> setProfileRefreshInterval(String profileId, int? minutes) async {
+    final i = _state.profiles.indexWhere((p) => p.id == profileId);
+    if (i < 0) return;
+    final updated = minutes == null
+        ? _state.profiles[i].copyWith(clearRefreshInterval: true)
+        : _state.profiles[i].copyWith(refreshIntervalMinutesOverride: minutes);
+    final list = [..._state.profiles]..[i] = updated;
+    _state = _state.copyWith(profiles: list);
+    await _persist();
   }
 
   /// Смена движка ноды. Если это активная нода на живом туннеле — переподключаем,
@@ -548,6 +634,19 @@ class AppController extends ChangeNotifier {
     }
   }
 
+  Future<void> updateNetworkSettings(NetworkSettings settings) async {
+    _state = _state.copyWith(networkSettings: settings);
+    await _persist();
+  }
+
+  /// Пересобирает конфиг и поднимает туннель заново — нужен после смены
+  /// сетевых настроек, которые читаются только при сборке.
+  Future<void> reconnect() async {
+    if (!isConnected) return;
+    await disconnect();
+    await connect();
+  }
+
   /// Переключение в TUN с проверкой системного helper'а. Helper ставится
   /// отдельным .pkg-инсталлятором; приложение его не регистрирует, только
   /// проверяет доступность по XPC.
@@ -566,6 +665,9 @@ class AppController extends ChangeNotifier {
   Future<String> helperStatus() => _helper.status();
 
   Future<void> checkForUpdate() async {
+    // Ручная проверка должна показать правду, даже если пользователь до этого
+    // нажал «Позже» — иначе результат явного действия не будет виден.
+    _updateBannerDismissed = false;
     isCheckingUpdate = true;
     notifyListeners();
     try {
@@ -578,6 +680,47 @@ class AppController extends ChangeNotifier {
       isCheckingUpdate = false;
       notifyListeners();
     }
+  }
+
+  /// Обновление, которое стоит показать пользователю: не пропущенное им и
+  /// не скрытое кнопкой «Позже».
+  UpdateInfo? get updateToOffer {
+    final info = availableUpdate;
+    if (info == null) return null;
+    if (_updateBannerDismissed) return null;
+    if (info.version == _state.settings.skippedVersion) return null;
+    return info;
+  }
+
+  void dismissUpdateBanner() {
+    _updateBannerDismissed = true;
+    notifyListeners();
+  }
+
+  Future<void> skipUpdateVersion() async {
+    final info = availableUpdate;
+    if (info == null) return;
+    await updateSettings(
+        _state.settings.copyWith(skippedVersion: info.version));
+  }
+
+  /// Фоновая проверка при старте. В отличие от [checkForUpdate], молчит при
+  /// ошибке: отсутствие интернета не должно выглядеть как поломка.
+  Future<void> checkForUpdateSilently() async {
+    final last = _state.settings.lastUpdateCheckAt;
+    if (last != null &&
+        DateTime.now().difference(last) < _updateCheckPeriod) {
+      return;
+    }
+    try {
+      availableUpdate =
+          await _update.checkForUpdate(await _platform.appVersion());
+    } catch (e) {
+      _appendLog('Проверка обновлений не удалась: $e');
+    }
+    // Отметку пишем в любом случае, иначе каждый запуск без сети бил бы по API.
+    await updateSettings(
+        _state.settings.copyWith(lastUpdateCheckAt: DateTime.now()));
   }
 
   Future<void> downloadAndInstallUpdate() async {
@@ -686,6 +829,7 @@ class AppController extends ChangeNotifier {
       geoAssetDir: geoAssetDir,
       clashApiPort: api.port,
       clashApiSecret: api.secret,
+      network: _state.networkSettings,
     );
     final routing = activeRoutingProfile;
     if (_state.settings.tunnelMode == TunnelMode.tun) {
@@ -713,7 +857,8 @@ class AppController extends ChangeNotifier {
   /// удалось. Критерий успеха: процесс жив после startup-grace И порт отвечает.
   Future<int?> _startXray(NodeConfig node) async {
     final port = await _pickPort();
-    final config = buildXrayConfig(node, socksPort: port);
+    final config = buildXrayConfig(node,
+        socksPort: port, network: _state.networkSettings);
     if (config == null) {
       _appendLog('для этой ноды Xray-конфиг не собирается');
       return null;

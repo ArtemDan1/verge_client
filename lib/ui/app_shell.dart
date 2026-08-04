@@ -6,6 +6,7 @@ import '../app/app_controller.dart';
 import '../models/connection_info.dart';
 import '../services/deep_link.dart';
 import 'widgets/sidebar.dart';
+import 'widgets/update_banner.dart';
 import 'profiles_screen.dart';
 import 'settings_screen.dart';
 import 'logs_screen.dart';
@@ -96,22 +97,33 @@ class _AppShellState extends State<AppShell> {
           AboutScreen(controller: widget.controller),
         ];
         return Scaffold(
-          body: Row(
+          body: Column(
             children: [
-              ValueListenableBuilder<List<ConnectionInfo>>(
-                valueListenable: widget.controller.connections,
-                builder: (context, conns, _) =>
-                    ValueListenableBuilder<TrafficStats>(
-                  valueListenable: widget.controller.traffic,
-                  builder: (context, traffic, _) => Sidebar(
-                    index: _index,
-                    onSelect: (i) => setState(() => _index = i),
-                    connectionCount: conns.length,
-                    traffic: traffic,
-                  ),
+              UpdateBanner(controller: widget.controller),
+              Expanded(
+                child: Row(
+                  children: [
+                    ValueListenableBuilder<List<ConnectionInfo>>(
+                      valueListenable: widget.controller.connections,
+                      builder: (context, conns, _) =>
+                          ValueListenableBuilder<TrafficStats>(
+                        valueListenable: widget.controller.traffic,
+                        builder: (context, traffic, _) => Sidebar(
+                          index: _index,
+                          onSelect: (i) => setState(() => _index = i),
+                          connectionCount: conns.length,
+                          traffic: traffic,
+                          hasUpdate: widget.controller.availableUpdate !=
+                                  null &&
+                              widget.controller.availableUpdate!.version !=
+                                  widget.controller.settings.skippedVersion,
+                        ),
+                      ),
+                    ),
+                    Expanded(child: screens[_index]),
+                  ],
                 ),
               ),
-              Expanded(child: screens[_index]),
             ],
           ),
         );

@@ -65,6 +65,9 @@ void main() {
     await tester.tap(find.text('Настройки'));
     await tester.pumpAndSettle();
     expect(find.text('Автозапуск'), findsOneWidget);
+    // Реальный периодический таймер автообновления должен быть отменён
+    // до конца теста — иначе flutter_test падает на pending timer.
+    c.dispose();
   });
 
   testWidgets('сайдбар показывает пункт «Соединения» с badge и трафик',
@@ -75,6 +78,7 @@ void main() {
         onSelect: (_) {},
         connectionCount: 0,
         traffic: TrafficStats.zero,
+        hasUpdate: false,
       ),
     ));
     await tester.pumpAndSettle();
