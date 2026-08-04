@@ -3,7 +3,6 @@ import 'package:singbox_client/models/persisted_state.dart';
 import 'package:singbox_client/models/profile.dart';
 import 'package:singbox_client/models/app_settings.dart';
 import 'package:singbox_client/models/routing_profile.dart';
-import 'package:singbox_client/models/routing_rule.dart';
 
 void main() {
   test('пустой дефолт', () {

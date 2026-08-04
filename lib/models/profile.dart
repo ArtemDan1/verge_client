@@ -29,6 +29,12 @@ class Profile {
   /// потому что ключ построен по адресу, а не по имени.
   final Map<String, EngineChoice> engineOverrides;
 
+  /// Свой интервал автообновления в минутах. null — значения нет, и тогда
+  /// берётся интервал, присланный провайдером; если нет и его, профиль
+  /// автоматически не обновляется. Отдельного флага «включено» нет намеренно:
+  /// отсутствие значения и есть «выключено».
+  final int? refreshIntervalMinutesOverride;
+
   const Profile({
     required this.id,
     required this.name,
@@ -40,6 +46,7 @@ class Profile {
     this.subscriptionMeta,
     this.nameIsCustom = false,
     this.engineOverrides = const {},
+    this.refreshIntervalMinutesOverride,
   });
 
   NodeConfig? get selectedNode {
@@ -63,6 +70,16 @@ class Profile {
     return copyWith(engineOverrides: map);
   }
 
+  /// Через сколько минут профиль должен обновиться. null — не обновляется.
+  int? get effectiveRefreshIntervalMinutes {
+    final own = refreshIntervalMinutesOverride;
+    if (own != null && own > 0) return own;
+    final hours = subscriptionMeta?.updateIntervalHours;
+    // Панели иногда шлют 0 — это «не обновлять», а не «обновлять постоянно».
+    if (hours != null && hours > 0) return hours * 60;
+    return null;
+  }
+
   Profile copyWith({
     String? name,
     String? url,
@@ -74,6 +91,8 @@ class Profile {
     SubscriptionMeta? subscriptionMeta,
     bool? nameIsCustom,
     Map<String, EngineChoice>? engineOverrides,
+    int? refreshIntervalMinutesOverride,
+    bool clearRefreshInterval = false,
   }) =>
       Profile(
         id: id,
@@ -87,6 +106,9 @@ class Profile {
         subscriptionMeta: subscriptionMeta ?? this.subscriptionMeta,
         nameIsCustom: nameIsCustom ?? this.nameIsCustom,
         engineOverrides: engineOverrides ?? this.engineOverrides,
+        refreshIntervalMinutesOverride: clearRefreshInterval
+            ? null
+            : (refreshIntervalMinutesOverride ?? this.refreshIntervalMinutesOverride),
       );
 
   Map<String, dynamic> toJson() => {
@@ -101,6 +123,7 @@ class Profile {
         'nameIsCustom': nameIsCustom,
         'engineOverrides':
             engineOverrides.map((k, v) => MapEntry(k, v.name)),
+        'refreshIntervalMinutesOverride': refreshIntervalMinutesOverride,
       };
 
   factory Profile.fromJson(Map<String, dynamic> json) => Profile(
@@ -129,6 +152,8 @@ class Profile {
               (k, v) => MapEntry('$k', EngineChoice.values.byName('$v')),
             ) ??
             const {},
+        refreshIntervalMinutesOverride:
+            (json['refreshIntervalMinutesOverride'] as num?)?.toInt(),
       );
 
   @override
@@ -143,9 +168,10 @@ class Profile {
       other.subscriptionInfo == subscriptionInfo &&
       other.subscriptionMeta == subscriptionMeta &&
       other.nameIsCustom == nameIsCustom &&
-      mapEquals(other.engineOverrides, engineOverrides);
+      mapEquals(other.engineOverrides, engineOverrides) &&
+      other.refreshIntervalMinutesOverride == refreshIntervalMinutesOverride;
 
   @override
   int get hashCode => Object.hash(id, name, url, selectedNodeIndex, lastRefreshedAt,
-      subscriptionInfo, subscriptionMeta, nameIsCustom, Object.hashAll(nodes), Object.hashAllUnordered(engineOverrides.entries));
+      subscriptionInfo, subscriptionMeta, nameIsCustom, Object.hashAll(nodes), Object.hashAllUnordered(engineOverrides.entries), refreshIntervalMinutesOverride);
 }

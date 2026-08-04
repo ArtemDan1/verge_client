@@ -1,24 +1,36 @@
+import '../models/network_settings.dart';
 import '../models/node_config.dart';
 
 /// Xray-outbound для ноды: passthrough для нод из Xray-подписки, сборка из
 /// params для share-ссылок. null — из этой ноды Xray-outbound не собрать,
 /// значит движок Xray для неё недоступен.
-Map<String, dynamic>? buildXrayOutbound(NodeConfig node) {
+Map<String, dynamic>? buildXrayOutbound(NodeConfig node,
+    {NetworkSettings network = const NetworkSettings()}) {
   final raw = node.rawOutbound;
   if (raw != null) {
     // Оригинал уже в схеме Xray — отдаём как есть, нормализуя тег.
-    if (node.rawSchema == RawSchema.xray) return {...raw, 'tag': 'proxy'};
+    if (node.rawSchema == RawSchema.xray) {
+      final out = {...raw, 'tag': 'proxy'};
+      if (network.tlsSkipCertVerify) {
+        final stream = (out['streamSettings'] as Map?)?.cast<String, dynamic>();
+        final tls = (stream?['tlsSettings'] as Map?)?.cast<String, dynamic>();
+        if (tls != null) tls['allowInsecure'] = true;
+      }
+      return out;
+    }
     // Оригинал в схеме sing-box: обратной конвертации нет и не планируется.
     return null;
   }
   return switch (node.protocol) {
-    NodeProtocol.hysteria2 => _hysteria2(node),
-    NodeProtocol.vless => _vless(node),
+    NodeProtocol.hysteria2 => _hysteria2(n: node, network: network),
+    NodeProtocol.vless => _vless(n: node, network: network),
     NodeProtocol.naive => null, // в Xray такого протокола нет
   };
 }
 
-Map<String, dynamic> _hysteria2(NodeConfig n) => {
+Map<String, dynamic> _hysteria2(
+        {required NodeConfig n, required NetworkSettings network}) =>
+    {
       'protocol': 'hysteria',
       'tag': 'proxy',
       'settings': {'address': n.host, 'port': n.port, 'version': 2},
@@ -31,11 +43,12 @@ Map<String, dynamic> _hysteria2(NodeConfig n) => {
         },
         // alpn h3 обязателен: hysteria2 живёт поверх QUIC/HTTP3, без него
         // сервер рвёт TLS-хендшейк.
-        'tlsSettings': _tls(n, alpn: const ['h3']),
+        'tlsSettings': _tls(n, network, alpn: const ['h3']),
       },
     };
 
-Map<String, dynamic> _vless(NodeConfig n) {
+Map<String, dynamic> _vless(
+    {required NodeConfig n, required NetworkSettings network}) {
   final user = <String, dynamic>{
     'id': n.params['uuid'] ?? '',
     'encryption': 'none',
@@ -56,7 +69,7 @@ Map<String, dynamic> _vless(NodeConfig n) {
     };
   } else {
     stream['security'] = 'tls';
-    stream['tlsSettings'] = _tls(n);
+    stream['tlsSettings'] = _tls(n, network);
   }
   if (n.transport == 'xhttp') {
     stream['xhttpSettings'] = {
@@ -78,10 +91,14 @@ Map<String, dynamic> _vless(NodeConfig n) {
   };
 }
 
-Map<String, dynamic> _tls(NodeConfig n, {List<String>? alpn}) => {
+Map<String, dynamic> _tls(NodeConfig n, NetworkSettings network,
+        {List<String>? alpn}) =>
+    {
       'serverName': n.params['sni'] ?? n.host,
       if (alpn != null) 'alpn': alpn,
       if ((n.params['fp'] ?? '').isNotEmpty) 'fingerprint': n.params['fp'],
-      if (n.params['insecure'] == '1' || n.params['allowInsecure'] == '1')
+      if (n.params['insecure'] == '1' ||
+          n.params['allowInsecure'] == '1' ||
+          network.tlsSkipCertVerify)
         'allowInsecure': true,
     };

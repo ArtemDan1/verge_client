@@ -4,10 +4,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:singbox_client/app/app_controller.dart';
 import 'package:singbox_client/models/node_engine.dart';
+import 'package:singbox_client/models/profile.dart';
 import 'package:singbox_client/tunnel/xray_process.dart';
 import 'package:singbox_client/services/update_service.dart';
 import 'package:singbox_client/models/app_settings.dart';
 import 'package:singbox_client/models/persisted_state.dart';
+import 'package:singbox_client/models/subscription_meta.dart';
 import 'package:singbox_client/services/subscription_service.dart';
 import 'package:singbox_client/services/config_builder.dart';
 import 'package:singbox_client/storage/state_repository.dart';
@@ -154,6 +156,24 @@ class FakeTimer implements Timer {
   int get tick => 0;
 }
 
+/// Записывает, какие URL запрашивались, и умеет подвиснуть на [hold] —
+/// так проверяется защита от параллельных обновлений одного профиля.
+class RecordingSubscriptionService implements SubscriptionService {
+  RecordingSubscriptionService({this.hold});
+  final Future<void>? hold;
+  final loadedUrls = <String>[];
+
+  @override
+  Future<LoadResult> loadWithInfo(String url) async {
+    loadedUrls.add(url);
+    if (hold != null) await hold;
+    return const LoadResult([], null, null);
+  }
+
+  @override
+  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 class ControlledTimerFactory {
   FakeTimer? _timer;
   void Function(Timer)? _callback;
@@ -205,6 +225,7 @@ AppController build({
   HelperService? helper,
   UpdateService? updateService,
   ClashApiClient? clashApi,
+  Timer Function(Duration, void Function(Timer))? timerFactory,
 }) =>
     AppController(
       subscription: sub ??
@@ -219,6 +240,7 @@ AppController build({
       helper: helper,
       updateService: updateService,
       clashApi: clashApi,
+      timerFactory: timerFactory,
     );
 
 void main() {
@@ -445,120 +467,7 @@ void main() {
     expect(tunTunnel.lastConfig, isNull);
   });
 
-  group('auto-refresh', () {
-    test('disabled по умолчанию — timerFactory не вызывается при init', () async {
-      final tf = ControlledTimerFactory();
-      final app = AppController(
-        subscription: SubscriptionService(fetcher: (_) async => FetchResult(fakeSub, const {})),
-        builder: const ConfigBuilder(),
-        proxyTunnel: FakeTunnel(),
-        tunTunnel: FakeTunnel(),
-        repo: InMemoryStateRepository(),
-        platform: FakePlatformInfo(),
-        timerFactory: tf.call,
-      );
-      await app.init();
-      expect(tf.callCount, 0);
-      app.dispose();
-    });
-
-    test('enabled — timerFactory вызывается с правильным интервалом при init', () async {
-      final tf = ControlledTimerFactory();
-      final repo = InMemoryStateRepository();
-      await repo.save(PersistedState(
-        profiles: [],
-        activeProfileId: null,
-        settings: const AppSettings(autoRefreshEnabled: true, autoRefreshIntervalMinutes: 120),
-      ));
-      final app = AppController(
-        subscription: SubscriptionService(fetcher: (_) async => FetchResult(fakeSub, const {})),
-        builder: const ConfigBuilder(),
-        proxyTunnel: FakeTunnel(),
-        tunTunnel: FakeTunnel(),
-        repo: repo,
-        platform: FakePlatformInfo(),
-        timerFactory: tf.call,
-      );
-      await app.init();
-      expect(tf.callCount, 1);
-      expect(tf.capturedDuration, const Duration(minutes: 120));
-      app.dispose();
-    });
-
-    test('updateSettings с новым интервалом пересоздаёт таймер', () async {
-      final tf = ControlledTimerFactory();
-      final repo = InMemoryStateRepository();
-      await repo.save(PersistedState(
-        profiles: [],
-        activeProfileId: null,
-        settings: const AppSettings(autoRefreshEnabled: true, autoRefreshIntervalMinutes: 60),
-      ));
-      final app = AppController(
-        subscription: SubscriptionService(fetcher: (_) async => FetchResult(fakeSub, const {})),
-        builder: const ConfigBuilder(),
-        proxyTunnel: FakeTunnel(),
-        tunTunnel: FakeTunnel(),
-        repo: repo,
-        platform: FakePlatformInfo(),
-        timerFactory: tf.call,
-      );
-      await app.init();
-      expect(tf.callCount, 1);
-      await app.updateSettings(app.settings.copyWith(autoRefreshIntervalMinutes: 30));
-      expect(tf.callCount, 2);
-      expect(tf.capturedDuration, const Duration(minutes: 30));
-      app.dispose();
-    });
-
-    test('updateSettings отключает → таймер отменяется', () async {
-      final tf = ControlledTimerFactory();
-      final repo = InMemoryStateRepository();
-      await repo.save(PersistedState(
-        profiles: [],
-        activeProfileId: null,
-        settings: const AppSettings(autoRefreshEnabled: true, autoRefreshIntervalMinutes: 60),
-      ));
-      final app = AppController(
-        subscription: SubscriptionService(fetcher: (_) async => FetchResult(fakeSub, const {})),
-        builder: const ConfigBuilder(),
-        proxyTunnel: FakeTunnel(),
-        tunTunnel: FakeTunnel(),
-        repo: repo,
-        platform: FakePlatformInfo(),
-        timerFactory: tf.call,
-      );
-      await app.init();
-      final timer = tf._timer!;
-      await app.updateSettings(app.settings.copyWith(autoRefreshEnabled: false));
-      expect(timer.cancelled, true);
-      app.dispose();
-    });
-
-    test('тик таймера вызывает refreshAllProfiles', () async {
-      final tf = ControlledTimerFactory();
-      final repo = InMemoryStateRepository();
-      await repo.save(PersistedState(
-        profiles: [],
-        activeProfileId: null,
-        settings: const AppSettings(autoRefreshEnabled: true, autoRefreshIntervalMinutes: 60),
-      ));
-      final app = AppController(
-        subscription: SubscriptionService(fetcher: (_) async => FetchResult(fakeSub, const {})),
-        builder: const ConfigBuilder(),
-        proxyTunnel: FakeTunnel(),
-        tunTunnel: FakeTunnel(),
-        repo: repo,
-        platform: FakePlatformInfo(),
-        timerFactory: tf.call,
-      );
-      await app.init();
-      await app.addProfile('Sub', 'https://x');
-      tf.fire();
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-      expect(app.profiles.first.lastRefreshedAt, isNotNull);
-      app.dispose();
-    });
-
+  group('refreshAllProfiles', () {
     test('refreshAllProfiles — успех проставляет lastRefreshedAt', () async {
       final app = build();
       await app.init();
@@ -636,6 +545,99 @@ void main() {
       expect(app2.isRefreshingAll, true);
       await future;
       expect(app2.isRefreshingAll, false);
+    });
+  });
+
+  group('auto-refresh per profile', () {
+    test('на тике обновляется только просроченный профиль', () async {
+      void Function(Timer)? tick;
+      final repo = InMemoryStateRepository();
+      await repo.save(PersistedState(profiles: [
+        Profile(
+          id: 'stale', name: 'Stale', url: 'https://example.com/a',
+          nodes: const [], selectedNodeIndex: null,
+          refreshIntervalMinutesOverride: 60,
+          lastRefreshedAt: DateTime.now().subtract(const Duration(hours: 2)),
+        ),
+        Profile(
+          id: 'fresh', name: 'Fresh', url: 'https://example.com/b',
+          nodes: const [], selectedNodeIndex: null,
+          refreshIntervalMinutesOverride: 60,
+          lastRefreshedAt: DateTime.now().subtract(const Duration(minutes: 5)),
+        ),
+        Profile(
+          id: 'off', name: 'Off', url: 'https://example.com/c',
+          nodes: const [], selectedNodeIndex: null,
+        ),
+      ]));
+      final sub = RecordingSubscriptionService();
+      final c = build(
+        repo: repo,
+        sub: sub,
+        timerFactory: (d, cb) {
+          expect(d, const Duration(minutes: 1));
+          tick = cb;
+          return Timer(const Duration(days: 1), () {});
+        },
+      );
+      await c.init();
+
+      tick!(FakeTimer());
+      await pumpEventQueue();
+
+      expect(sub.loadedUrls, ['https://example.com/a']);
+    });
+
+    test('профиль с идущим обновлением не запускается повторно', () async {
+      void Function(Timer)? tick;
+      final gate = Completer<void>();
+      final sub = RecordingSubscriptionService(hold: gate.future);
+      final repo = InMemoryStateRepository();
+      await repo.save(PersistedState(profiles: [
+        Profile(
+          id: 'stale', name: 'Stale', url: 'https://example.com/a',
+          nodes: const [], selectedNodeIndex: null,
+          refreshIntervalMinutesOverride: 60,
+          lastRefreshedAt: DateTime.now().subtract(const Duration(hours: 2)),
+        ),
+      ]));
+      final c = build(
+        repo: repo, sub: sub,
+        timerFactory: (d, cb) { tick = cb; return Timer(const Duration(days: 1), () {}); },
+      );
+      await c.init();
+
+      tick!(FakeTimer());
+      await pumpEventQueue();
+      tick!(FakeTimer());
+      await pumpEventQueue();
+      gate.complete();
+      await pumpEventQueue();
+
+      expect(sub.loadedUrls.length, 1);
+    });
+
+    test('профиль без интервала не обновляется никогда', () async {
+      void Function(Timer)? tick;
+      final sub = RecordingSubscriptionService();
+      final repo = InMemoryStateRepository();
+      await repo.save(PersistedState(profiles: [
+        Profile(
+          id: 'off', name: 'Off', url: 'https://example.com/c',
+          nodes: const [], selectedNodeIndex: null,
+          lastRefreshedAt: DateTime.fromMillisecondsSinceEpoch(0),
+        ),
+      ]));
+      final c = build(
+        repo: repo, sub: sub,
+        timerFactory: (d, cb) { tick = cb; return Timer(const Duration(days: 1), () {}); },
+      );
+      await c.init();
+
+      tick!(FakeTimer());
+      await pumpEventQueue();
+
+      expect(sub.loadedUrls, isEmpty);
     });
   });
 
@@ -979,6 +981,95 @@ void main() {
       expect(platform.tunnelActiveOnInstall, isFalse);
       expect(app.status, TunnelStatus.disconnected);
     });
+
+    test('проверка обновлений не идёт, если прошло меньше суток', () async {
+      final svc = FakeUpdateService();
+      final repo = InMemoryStateRepository(PersistedState(
+        settings: const AppSettings().copyWith(
+          lastUpdateCheckAt: DateTime.now().subtract(const Duration(hours: 3)),
+        ),
+      ));
+      final app = build(repo: repo, updateService: svc);
+      await app.init();
+      await Future<void>.delayed(Duration.zero);
+      expect(svc.checkCalls, 0);
+    });
+
+    test('проверка обновлений идёт, если прошло больше суток', () async {
+      final svc = FakeUpdateService();
+      final repo = InMemoryStateRepository(PersistedState(
+        settings: const AppSettings().copyWith(
+          lastUpdateCheckAt: DateTime.now().subtract(const Duration(days: 2)),
+        ),
+      ));
+      final app = build(repo: repo, updateService: svc);
+      await app.init();
+      await Future<void>.delayed(Duration.zero);
+      expect(svc.checkCalls, 1);
+    });
+
+    test('ошибка тихой проверки не всплывает и обновляет отметку времени',
+        () async {
+      final svc = FakeUpdateService(checkError: Exception('net'));
+      final repo = InMemoryStateRepository();
+      final app = build(repo: repo, updateService: svc);
+      final alerts = <String>[];
+      final sub = app.alerts.listen(alerts.add);
+      await app.init();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(app.availableUpdate, isNull);
+      expect(alerts, isEmpty);
+      expect(app.settings.lastUpdateCheckAt, isNotNull);
+      await sub.cancel();
+    });
+
+    test(
+        'пропущенная версия не предлагается, а более новая предлагается',
+        () async {
+      final svc = FakeUpdateService(
+          info: const UpdateInfo(
+              version: 'v1.2.3', pkgUrl: 'https://e/x.pkg', releaseUrl: 'https://e'));
+      final repo = InMemoryStateRepository(PersistedState(
+        settings: const AppSettings().copyWith(skippedVersion: 'v1.2.3'),
+      ));
+      final app = build(repo: repo, updateService: svc);
+      await app.init();
+      await Future<void>.delayed(Duration.zero);
+      expect(app.updateToOffer, isNull);
+
+      // Пропущена другая версия — текущая снова предлагается.
+      await app.updateSettings(app.settings.copyWith(skippedVersion: 'v1.0.0'));
+      expect(app.updateToOffer?.version, 'v1.2.3');
+    });
+
+    test('dismissUpdateBanner скрывает предложение до перезапуска', () async {
+      final svc = FakeUpdateService(
+          info: const UpdateInfo(
+              version: 'v9.9.9', pkgUrl: 'https://e/x.pkg', releaseUrl: 'https://e'));
+      final app = build(updateService: svc);
+      await app.init();
+      await Future<void>.delayed(Duration.zero);
+      expect(app.updateToOffer, isNotNull);
+
+      app.dismissUpdateBanner();
+      expect(app.updateToOffer, isNull);
+      // availableUpdate остаётся — бейдж в сайдбаре строится по нему.
+      expect(app.availableUpdate, isNotNull);
+    });
+
+    test('skipUpdateVersion записывает версию в настройки', () async {
+      final svc = FakeUpdateService(
+          info: const UpdateInfo(
+              version: 'v9.9.9', pkgUrl: 'https://e/x.pkg', releaseUrl: 'https://e'));
+      final app = build(updateService: svc);
+      await app.init();
+      await Future<void>.delayed(Duration.zero);
+
+      await app.skipUpdateVersion();
+      expect(app.settings.skippedVersion, 'v9.9.9');
+      expect(app.updateToOffer, isNull);
+    });
   });
 
   test('clash-клиент стартует при подключении и останавливается при отключении',
@@ -1123,5 +1214,24 @@ void main() {
       expect(app.activeEngine, NodeEngine.singbox);
       expect(xray.startCalls, 0);
     });
+  });
+
+  test('setProfileRefreshInterval пишет и сбрасывает оверрайд', () async {
+    final repo = InMemoryStateRepository(PersistedState(profiles: [
+      Profile(
+        id: 'p1', name: 'P', url: 'https://example.com/a',
+        nodes: const [], selectedNodeIndex: null,
+        subscriptionMeta: const SubscriptionMeta(updateIntervalHours: 6),
+      ),
+    ]));
+    final app = build(repo: repo);
+    await app.init();
+
+    await app.setProfileRefreshInterval('p1', 30);
+    expect(app.profiles.first.effectiveRefreshIntervalMinutes, 30);
+
+    await app.setProfileRefreshInterval('p1', null);
+    // Оверрайд снят — снова действует интервал провайдера.
+    expect(app.profiles.first.effectiveRefreshIntervalMinutes, 360);
   });
 }

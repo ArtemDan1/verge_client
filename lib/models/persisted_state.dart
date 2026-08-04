@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'profile.dart';
 import 'app_settings.dart';
+import 'network_settings.dart';
 import 'routing_profile.dart';
 
 @immutable
@@ -17,6 +18,8 @@ class PersistedState {
   /// Стабильный per-install идентификатор устройства для панелей с HWID-привязкой.
   final String? hwid;
 
+  final NetworkSettings networkSettings;
+
   const PersistedState({
     this.profiles = const [],
     this.activeProfileId,
@@ -25,6 +28,7 @@ class PersistedState {
     this.activeRoutingProfileId,
     this.geoUpdatedAt,
     this.hwid,
+    this.networkSettings = const NetworkSettings(),
   });
 
   PersistedState copyWith({
@@ -37,6 +41,7 @@ class PersistedState {
     bool clearActiveRouting = false,
     DateTime? geoUpdatedAt,
     String? hwid,
+    NetworkSettings? networkSettings,
   }) =>
       PersistedState(
         profiles: profiles ?? this.profiles,
@@ -49,6 +54,7 @@ class PersistedState {
             : (activeRoutingProfileId ?? this.activeRoutingProfileId),
         geoUpdatedAt: geoUpdatedAt ?? this.geoUpdatedAt,
         hwid: hwid ?? this.hwid,
+        networkSettings: networkSettings ?? this.networkSettings,
       );
 
   Map<String, dynamic> toJson() => {
@@ -59,6 +65,7 @@ class PersistedState {
         'activeRoutingProfileId': activeRoutingProfileId,
         'geoUpdatedAt': geoUpdatedAt?.toIso8601String(),
         'hwid': hwid,
+        'networkSettings': networkSettings.toJson(),
       };
 
   factory PersistedState.fromJson(Map<String, dynamic> json) => PersistedState(
@@ -79,5 +86,9 @@ class PersistedState {
             ? null
             : DateTime.tryParse(json['geoUpdatedAt'] as String),
         hwid: json['hwid'] as String?,
+        networkSettings: json['networkSettings'] == null
+            ? const NetworkSettings()
+            : NetworkSettings.fromJson(
+                (json['networkSettings'] as Map).cast<String, dynamic>()),
       );
 }

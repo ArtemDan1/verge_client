@@ -125,4 +125,52 @@ void main() {
     expect(round.subscriptionMeta?.title, 'T');
     expect(round.subscriptionMeta?.announce, 'A');
   });
+
+  Profile profileWith({int? override, int? providerHours}) => Profile(
+        id: 'p1',
+        name: 'P',
+        url: 'https://example.com/sub',
+        nodes: const [],
+        selectedNodeIndex: null,
+        refreshIntervalMinutesOverride: override,
+        subscriptionMeta: providerHours == null
+            ? null
+            : SubscriptionMeta(updateIntervalHours: providerHours),
+      );
+
+  test('оверрайд перекрывает интервал провайдера', () {
+    expect(profileWith(override: 30, providerHours: 6)
+        .effectiveRefreshIntervalMinutes, 30);
+  });
+
+  test('без оверрайда берётся интервал провайдера в минутах', () {
+    expect(profileWith(providerHours: 6)
+        .effectiveRefreshIntervalMinutes, 360);
+  });
+
+  test('без оверрайда и без провайдера автообновления нет', () {
+    expect(profileWith().effectiveRefreshIntervalMinutes, isNull);
+  });
+
+  test('нулевой или отрицательный интервал провайдера игнорируется', () {
+    expect(profileWith(providerHours: 0).effectiveRefreshIntervalMinutes, isNull);
+    expect(profileWith(providerHours: -1).effectiveRefreshIntervalMinutes, isNull);
+  });
+
+  test('оверрайд переживает round-trip через JSON', () {
+    final p = profileWith(override: 45);
+    expect(Profile.fromJson(p.toJson()).refreshIntervalMinutesOverride, 45);
+  });
+
+  test('старый JSON без поля читается как отсутствие оверрайда', () {
+    final json = profileWith(override: 45).toJson()
+      ..remove('refreshIntervalMinutesOverride');
+    expect(Profile.fromJson(json).refreshIntervalMinutesOverride, isNull);
+  });
+
+  test('clearRefreshInterval сбрасывает оверрайд в null', () {
+    final p = profileWith(override: 45);
+    expect(p.copyWith(clearRefreshInterval: true)
+        .refreshIntervalMinutesOverride, isNull);
+  });
 }

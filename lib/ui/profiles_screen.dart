@@ -79,6 +79,9 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
   void _onControllerChanged() {
     if (!mounted) return;
     final c = widget.controller;
+    // Любое изменение состояния контроллера может влиять на отображение
+    // профилей (интервал, имя, ноды) — перестраиваемся.
+    setState(() {});
     // Завершение обновления подписок → уведомление.
     if (_wasRefreshing && !c.isRefreshingAll) {
       _wasRefreshing = false;
@@ -596,6 +599,12 @@ class _ProfileMenuState extends State<_ProfileMenu> {
             child: const Text('Поддержка'),
           ),
         ShadContextMenuItem(
+          leading: const Icon(LucideIcons.timer, size: 16),
+          onPressed: () => act(() => _editRefreshInterval(context, c, p)),
+          trailing: Text(_refreshLabel(p), style: theme.textTheme.muted),
+          child: const Text('Автообновление'),
+        ),
+        ShadContextMenuItem(
           leading: const Icon(LucideIcons.pencil, size: 16),
           onPressed: () => act(() => _showRenameDialog(context, c, p)),
           child: const Text('Переименовать'),
@@ -660,4 +669,69 @@ class _ScrollFadeShadow extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Человекочитаемое состояние автообновления профиля. Единица измерения —
+/// часы: провайдеры присылают интервал именно в часах, и минуты здесь дают
+/// ложную точность.
+String _refreshLabel(Profile p) {
+  final own = p.refreshIntervalMinutesOverride;
+  if (own != null && own > 0) return 'Своё: ${_asHours(own)} ч';
+  final hours = p.subscriptionMeta?.updateIntervalHours;
+  if (hours != null && hours > 0) return 'По подписке: $hours ч';
+  return 'Выключено';
+}
+
+/// Хранение в минутах, показ в часах. Округляем вверх, чтобы интервал,
+/// записанный старой версией приложения, не превратился в «0 ч».
+int _asHours(int minutes) => (minutes / 60).ceil().clamp(1, 1 << 30);
+
+/// Диалог выбора интервала в часах. Пустое поле = снять оверрайд.
+Future<void> _editRefreshInterval(
+    BuildContext context, AppController c, Profile p) async {
+  final own = p.refreshIntervalMinutesOverride;
+  final ctrl = TextEditingController(
+    text: (own != null && own > 0) ? '${_asHours(own)}' : '',
+  );
+  final result = await showShadDialog<String?>(
+    context: context,
+    builder: (ctx) => ShadDialog(
+      title: const Text('Интервал автообновления'),
+      constraints: const BoxConstraints(maxWidth: 380),
+      actions: [
+        ShadButton.outline(
+          onPressed: () => Navigator.of(ctx).pop(null),
+          child: const Text('Отмена'),
+        ),
+        ShadButton(
+          onPressed: () => Navigator.of(ctx).pop(ctrl.text.trim()),
+          child: const Text('Сохранить'),
+        ),
+      ],
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ShadInput(
+            controller: ctrl,
+            placeholder: const Text('Часы'),
+            keyboardType: TextInputType.number,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            p.subscriptionMeta?.updateIntervalHours != null
+                ? 'Пусто — использовать интервал из подписки '
+                    '(${p.subscriptionMeta!.updateIntervalHours} ч)'
+                : 'Пусто — не обновлять автоматически',
+            style: ShadTheme.of(ctx).textTheme.muted,
+          ),
+        ],
+      ),
+    ),
+  );
+  if (result == null) return;
+  final hours = result.isEmpty ? null : int.tryParse(result);
+  // Мусор в поле трактуем как «не менять»: молча ставить null было бы хуже.
+  if (result.isNotEmpty && (hours == null || hours < 1)) return;
+  await c.setProfileRefreshInterval(p.id, hours == null ? null : hours * 60);
 }

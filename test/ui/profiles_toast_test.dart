@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
@@ -46,8 +47,10 @@ void main() {
       tunTunnel: FakeTunnel(),
       repo: InMemoryStateRepository(),
       platform: FakePlatformInfo(),
+      timerFactory: (duration, callback) => Timer(Duration.zero, () {}),
     );
     await c.init();
+    addTearDown(c.dispose);
     await c.addProfile('Sub', 'https://example.com/sub');
 
     await tester.pumpWidget(ShadApp(home: ProfilesScreen(controller: c)));

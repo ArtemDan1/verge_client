@@ -54,6 +54,9 @@ void main() {
     await tester.tap(find.byIcon(LucideIcons.plus));
     await tester.pumpAndSettle();
     expect(c.routingProfiles.where((p) => !p.isBuiltIn), isNotEmpty);
+    // Реальный периодический таймер автообновления должен быть отменён
+    // до конца теста — иначе flutter_test падает на pending timer.
+    c.dispose();
   });
 
   testWidgets('клон пресета создаёт редактируемую копию', (tester) async {
@@ -65,5 +68,6 @@ void main() {
     await tester.tap(find.byIcon(LucideIcons.copy).first);
     await tester.pumpAndSettle();
     expect(c.routingProfiles.where((p) => !p.isBuiltIn), isNotEmpty);
+    c.dispose();
   });
 }

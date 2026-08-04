@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:singbox_client/models/network_settings.dart';
 import 'package:singbox_client/models/node_config.dart';
 import 'package:singbox_client/services/xray_outbound_builder.dart';
 
@@ -108,5 +109,25 @@ void main() {
       rawOutbound: {'type': 'vless', 'tag': 'proxy', 'server': 'h'},
     );
     expect(buildXrayOutbound(node), isNull);
+  });
+
+  test('network.tlsSkipCertVerify выставляет allowInsecure', () {
+    const node = NodeConfig(
+      name: 'A', protocol: NodeProtocol.vless, host: 'h.example', port: 443,
+      params: {'uuid': 'uid', 'security': 'tls', 'sni': 'h.example'},
+    );
+    final out = buildXrayOutbound(node,
+        network: const NetworkSettings(tlsSkipCertVerify: true))!;
+    expect(out['streamSettings']['tlsSettings']['allowInsecure'], true);
+  });
+
+  test('без network.tlsSkipCertVerify allowInsecure не выставляется', () {
+    const node = NodeConfig(
+      name: 'A', protocol: NodeProtocol.vless, host: 'h.example', port: 443,
+      params: {'uuid': 'uid', 'security': 'tls', 'sni': 'h.example'},
+    );
+    final out = buildXrayOutbound(node)!;
+    expect(out['streamSettings']['tlsSettings'].containsKey('allowInsecure'),
+        isFalse);
   });
 }
