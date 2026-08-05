@@ -258,12 +258,13 @@ class ConfigBuilder {
         'udp_over_tcp': false,
       };
     }
-    return _outboundFor(n);
+    return outboundFor(n);
   }
 
   /// Outbound: из готового оригинала (конвертируя, если он в схеме Xray) либо
-  /// собранный из params.
-  Map<String, dynamic> _outboundFor(NodeConfig n) {
+  /// собранный из params. Тег параметризован: тестовый конфиг держит по
+  /// outbound'у на ноду и не может звать их все `proxy`.
+  Map<String, dynamic> outboundFor(NodeConfig n, {String tag = 'proxy'}) {
     final raw = n.rawOutbound;
     final Map<String, dynamic> out;
     if (raw == null) {
@@ -303,6 +304,7 @@ class ConfigBuilder {
         tls.remove('record_fragment');
       }
     }
+    out['tag'] = tag;
     return out;
   }
 

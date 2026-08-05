@@ -11,6 +11,9 @@ import '../models/network_settings.dart';
 import '../models/persisted_state.dart';
 import '../models/routing_profile.dart';
 import '../models/log_entry.dart';
+import '../models/auto_select_settings.dart';
+import '../services/node_tester.dart';
+import '../tunnel/test_process.dart';
 import '../services/subscription_service.dart';
 import '../services/config_builder.dart';
 import '../services/engine_selector.dart';
@@ -71,13 +74,35 @@ class AppController extends ChangeNotifier {
   bool isCheckingUpdate = false;
   double? updateDownloadProgress;
 
+  late final NodeTester _nodeTester;
+
+  /// true, пока идёт перебор нод. Нужен и UI (прогресс), и health-check:
+  /// накладывать фоновый тик на идущий перебор нельзя.
+  bool _autoSelecting = false;
+  bool get isAutoSelecting => _autoSelecting;
+
+  /// Чем закончился последний перебор. Живёт до перезапуска приложения:
+  /// без этого автовыбор молчалив и снаружи неотличим от неработающего.
+  String? get lastAutoSelectResult => _lastAutoSelectResult;
+  String? _lastAutoSelectResult;
+
+  void _setAutoSelectResult(String message) {
+    _lastAutoSelectResult = message;
+    _appendLog('Автовыбор: $message');
+    notifyListeners();
+  }
+
+  AutoSelectSettings get autoSelect => _state.autoSelect;
+
   /// «Позже»: скрывает баннер до следующего запуска. Намеренно не в
   /// persisted-state — пользователь должен снова увидеть предложение,
   /// а не потерять его навсегда одним случайным кликом.
   bool _updateBannerDismissed = false;
 
-  /// Как часто ходим в GitHub Releases в фоне.
-  static const _updateCheckPeriod = Duration(hours: 24);
+  /// Как часто ходим в GitHub Releases в фоне. Час, а не сутки: приложение
+  /// запускают руками и ждут, что при запуске проверка есть. Троттлинг тут
+  /// только чтобы серия перезапусков подряд не долбила API.
+  static const _updateCheckPeriod = Duration(hours: 1);
 
   /// Папка с распакованными .srs; если задана — rule-set подключаются локально.
   final String? geoAssetDir;
@@ -90,6 +115,20 @@ class AppController extends ChangeNotifier {
   final _uuid = const Uuid();
   late final StreamSubscription<TunnelStatus> _proxySub;
   late final StreamSubscription<TunnelStatus> _tunSub;
+  /// Логи тестовых процессов подключаются лениво, перед первым замером:
+  /// подписка на EventChannel требует платформенного биндинга, которого в
+  /// юнит-тестах нет, а с подменённым тестером процессов и не будет.
+  late final bool _ownTester;
+  final List<StreamSubscription<String>> _testLogSubs = [];
+
+  void _listenTestLogs() {
+    if (!_ownTester || _testLogSubs.isNotEmpty) return;
+    _testLogSubs.addAll([
+      SingboxTestProcess.logs.listen(_appendLog, onError: (Object _) {}),
+      XrayTestProcess.logs.listen(_appendLog, onError: (Object _) {}),
+    ]);
+  }
+
   late final StreamSubscription<String> _proxyLogSub;
   late final StreamSubscription<String> _tunLogSub;
 
@@ -153,6 +192,7 @@ class AppController extends ChangeNotifier {
     XrayProcess Function()? xrayFactory,
     Future<int> Function()? pickPort,
     Future<bool> Function(int port)? probeSocks,
+    NodeTester? nodeTester,
   })  : _xrayFactory = xrayFactory ?? XrayProcess.new,
         _pickPort = pickPort ?? pickFreePort,
         _probeSocks = probeSocks ?? _defaultProbeSocks,
@@ -170,6 +210,11 @@ class AppController extends ChangeNotifier {
         _timerFactory = timerFactory ?? Timer.periodic {
     _proxySub = _proxyTunnel.statusStream.listen((s) => _onStatus(_proxyTunnel, s));
     _tunSub = _tunTunnel.statusStream.listen((s) => _onStatus(_tunTunnel, s));
+    // Тестер логирует причины провалов замера, а тестовые процессы — свой
+    // вывод: без этого «HTTP не прошёл ни у одной ноды» ничем не объяснить.
+    _ownTester = nodeTester == null;
+    _nodeTester =
+        nodeTester ?? NodeTester(onLog: (m) => _appendLog('Автовыбор: $m'));
     _proxyLogSub = _proxyTunnel.logStream.listen(_appendLog);
     _tunLogSub = _tunTunnel.logStream.listen(_appendLog);
   }
@@ -192,6 +237,7 @@ class AppController extends ChangeNotifier {
     if (s == TunnelStatus.disconnected || s == TunnelStatus.error) {
       _clashApi.stop();
     }
+    _restartHealthCheck();
     notifyListeners();
     // Туннель поднялся — самое время обновить устаревшие наборы через прокси.
     if (s == TunnelStatus.connected &&
@@ -480,6 +526,8 @@ class AppController extends ChangeNotifier {
     final updated = _state.profiles[idx].copyWith(selectedNodeIndex: index);
     final list = [..._state.profiles]..[idx] = updated;
     _state = _state.copyWith(profiles: list, activeProfileId: profileId);
+    // Ручная смена ноды обнуляет счётчик провалов health-check.
+    _healthFailures = 0;
     await _persist();
     if (_status == TunnelStatus.connected ||
         _status == TunnelStatus.connecting) {
@@ -639,6 +687,72 @@ class AppController extends ChangeNotifier {
     await _persist();
   }
 
+  Future<void> updateAutoSelectSettings(AutoSelectSettings settings) async {
+    _state = _state.copyWith(autoSelect: settings);
+    await _persist();
+    // Интервал мог измениться — иначе новое значение подхватилось бы только
+    // со следующего подключения.
+    _restartHealthCheck();
+    notifyListeners();
+  }
+
+  Timer? _healthTimer;
+
+  /// Сколько проверок подряд провалилось. Один провал ничего не значит —
+  /// сеть мигает; переключаемся на втором.
+  int _healthFailures = 0;
+  bool _healthChecking = false;
+
+  static const _healthFailuresBeforeSwitch = 2;
+
+  void _restartHealthCheck() {
+    _healthTimer?.cancel();
+    _healthTimer = null;
+    _healthFailures = 0;
+    if (_status != TunnelStatus.connected) return;
+    if (!_state.autoSelect.isActive) return;
+    _healthTimer = _timerFactory(
+      Duration(seconds: _state.autoSelect.healthCheckIntervalSeconds),
+      (_) => _onHealthTick(),
+    );
+  }
+
+  /// Фоновая проверка активной ноды: один запрос, не перебор. Полный перебор
+  /// раз в минуту был бы заметной нагрузкой и трафиком.
+  Future<void> _onHealthTick() async {
+    // Перебор уже идёт (или предыдущий тик ещё не закончился) — пропускаем,
+    // иначе тики наложатся друг на друга.
+    if (_autoSelecting || _healthChecking) return;
+    final node = selectedNode;
+    final profileId = activeProfileId;
+    if (node == null || profileId == null) return;
+
+    _listenTestLogs();
+    _healthChecking = true;
+    try {
+      final ok = await _nodeTester.check(node,
+          url: _state.autoSelect.testUrl, network: _state.networkSettings);
+      if (ok) {
+        _healthFailures = 0;
+        return;
+      }
+      _healthFailures++;
+      if (_healthFailures < _healthFailuresBeforeSwitch) return;
+      _healthFailures = 0;
+      _appendLog('Нода ${node.name} не отвечает — подбираем другую');
+    } finally {
+      _healthChecking = false;
+    }
+
+    await autoSelectBest();
+    // Переключение молчаливое: пользователю не за чем следить, в логе есть.
+    // Если нода сменилась, туннель уже перезапустил сам selectNode — второй
+    // reconnect здесь дал бы лишний разрыв и лишний прогон перебора. Если же
+    // победила та же нода, туннель всё равно надо поднять заново: проверка
+    // только что показала, что через него не ходит трафик.
+    if (selectedNode == node) await reconnect();
+  }
+
   /// Пересобирает конфиг и поднимает туннель заново — нужен после смены
   /// сетевых настроек, которые читаются только при сборке.
   Future<void> reconnect() async {
@@ -713,12 +827,17 @@ class AppController extends ChangeNotifier {
       return;
     }
     try {
-      availableUpdate =
-          await _update.checkForUpdate(await _platform.appVersion());
+      final info = await _update.checkForUpdate(await _platform.appVersion());
+      availableUpdate = info;
+      _appendLog(info == null
+          ? 'Проверка обновлений: установлена последняя версия'
+          : 'Проверка обновлений: доступна ${info.version}');
     } catch (e) {
+      // Отметку при неудаче не пишем: иначе один запуск без сети затыкает
+      // проверку до конца периода, и следующий запуск снова «не проверяет».
       _appendLog('Проверка обновлений не удалась: $e');
+      return;
     }
-    // Отметку пишем в любом случае, иначе каждый запуск без сети бил бы по API.
     await updateSettings(
         _state.settings.copyWith(lastUpdateCheckAt: DateTime.now()));
   }
@@ -788,11 +907,66 @@ class AppController extends ChangeNotifier {
     await pingNodes(all);
   }
 
+  /// Подбирает лучшую ноду среди всех отмеченных профилей и делает её
+  /// активной. Пул кандидатов — ноды всех отмеченных профилей сразу, поэтому
+  /// вместе с нодой может смениться и активный профиль: пользователю нужна
+  /// самая быстрая нода, а в каком профиле она лежит — деталь.
+  ///
+  /// Победитель — минимальная задержка реального HTTP-запроса через ноду;
+  /// если HTTP не прошёл ни у кого, берём лучшую по TCP, чтобы не оставить
+  /// пользователя вообще без ноды.
+  Future<void> autoSelectBest() async {
+    if (_autoSelecting) return;
+    final pool = <({String profileId, int index, NodeConfig node})>[];
+    for (final p in _state.profiles) {
+      if (!_state.autoSelect.profileIds.contains(p.id)) continue;
+      for (var i = 0; i < p.nodes.length; i++) {
+        pool.add((profileId: p.id, index: i, node: p.nodes[i]));
+      }
+    }
+    if (pool.isEmpty) return;
+
+    _listenTestLogs();
+    _autoSelecting = true;
+    notifyListeners();
+    try {
+      final results = await _nodeTester.test(
+          [for (final e in pool) e.node],
+          url: _state.autoSelect.testUrl,
+          network: _state.networkSettings);
+      final best = results.isEmpty ? null : results.first;
+      if (best == null || (best.latencyMs == null && best.tcpMs == null)) {
+        _setAutoSelectResult('живых нод не найдено, выбор не изменён');
+        return;
+      }
+      // Сопоставляем по позиции, а не по самой ноде: один и тот же сервер
+      // может лежать сразу в двух профилях.
+      final win = pool[best.index];
+      final how = best.latencyMs != null
+          ? '${best.latencyMs} мс'
+          : 'TCP ${best.tcpMs} мс (HTTP не прошёл ни у одной ноды)';
+      final profile = _state.profiles.firstWhere((p) => p.id == win.profileId);
+      _setAutoSelectResult('${win.node.name} · ${profile.name} — $how');
+      if (win.profileId != activeProfileId ||
+          win.index != profile.selectedNodeIndex) {
+        // selectNode делает профиль активным и, если туннель поднят,
+        // перезапускает его на новой ноде.
+        await selectNode(win.profileId, win.index);
+      }
+    } finally {
+      _autoSelecting = false;
+      notifyListeners();
+    }
+  }
+
   /// Фактический движок текущего подключения. null — не подключены.
   NodeEngine? get activeEngine => _activeEngine;
   NodeEngine? _activeEngine;
 
   Future<void> connect() async {
+    // Автовыбор до старта туннеля: тестовые процессы отдельные, но чем меньше
+    // движущихся частей во время подключения, тем лучше.
+    if (_state.autoSelect.isActive) await autoSelectBest();
     final node = selectedNode;
     if (node == null) return;
     _status = TunnelStatus.connecting;
@@ -920,6 +1094,10 @@ class AppController extends ChangeNotifier {
   @override
   void dispose() {
     _refreshTimer?.cancel();
+    _healthTimer?.cancel();
+    for (final s in _testLogSubs) {
+      s.cancel();
+    }
     _proxySub.cancel();
     _tunSub.cancel();
     _proxyLogSub.cancel();

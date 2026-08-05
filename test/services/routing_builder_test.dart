@@ -86,6 +86,15 @@ void main() {
     expect(f.rules[3]['domain_suffix'], ['x.com']);
   });
 
+  test('TUN: трафик тестового sing-box идёт мимо туннеля', () {
+    final frag = builder.build(profile(), tun: true);
+    final names = frag.rules
+        .where((r) => r['process_name'] != null)
+        .expand((r) => (r['process_name'] as List).cast<String>())
+        .toList();
+    expect(names, containsAll(['xray', 'sing-box-test']));
+  });
+
   test('allow с direct резолвится через direct-dns (домены и geo)', () {
     final f = builder.build(profile(
       allow: const [

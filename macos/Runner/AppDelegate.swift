@@ -8,6 +8,8 @@ class AppDelegate: FlutterAppDelegate {
   private let helperChannel = HelperChannel()
   private let deepLinkChannel = DeepLinkChannel()
   private let xrayChannel = XrayChannel()
+  private let singboxTestChannel = SingboxTestChannel()
+  private let xrayTestChannel = XrayTestChannel()
 
   override func applicationDidFinishLaunching(_ notification: Notification) {
     let controller = mainFlutterWindow?.contentViewController
@@ -17,6 +19,8 @@ class AppDelegate: FlutterAppDelegate {
     helperChannel.register(with: controller.registrar(forPlugin: "HelperChannel"))
     deepLinkChannel.register(with: controller.registrar(forPlugin: "DeepLinkChannel"))
     xrayChannel.register(with: controller.registrar(forPlugin: "XrayChannel"))
+    singboxTestChannel.register(with: controller.registrar(forPlugin: "SingboxTestChannel"))
+    xrayTestChannel.register(with: controller.registrar(forPlugin: "XrayTestChannel"))
     super.applicationDidFinishLaunching(notification)
   }
 

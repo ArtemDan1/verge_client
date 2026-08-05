@@ -3,8 +3,10 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:singbox_client/app/app_controller.dart';
+import 'package:singbox_client/models/auto_select_settings.dart';
 import 'package:singbox_client/models/node_engine.dart';
 import 'package:singbox_client/models/profile.dart';
+import 'package:singbox_client/services/node_tester.dart';
 import 'package:singbox_client/tunnel/xray_process.dart';
 import 'package:singbox_client/services/update_service.dart';
 import 'package:singbox_client/models/app_settings.dart';
@@ -156,6 +158,21 @@ class FakeTimer implements Timer {
   int get tick => 0;
 }
 
+/// FakeTimer с доступом к колбэку: health-check запускаем вручную.
+class _RecordedTimer extends FakeTimer {
+  _RecordedTimer(this.callback, this.onCancel);
+  final void Function(Timer) callback;
+  final void Function(_RecordedTimer) onCancel;
+  @override
+  void cancel() {
+    super.cancel();
+    onCancel(this);
+  }
+  void fire() {
+    if (!cancelled) callback(this);
+  }
+}
+
 /// Записывает, какие URL запрашивались, и умеет подвиснуть на [hold] —
 /// так проверяется защита от параллельных обновлений одного профиля.
 class RecordingSubscriptionService implements SubscriptionService {
@@ -225,6 +242,7 @@ AppController build({
   HelperService? helper,
   UpdateService? updateService,
   ClashApiClient? clashApi,
+  NodeTester? nodeTester,
   Timer Function(Duration, void Function(Timer))? timerFactory,
 }) =>
     AppController(
@@ -240,8 +258,90 @@ AppController build({
       helper: helper,
       updateService: updateService,
       clashApi: clashApi,
+      nodeTester: nodeTester,
       timerFactory: timerFactory,
     );
+
+/// Контроллер с профилем из fakeSub (две ноды A/h и B/h2) и подставным
+/// NodeTester: `best` — индекс ноды, проходящей HTTP-пробу, `tcpBest` —
+/// индекс ноды с лучшим TCP; null означает «все провалились».
+/// `checkResults` — очередь ответов пробы (для health-check из Task 6).
+Future<AppController> _controllerWithProfile({
+  int? best,
+  int? tcpBest,
+  List<bool> checkResults = const [],
+  Timer Function(Duration, void Function(Timer))? timerFactory,
+}) async {
+  var nextPort = 9000;
+  var probeCalls = 0;
+  // Нода с HTTP-ответом по определению жива и по TCP, иначе до HTTP-фазы
+  // она просто не дойдёт.
+  final tcpAlive = tcpBest ?? best;
+  // Порты в HTTP-фазе выдаются не в порядке профиля, а по возрастанию
+  // TCP-задержки: сначала лучшая по TCP нода.
+  final portOrder =
+      tcpAlive == null ? const <int>[] : (tcpAlive == 0 ? [0, 1] : [1, 0]);
+  final tester = NodeTester(
+    ping: _FakePing((node) {
+      if (tcpAlive == null) return const PingResult.timeout();
+      final i = node.name == 'A' ? 0 : 1;
+      return PingResult.ok(tcpAlive == i ? 1 : 100);
+    }),
+    startSingbox: (_) async {},
+    stopSingbox: () async {},
+    startXray: (_) async {},
+    stopXray: () async {},
+    pickPort: () async => nextPort++,
+    probe: (url, port, timeout) async {
+      final call = probeCalls++;
+      // Сначала расходуем очередь health-check, иначе отвечаем по best.
+      if (call < checkResults.length) {
+        return checkResults[call] ? 10 : null;
+      }
+      return best == portOrder[(port - 9000) % portOrder.length] ? 10 : null;
+    },
+  );
+  final c = build(nodeTester: tester, timerFactory: timerFactory);
+  await c.init();
+  await c.addProfile('Sub', 'https://x');
+  return c;
+}
+
+// --- health-check: записанные таймеры и их ручной запуск ---
+final _activeTimers = <_RecordedTimer>[];
+
+Timer _recordTimer(Duration d, void Function(Timer) cb) {
+  final t = _RecordedTimer(cb, _activeTimers.remove);
+  _activeTimers.add(t);
+  return t;
+}
+
+void _fireTimer() => _activeTimers.last.fire();
+
+/// Отмечает активный профиль в автовыборе: пул кандидатов пуст по умолчанию.
+Future<void> _markActive(AppController c) => c.updateAutoSelectSettings(
+    AutoSelectSettings(enabled: true, profileIds: {c.activeProfileId!}));
+
+/// Контроллер с профилем, подключённый, с включённым автовыбором на нём.
+Future<AppController> _controllerWithHealthCheck({
+  required List<bool> checkResults,
+  int? best,
+}) async {
+  final c = await _controllerWithProfile(
+    best: best,
+    checkResults: checkResults,
+    timerFactory: _recordTimer,
+  );
+  await c.connect();
+  // Отбрасываем таймер автообновления профилей: дальше интересует только
+  // таймер health-check.
+  _activeTimers.clear();
+  // Включаем после connect: иначе хук подключения съест очередь checkResults,
+  // предназначенную фоновым тикам.
+  await c.updateAutoSelectSettings(
+      AutoSelectSettings(enabled: true, profileIds: {c.activeProfileId!}));
+  return c;
+}
 
 void main() {
   setUp(() {
@@ -982,11 +1082,12 @@ void main() {
       expect(app.status, TunnelStatus.disconnected);
     });
 
-    test('проверка обновлений не идёт, если прошло меньше суток', () async {
+    test('проверка обновлений не идёт сразу после предыдущей', () async {
       final svc = FakeUpdateService();
       final repo = InMemoryStateRepository(PersistedState(
         settings: const AppSettings().copyWith(
-          lastUpdateCheckAt: DateTime.now().subtract(const Duration(hours: 3)),
+          lastUpdateCheckAt:
+              DateTime.now().subtract(const Duration(minutes: 10)),
         ),
       ));
       final app = build(repo: repo, updateService: svc);
@@ -995,11 +1096,11 @@ void main() {
       expect(svc.checkCalls, 0);
     });
 
-    test('проверка обновлений идёт, если прошло больше суток', () async {
+    test('проверка обновлений идёт, когда период истёк', () async {
       final svc = FakeUpdateService();
       final repo = InMemoryStateRepository(PersistedState(
         settings: const AppSettings().copyWith(
-          lastUpdateCheckAt: DateTime.now().subtract(const Duration(days: 2)),
+          lastUpdateCheckAt: DateTime.now().subtract(const Duration(hours: 2)),
         ),
       ));
       final app = build(repo: repo, updateService: svc);
@@ -1008,7 +1109,7 @@ void main() {
       expect(svc.checkCalls, 1);
     });
 
-    test('ошибка тихой проверки не всплывает и обновляет отметку времени',
+    test('ошибка тихой проверки не всплывает и НЕ пишет отметку времени',
         () async {
       final svc = FakeUpdateService(checkError: Exception('net'));
       final repo = InMemoryStateRepository();
@@ -1020,7 +1121,9 @@ void main() {
 
       expect(app.availableUpdate, isNull);
       expect(alerts, isEmpty);
-      expect(app.settings.lastUpdateCheckAt, isNotNull);
+      // Иначе неудача из-за отсутствия сети заткнула бы проверку на весь
+      // период, и следующий запуск снова «не проверял бы».
+      expect(app.settings.lastUpdateCheckAt, isNull);
       await sub.cancel();
     });
 
@@ -1213,6 +1316,125 @@ void main() {
 
       expect(app.activeEngine, NodeEngine.singbox);
       expect(xray.startCalls, 0);
+    });
+  });
+
+  group('автовыбор ноды', () {
+    test('autoSelectBest выбирает ноду с лучшей HTTP-задержкой', () async {
+      // Профиль с двумя нодами; тестер отдаёт вторую как лучшую.
+      final c = await _controllerWithProfile(best: 1);
+      await _markActive(c);
+      await c.autoSelectBest();
+      expect(c.profiles.first.selectedNodeIndex, 1);
+    });
+
+    test('при нуле успешных HTTP берётся лучшая по TCP', () async {
+      final c = await _controllerWithProfile(best: null, tcpBest: 1);
+      await _markActive(c);
+      await c.autoSelectBest();
+      expect(c.profiles.first.selectedNodeIndex, 1);
+    });
+
+    test('когда все ноды мертвы, выбор не меняется', () async {
+      final c = await _controllerWithProfile(best: null, tcpBest: null);
+      await _markActive(c);
+      final before = c.profiles.first.selectedNodeIndex;
+      await c.autoSelectBest();
+      expect(c.profiles.first.selectedNodeIndex, before);
+    });
+
+    test('неотмеченный профиль в переборе не участвует', () async {
+      final c = await _controllerWithProfile(best: 1);
+      await c.updateAutoSelectSettings(
+          const AutoSelectSettings(enabled: true, profileIds: {}));
+      await c.autoSelectBest();
+      expect(c.profiles.first.selectedNodeIndex, 0);
+    });
+
+    test('лучшая нода в другом профиле делает его активным', () async {
+      // Два профиля: в первом ноды мертвы по TCP, во втором живы. Победитель
+      // из второго профиля должен и профиль сделать активным.
+      final c = build(
+        sub: SubscriptionService(
+          fetcher: (url) async => FetchResult(
+              url.endsWith('/2')
+                  ? 'vless://uid@alive:443#C'
+                  : 'vless://uid@dead:443#A',
+              const {}),
+        ),
+        nodeTester: NodeTester(
+          ping: _FakePing((node) => node.host == 'alive'
+              ? PingResult.ok(10)
+              : const PingResult.timeout()),
+          startSingbox: (_) async {},
+          stopSingbox: () async {},
+          startXray: (_) async {},
+          stopXray: () async {},
+          pickPort: () async => 9000,
+          probe: (url, port, timeout) async => 5,
+        ),
+      );
+      await c.init();
+      await c.addProfile('First', 'https://x/1');
+      await c.addProfile('Second', 'https://x/2');
+      final first = c.profiles.first.id;
+      final second = c.profiles.last.id;
+      await c.selectNode(first, 0);
+      expect(c.activeProfileId, first);
+
+      await c.updateAutoSelectSettings(
+          AutoSelectSettings(enabled: true, profileIds: {first, second}));
+      await c.autoSelectBest();
+
+      expect(c.activeProfileId, second);
+      expect(c.selectedNode!.name, 'C');
+    });
+
+    test('connect зовёт автовыбор только при непустом наборе профилей',
+        () async {
+      final c = await _controllerWithProfile(best: 1);
+      await c.updateAutoSelectSettings(
+          const AutoSelectSettings(enabled: true, profileIds: {}));
+      await c.connect();
+      expect(c.profiles.first.selectedNodeIndex, 0, reason: 'профиль не отмечен');
+
+      await c.disconnect();
+      await c.updateAutoSelectSettings(AutoSelectSettings(
+          enabled: true, profileIds: {c.activeProfileId!}));
+      await c.connect();
+      expect(c.profiles.first.selectedNodeIndex, 1);
+    });
+
+    test('выключенный автовыбор не трогает выбор при connect', () async {
+      final c = await _controllerWithProfile(best: 1);
+      await c.updateAutoSelectSettings(AutoSelectSettings(
+          enabled: false, profileIds: {c.activeProfileId!}));
+      await c.connect();
+      expect(c.profiles.first.selectedNodeIndex, 0);
+    });
+  });
+
+  group('health-check', () {
+    test('один провал health-check ноду не меняет, два подряд — меняют', () async {
+      final c = await _controllerWithHealthCheck(checkResults: [false, true]);
+      _fireTimer(); await pumpEventQueue();
+      expect(c.profiles.first.selectedNodeIndex, 0, reason: 'сеть могла мигнуть');
+      _fireTimer(); await pumpEventQueue();
+      expect(c.profiles.first.selectedNodeIndex, 0, reason: 'успех обнуляет счётчик');
+    });
+
+    test('два провала подряд запускают автовыбор и переподключение', () async {
+      final c = await _controllerWithHealthCheck(
+          checkResults: [false, false], best: 1);
+      _fireTimer(); await pumpEventQueue();
+      _fireTimer(); await pumpEventQueue();
+      expect(c.profiles.first.selectedNodeIndex, 1);
+    });
+
+    test('таймер снимается при disconnect', () async {
+      final c = await _controllerWithHealthCheck(checkResults: [false, false]);
+      await c.disconnect();
+      expect(_activeTimers, isEmpty);
     });
   });
 

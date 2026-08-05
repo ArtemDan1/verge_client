@@ -50,7 +50,13 @@ class RoutingBuilder {
     if (tun) {
       // Трафик самого Xray-процесса не должен уходить в прокси: иначе
       // sing-box → Xray → sing-box → петля. find_process даёт process_name.
-      rules.add({'process_name': ['xray'], 'outbound': 'direct'});
+      // Тестовый sing-box здесь по той же причине: в TUN его замер поехал бы
+      // через сам туннель и показывал бы «всё хорошо» на мёртвой ноде.
+      // Боевой процесс называется `sing-box` и под правило не попадает.
+      rules.add({
+        'process_name': ['xray', 'sing-box-test'],
+        'outbound': 'direct'
+      });
       if (serverIp != null && serverIp.isNotEmpty) {
         rules.add({'ip_cidr': ['$serverIp/32'], 'outbound': 'direct'});
       }

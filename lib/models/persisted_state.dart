@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'profile.dart';
 import 'app_settings.dart';
+import 'auto_select_settings.dart';
 import 'network_settings.dart';
 import 'routing_profile.dart';
 
@@ -20,6 +21,8 @@ class PersistedState {
 
   final NetworkSettings networkSettings;
 
+  final AutoSelectSettings autoSelect;
+
   const PersistedState({
     this.profiles = const [],
     this.activeProfileId,
@@ -29,6 +32,7 @@ class PersistedState {
     this.geoUpdatedAt,
     this.hwid,
     this.networkSettings = const NetworkSettings(),
+    this.autoSelect = const AutoSelectSettings(),
   });
 
   PersistedState copyWith({
@@ -42,6 +46,7 @@ class PersistedState {
     DateTime? geoUpdatedAt,
     String? hwid,
     NetworkSettings? networkSettings,
+    AutoSelectSettings? autoSelect,
   }) =>
       PersistedState(
         profiles: profiles ?? this.profiles,
@@ -55,6 +60,7 @@ class PersistedState {
         geoUpdatedAt: geoUpdatedAt ?? this.geoUpdatedAt,
         hwid: hwid ?? this.hwid,
         networkSettings: networkSettings ?? this.networkSettings,
+        autoSelect: autoSelect ?? this.autoSelect,
       );
 
   Map<String, dynamic> toJson() => {
@@ -66,6 +72,7 @@ class PersistedState {
         'geoUpdatedAt': geoUpdatedAt?.toIso8601String(),
         'hwid': hwid,
         'networkSettings': networkSettings.toJson(),
+        'autoSelect': autoSelect.toJson(),
       };
 
   factory PersistedState.fromJson(Map<String, dynamic> json) => PersistedState(
@@ -90,5 +97,9 @@ class PersistedState {
             ? const NetworkSettings()
             : NetworkSettings.fromJson(
                 (json['networkSettings'] as Map).cast<String, dynamic>()),
+        autoSelect: json['autoSelect'] == null
+            ? const AutoSelectSettings()
+            : AutoSelectSettings.fromJson(
+                (json['autoSelect'] as Map).cast<String, dynamic>()),
       );
 }
