@@ -21,14 +21,28 @@ final class SingboxProcess {
   /// За это время вылезает FATAL некорректного конфига.
   private let startupGrace: TimeInterval = 0.8
 
-  func start(configJSON: String) throws {
+  /// Имя, под которым запускается процесс. Тестовый прогон запускается через
+  /// симлинк `sing-box-test`: в режиме TUN роутинг отличает тестовый процесс
+  /// от боевого только по process_name, а bypass по `sing-box` задел бы
+  /// боевой туннель.
+  func start(configJSON: String, processName: String = "sing-box") throws {
     let dir = FileManager.default.temporaryDirectory
-    let cfg = dir.appendingPathComponent("singbox-config.json")
+    let cfg = dir.appendingPathComponent("\(processName)-config.json")
     try configJSON.write(to: cfg, atomically: true, encoding: .utf8)
 
-    guard let bin = Bundle.main.url(forResource: "sing-box", withExtension: nil)
+    guard let bundled = Bundle.main.url(forResource: "sing-box", withExtension: nil)
     else { throw NSError(domain: "Singbox", code: 1,
             userInfo: [NSLocalizedDescriptionKey: "binary not bundled"]) }
+
+    let bin: URL
+    if processName == "sing-box" {
+      bin = bundled
+    } else {
+      let link = dir.appendingPathComponent(processName)
+      try? FileManager.default.removeItem(at: link)
+      try FileManager.default.createSymbolicLink(at: link, withDestinationURL: bundled)
+      bin = link
+    }
 
     stopping = false
     logLock.lock(); logTail.removeAll(); logLock.unlock()

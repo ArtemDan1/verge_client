@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:singbox_client/models/auto_select_settings.dart';
 import 'package:singbox_client/models/persisted_state.dart';
 import 'package:singbox_client/models/profile.dart';
 import 'package:singbox_client/models/app_settings.dart';
@@ -62,5 +63,16 @@ void main() {
   test('старый JSON без hwid → null', () {
     final r = PersistedState.fromJson(const <String, dynamic>{});
     expect(r.hwid, isNull);
+  });
+
+  test('autoSelect переживает round-trip и имеет дефолт', () {
+    const state = PersistedState(
+      autoSelect: AutoSelectSettings(enabled: true, profileIds: {'p1'}),
+    );
+    final back = PersistedState.fromJson(state.toJson());
+    expect(back.autoSelect.enabled, isTrue);
+    expect(back.autoSelect.profileIds, {'p1'});
+    // Состояние старой версии без ключа читается как выключенный автовыбор.
+    expect(PersistedState.fromJson({}).autoSelect, const AutoSelectSettings());
   });
 }

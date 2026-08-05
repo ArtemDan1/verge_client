@@ -221,7 +221,8 @@ const _goldenNaiveTun = r'''{
       },
       {
         "process_name": [
-          "xray"
+          "xray",
+          "sing-box-test"
         ],
         "outbound": "direct"
       },

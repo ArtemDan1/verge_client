@@ -9,6 +9,7 @@ import '../models/subscription_info.dart';
 import '../services/engine_selector.dart';
 import '../services/link_opener.dart';
 import '../services/node_display.dart';
+import 'auto_select_dialog.dart';
 import 'widgets/engine_badge.dart';
 import 'widgets/hero_panel.dart';
 import 'widgets/ping_badge.dart';
@@ -174,9 +175,20 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
           const SizedBox(height: 10),
           HeroPanel(controller: c),
           const SizedBox(height: 10),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text('Профили', style: theme.textTheme.large),
+          Row(
+            children: [
+              Text('Профили', style: theme.textTheme.large),
+              const Spacer(),
+              // Перебор занимает секунды и молча меняет выбранную ноду —
+              // без индикатора он неотличим от неработающей кнопки.
+              if (c.isAutoSelecting) ...[
+                Text('Подбираем ноду…', style: theme.textTheme.muted),
+                const SizedBox(width: 8),
+              ],
+              // Включённый автовыбор — залитая кнопка, выключенный — обычная
+              // обводка: состояние фичи видно, не открывая диалог.
+              _AutoSelectButton(controller: c),
+            ],
           ),
           const SizedBox(height: 6),
           // --- Прокручиваемая секция профилей ---
@@ -632,41 +644,118 @@ class _ProfileMenuState extends State<_ProfileMenu> {
   }
 }
 
+/// Кнопка автовыбора. Залита, когда фича включена и есть отмеченные
+/// профили, — иначе включённое состояние никак не отличить от выключенного.
+class _AutoSelectButton extends StatelessWidget {
+  const _AutoSelectButton({required this.controller});
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = controller;
+    final on = c.autoSelect.isActive;
+    final leading = c.isAutoSelecting
+        ? const SizedBox(width: 14, height: 14, child: ShadProgress())
+        : const Icon(LucideIcons.zap, size: 14);
+    final label = Text(on ? 'Автовыбор: вкл' : 'Автовыбор');
+    void open() => showAutoSelectDialog(context, c);
+    return on
+        ? ShadButton(
+            size: ShadButtonSize.sm,
+            onPressed: open,
+            leading: leading,
+            child: label,
+          )
+        : ShadButton.outline(
+            size: ShadButtonSize.sm,
+            onPressed: open,
+            leading: leading,
+            child: label,
+          );
+  }
+}
+
 /// Полупрозрачные градиенты сверху/снизу прокручиваемой области — визуальный
 /// намёк, что секция скроллится. Не перехватывает жесты (IgnorePointer).
-class _ScrollFadeShadow extends StatelessWidget {
+///
+/// Фейд гаснет там, где скроллить уже некуда: в самом верху нет верхнего, в
+/// самом низу — нижнего, а если контент вовсе не прокручивается, нет обоих.
+/// Прозрачность считается из запаса прокрутки, поэтому переход плавный сам по
+/// себе и отдельная анимация не нужна.
+class _ScrollFadeShadow extends StatefulWidget {
   const _ScrollFadeShadow({required this.child, required this.color});
   final Widget child;
   final Color color;
 
   @override
+  State<_ScrollFadeShadow> createState() => _ScrollFadeShadowState();
+}
+
+class _ScrollFadeShadowState extends State<_ScrollFadeShadow> {
+  static const _height = 14.0;
+
+  double _top = 0;
+  double _bottom = 0;
+
+  void _apply(ScrollMetrics m) {
+    final top = (m.extentBefore / _height).clamp(0.0, 1.0);
+    final bottom = (m.extentAfter / _height).clamp(0.0, 1.0);
+    if (top == _top && bottom == _bottom) return;
+    setState(() {
+      _top = top;
+      _bottom = bottom;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    Widget fade(Alignment begin, Alignment end) => IgnorePointer(
-          child: Container(
-            height: 14,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: begin,
-                end: end,
-                colors: [color, color.withValues(alpha: 0)],
+    final color = widget.color;
+    Widget fade(double opacity, Alignment begin, Alignment end) => IgnorePointer(
+          child: Opacity(
+            opacity: opacity,
+            child: Container(
+              height: _height,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: begin,
+                  end: end,
+                  colors: [color, color.withValues(alpha: 0)],
+                ),
               ),
             ),
           ),
         );
-    return Stack(
-      children: [
-        Positioned.fill(child: child),
-        Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: fade(Alignment.topCenter, Alignment.bottomCenter)),
-        Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: fade(Alignment.bottomCenter, Alignment.topCenter)),
-      ],
+    // Два слушателя: ScrollUpdateNotification ловит саму прокрутку, а
+    // ScrollMetricsNotification — изменение размеров контента (профиль
+    // раскрыли/добавили), в том числе первую раскладку. Второй не является
+    // ScrollNotification, поэтому одним NotificationListener не обойтись.
+    return NotificationListener<ScrollMetricsNotification>(
+      onNotification: (n) {
+        _apply(n.metrics);
+        return false;
+      },
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (n) {
+          _apply(n.metrics);
+          return false;
+        },
+        child: Stack(
+          children: [
+            Positioned.fill(child: widget.child),
+            Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: fade(_top, Alignment.topCenter, Alignment.bottomCenter)),
+            Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child:
+                    fade(_bottom, Alignment.bottomCenter, Alignment.topCenter)),
+          ],
+        ),
+      ),
     );
   }
 }
