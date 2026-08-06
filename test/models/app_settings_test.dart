@@ -34,4 +34,33 @@ void main() {
     expect(s.lastUpdateCheckAt, isNull);
     expect(s.skippedVersion, isNull);
   });
+
+  test('поля пинга gstatic имеют дефолты и переживают round-trip', () {
+    const s = AppSettings();
+    expect(s.gstaticPingEnabled, isTrue);
+    expect(s.gstaticPingIntervalSeconds, 20);
+
+    final changed = s.copyWith(
+      gstaticPingEnabled: false,
+      gstaticPingIntervalSeconds: 45,
+    );
+    final back = AppSettings.fromJson(changed.toJson());
+    expect(back.gstaticPingEnabled, isFalse);
+    expect(back.gstaticPingIntervalSeconds, 45);
+  });
+
+  test('старый JSON без полей пинга gstatic даёт дефолты', () {
+    final json = const AppSettings().toJson()
+      ..remove('gstaticPingEnabled')
+      ..remove('gstaticPingIntervalSeconds');
+    final s = AppSettings.fromJson(json);
+    expect(s.gstaticPingEnabled, isTrue);
+    expect(s.gstaticPingIntervalSeconds, 20);
+  });
+
+  test('clampGstaticPingInterval держит интервал в 5..60', () {
+    expect(AppSettings.clampGstaticPingInterval(1), 5);
+    expect(AppSettings.clampGstaticPingInterval(999), 60);
+    expect(AppSettings.clampGstaticPingInterval(30), 30);
+  });
 }

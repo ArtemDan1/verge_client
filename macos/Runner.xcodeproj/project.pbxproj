@@ -44,6 +44,7 @@
 		AE001001000000000000AAA6 /* XrayChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE001001000000000000BBB6 /* XrayChannel.swift */; };
 		AE001001000000000000AAA7 /* SingboxTestChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE001001000000000000BBB7 /* SingboxTestChannel.swift */; };
 		AE001001000000000000AAA8 /* XrayTestChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE001001000000000000BBB8 /* XrayTestChannel.swift */; };
+		AE001001000000000000AAA9 /* WindowControlChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE001001000000000000BBB9 /* WindowControlChannel.swift */; };
 		05EA0514801788EB8C6DFE23 /* DeepLinkChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D064585083E3D94527903AE0 /* DeepLinkChannel.swift */; };
 /* End PBXBuildFile section */
 
@@ -146,6 +147,7 @@
 		AE001001000000000000BBB6 /* XrayChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XrayChannel.swift; sourceTree = "<group>"; };
 		AE001001000000000000BBB7 /* SingboxTestChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SingboxTestChannel.swift; sourceTree = "<group>"; };
 		AE001001000000000000BBB8 /* XrayTestChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XrayTestChannel.swift; sourceTree = "<group>"; };
+		AE001001000000000000BBB9 /* WindowControlChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowControlChannel.swift; sourceTree = "<group>"; };
 		D064585083E3D94527903AE0 /* DeepLinkChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeepLinkChannel.swift; sourceTree = "<group>"; };
 		AE197E5516EE6B06C2355E62 /* sing-box */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = "compiled.mach-o.executable"; name = "sing-box"; path = "Resources/sing-box"; sourceTree = "<group>"; };
 		AE001001000000000000BBB0 /* xray */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = "compiled.mach-o.executable"; name = "xray"; path = "Resources/xray"; sourceTree = "<group>"; };
@@ -262,6 +264,7 @@
 				AE001001000000000000BBB6 /* XrayChannel.swift */,
 				AE001001000000000000BBB7 /* SingboxTestChannel.swift */,
 				AE001001000000000000BBB8 /* XrayTestChannel.swift */,
+				AE001001000000000000BBB9 /* WindowControlChannel.swift */,
 				D064585083E3D94527903AE0 /* DeepLinkChannel.swift */,
 				33E51913231747F40026EE4D /* DebugProfile.entitlements */,
 				33E51914231749380026EE4D /* Release.entitlements */,
@@ -512,6 +515,7 @@
 				AE001001000000000000AAA6 /* XrayChannel.swift in Sources */,
 				AE001001000000000000AAA7 /* SingboxTestChannel.swift in Sources */,
 				AE001001000000000000AAA8 /* XrayTestChannel.swift in Sources */,
+				AE001001000000000000AAA9 /* WindowControlChannel.swift in Sources */,
 				05EA0514801788EB8C6DFE23 /* DeepLinkChannel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

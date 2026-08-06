@@ -42,6 +42,7 @@ dependencies:
   path: ^1.9.1
   shadcn_ui: ^0.54.0
   lucide_icons: ^0.257.0
+  tray_manager: ^0.5.3
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -82,6 +83,7 @@ flutter:
   assets:
     - assets/rule-sets/
     - assets/branding/
+    - assets/tray/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

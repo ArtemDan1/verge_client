@@ -195,11 +195,16 @@ class ControlledTimerFactory {
   FakeTimer? _timer;
   void Function(Timer)? _callback;
   Duration? capturedDuration;
+  // Все запрошенные интервалы: _timerFactory используется и автообновлением
+  // профилей, и health-check, и пингом gstatic — по одному последнему вызову
+  // их не различить.
+  final durations = <Duration>[];
   int callCount = 0;
 
   Timer call(Duration duration, void Function(Timer) callback) {
     callCount++;
     capturedDuration = duration;
+    durations.add(duration);
     _callback = callback;
     _timer = FakeTimer();
     return _timer!;
@@ -244,6 +249,8 @@ AppController build({
   ClashApiClient? clashApi,
   NodeTester? nodeTester,
   Timer Function(Duration, void Function(Timer))? timerFactory,
+  Future<int?> Function(String url, int? port, {Duration timeout})?
+      gstaticProbe,
 }) =>
     AppController(
       subscription: sub ??
@@ -260,6 +267,9 @@ AppController build({
       clashApi: clashApi,
       nodeTester: nodeTester,
       timerFactory: timerFactory,
+      // По умолчанию — заглушка, чтобы тесты не ходили в реальную сеть.
+      gstaticProbe: gstaticProbe ??
+          (url, port, {timeout = const Duration(seconds: 3)}) async => null,
     );
 
 /// Контроллер с профилем из fakeSub (две ноды A/h и B/h2) и подставным
@@ -332,6 +342,9 @@ Future<AppController> _controllerWithHealthCheck({
     checkResults: checkResults,
     timerFactory: _recordTimer,
   );
+  // Пинг gstatic выключаем заранее: его таймер регистрировался бы после
+  // health-check в _activeTimers и _fireTimer() бил бы не по тому тику.
+  await c.updateSettings(c.settings.copyWith(gstaticPingEnabled: false));
   await c.connect();
   // Отбрасываем таймер автообновления профилей: дальше интересует только
   // таймер health-check.
@@ -1455,5 +1468,195 @@ void main() {
     await app.setProfileRefreshInterval('p1', null);
     // Оверрайд снят — снова действует интервал провайдера.
     expect(app.profiles.first.effectiveRefreshIntervalMinutes, 360);
+  });
+
+  group('пинг gstatic', () {
+    AppController buildWithProbe({
+      required Future<int?> Function(String url, int? port, {Duration timeout})
+          probe,
+      Timer Function(Duration, void Function(Timer))? timerFactory,
+    }) =>
+        AppController(
+          subscription: SubscriptionService(
+              fetcher: (_) async => FetchResult(fakeSub, const {})),
+          builder: const ConfigBuilder(),
+          proxyTunnel: proxyTunnel,
+          tunTunnel: tunTunnel,
+          repo: InMemoryStateRepository(),
+          platform: FakePlatformInfo(),
+          resolveHost: (_) async => '9.9.9.9',
+          timerFactory: timerFactory,
+          gstaticProbe: probe,
+        );
+
+    test('после подключения запускает таймер пинга с интервалом настроек',
+        () async {
+      final timerFactory = ControlledTimerFactory();
+      final c = buildWithProbe(
+        probe: (url, port, {timeout = const Duration(seconds: 3)}) async => 42,
+        timerFactory: timerFactory.call,
+      );
+      await c.init();
+      proxyTunnel.emit(TunnelStatus.connected);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(timerFactory.capturedDuration, const Duration(seconds: 20));
+    });
+
+    test('первый замер приходит сразу после подключения, не ждёт интервала',
+        () async {
+      final c = buildWithProbe(
+        probe: (url, port, {timeout = const Duration(seconds: 3)}) async => 42,
+      );
+      await c.init();
+      proxyTunnel.emit(TunnelStatus.connected);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(c.gstaticPingMs, 42);
+    });
+
+    test('выключенная настройка не запускает таймер и не пингует', () async {
+      final timerFactory = ControlledTimerFactory();
+      final c = buildWithProbe(
+        probe: (url, port, {timeout = const Duration(seconds: 3)}) async => 42,
+        timerFactory: timerFactory.call,
+      );
+      await c.init();
+      await c.updateSettings(c.settings.copyWith(gstaticPingEnabled: false));
+      proxyTunnel.emit(TunnelStatus.connected);
+      await Future<void>.delayed(Duration.zero);
+
+      // Таймеров с интервалом пинга нет — только автообновление профилей.
+      expect(timerFactory.durations, isNot(contains(const Duration(seconds: 20))));
+      expect(c.gstaticPingMs, isNull);
+    });
+
+    test('дисконнект останавливает таймер', () async {
+      final timerFactory = ControlledTimerFactory();
+      final c = buildWithProbe(
+        probe: (url, port, {timeout = const Duration(seconds: 3)}) async => 42,
+        timerFactory: timerFactory.call,
+      );
+      await c.init();
+      proxyTunnel.emit(TunnelStatus.connected);
+      await Future<void>.delayed(Duration.zero);
+      proxyTunnel.emit(TunnelStatus.disconnected);
+
+      // Таймер пинга заводился один раз и не перезапустился новым тиком.
+      expect(
+          timerFactory.durations
+              .where((d) => d == const Duration(seconds: 20))
+              .length,
+          1);
+    });
+
+    test('ручной pingGstatic() бьёт немедленно и обновляет значение',
+        () async {
+      var calls = 0;
+      final c = buildWithProbe(
+        probe: (url, port, {timeout = const Duration(seconds: 3)}) async {
+          calls++;
+          return 77;
+        },
+      );
+      await c.init();
+      proxyTunnel.emit(TunnelStatus.connected);
+      await Future<void>.delayed(Duration.zero);
+      calls = 0; // сбрасываем счётчик автозамера при коннекте
+
+      await c.pingGstatic();
+
+      expect(calls, 1);
+      expect(c.gstaticPingMs, 77);
+    });
+
+    test('устаревший ответ не перетирает более новый результат', () async {
+      final completers = <Completer<int?>>[];
+      final c = buildWithProbe(
+        probe: (url, port, {timeout = const Duration(seconds: 3)}) {
+          final completer = Completer<int?>();
+          completers.add(completer);
+          return completer.future;
+        },
+      );
+      await c.init();
+      proxyTunnel.emit(TunnelStatus.connected);
+      await Future<void>.delayed(Duration.zero);
+      // Замер при коннекте уже в полёте (completers[0]).
+
+      final first = c.pingGstatic(); // второй параллельный замер
+      await Future<void>.delayed(Duration.zero);
+      expect(completers.length, 2);
+
+      // Новый (второй) приходит первым...
+      completers[1].complete(10);
+      await first;
+      expect(c.gstaticPingMs, 10);
+
+      // ...старый (первый) приходит позже и не должен перетереть.
+      completers[0].complete(999);
+      await Future<void>.delayed(Duration.zero);
+      expect(c.gstaticPingMs, 10);
+    });
+
+    test('в TUN зонд идёт напрямую (без localPort — там нет mixed-inbound)',
+        () async {
+      int? capturedPort = -1; // сентинел, чтобы отличить "не вызывался"
+      final c = buildWithProbe(
+        probe: (url, port, {timeout = const Duration(seconds: 3)}) async {
+          capturedPort = port;
+          return 5;
+        },
+      );
+      await c.init();
+      await c.updateSettings(c.settings.copyWith(tunnelMode: TunnelMode.tun));
+      tunTunnel.emit(TunnelStatus.connected);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(capturedPort, isNull);
+      expect(c.gstaticPingMs, 5);
+    });
+
+    test('в режиме Proxy зонд идёт через localPort', () async {
+      int? capturedPort = -1;
+      final c = buildWithProbe(
+        probe: (url, port, {timeout = const Duration(seconds: 3)}) async {
+          capturedPort = port;
+          return 5;
+        },
+      );
+      await c.init();
+      proxyTunnel.emit(TunnelStatus.connected);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(capturedPort, c.settings.localPort);
+    });
+
+    test('refreshHeroPing пингует и gstatic, и ноду параллельно', () async {
+      var gstaticCalls = 0;
+      final fakePing = PingService(
+        connect: (host, port, {timeout}) async {
+          throw const SocketException('refused');
+        },
+      );
+      final app = build(
+        pingService: fakePing,
+        gstaticProbe: (url, port, {timeout = const Duration(seconds: 3)}) async {
+          gstaticCalls++;
+          return 42;
+        },
+      );
+      await app.init();
+      await app.addProfile('Sub', 'https://x');
+      await app.selectNode(app.profiles.first.id, 0);
+      proxyTunnel.emit(TunnelStatus.connected);
+      await Future<void>.delayed(Duration.zero);
+
+      await app.refreshHeroPing();
+
+      expect(gstaticCalls, greaterThanOrEqualTo(1));
+      expect(app.pingFor(app.selectedNode!), isNotNull);
+      app.dispose();
+    });
   });
 }

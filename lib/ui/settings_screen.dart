@@ -3,6 +3,7 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 import '../app/app_controller.dart';
 import 'settings/dns_section.dart';
 import 'settings/general_section.dart';
+import 'settings/gstatic_ping_section.dart';
 import 'settings/network_section.dart';
 import 'settings/tls_section.dart';
 import 'settings/tun_section.dart';
@@ -44,6 +45,7 @@ class SettingsScreen extends StatelessWidget {
               ),
             ),
           GeneralSection(controller: controller),
+          GstaticPingSection(controller: controller),
           NetworkSection(controller: controller),
           DnsSection(controller: controller),
           TunSection(controller: controller),

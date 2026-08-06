@@ -20,6 +20,18 @@ class AppSettings {
   /// ней не показываются; следующая версия покажется снова.
   final String? skippedVersion;
 
+  /// Периодический пинг активного соединения до gstatic (бейдж у таймера).
+  /// Независим от Автовыбора — тот использует свой критерий для подбора ноды.
+  final bool gstaticPingEnabled;
+  final int gstaticPingIntervalSeconds;
+
+  static const defaultGstaticPingIntervalSeconds = 20;
+  static const minGstaticPingIntervalSeconds = 5;
+  static const maxGstaticPingIntervalSeconds = 60;
+
+  static int clampGstaticPingInterval(int seconds) => seconds.clamp(
+      minGstaticPingIntervalSeconds, maxGstaticPingIntervalSeconds);
+
   const AppSettings({
     this.themeMode = AppThemeMode.system,
     this.localPort = 2080,
@@ -28,6 +40,8 @@ class AppSettings {
     this.tunnelMode = TunnelMode.systemProxy,
     this.lastUpdateCheckAt,
     this.skippedVersion,
+    this.gstaticPingEnabled = true,
+    this.gstaticPingIntervalSeconds = defaultGstaticPingIntervalSeconds,
   });
 
   AppSettings copyWith({
@@ -38,6 +52,8 @@ class AppSettings {
     TunnelMode? tunnelMode,
     DateTime? lastUpdateCheckAt,
     String? skippedVersion,
+    bool? gstaticPingEnabled,
+    int? gstaticPingIntervalSeconds,
   }) =>
       AppSettings(
         themeMode: themeMode ?? this.themeMode,
@@ -47,6 +63,10 @@ class AppSettings {
         tunnelMode: tunnelMode ?? this.tunnelMode,
         lastUpdateCheckAt: lastUpdateCheckAt ?? this.lastUpdateCheckAt,
         skippedVersion: skippedVersion ?? this.skippedVersion,
+        gstaticPingEnabled: gstaticPingEnabled ?? this.gstaticPingEnabled,
+        gstaticPingIntervalSeconds: gstaticPingIntervalSeconds == null
+            ? this.gstaticPingIntervalSeconds
+            : clampGstaticPingInterval(gstaticPingIntervalSeconds),
       );
 
   Map<String, dynamic> toJson() => {
@@ -57,6 +77,8 @@ class AppSettings {
         'tunnelMode': tunnelMode.name,
         'lastUpdateCheckAt': lastUpdateCheckAt?.toUtc().toIso8601String(),
         'skippedVersion': skippedVersion,
+        'gstaticPingEnabled': gstaticPingEnabled,
+        'gstaticPingIntervalSeconds': gstaticPingIntervalSeconds,
       };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -70,6 +92,11 @@ class AppSettings {
             ? null
             : DateTime.parse(json['lastUpdateCheckAt'] as String),
         skippedVersion: json['skippedVersion'] as String?,
+        gstaticPingEnabled: json['gstaticPingEnabled'] as bool? ?? true,
+        gstaticPingIntervalSeconds: (json['gstaticPingIntervalSeconds']
+                as num?)
+                ?.toInt() ??
+            defaultGstaticPingIntervalSeconds,
       );
 
   @override
@@ -81,9 +108,19 @@ class AppSettings {
       other.autostart == autostart &&
       other.tunnelMode == tunnelMode &&
       other.lastUpdateCheckAt == lastUpdateCheckAt &&
-      other.skippedVersion == skippedVersion;
+      other.skippedVersion == skippedVersion &&
+      other.gstaticPingEnabled == gstaticPingEnabled &&
+      other.gstaticPingIntervalSeconds == gstaticPingIntervalSeconds;
 
   @override
-  int get hashCode => Object.hash(themeMode, localPort, networkService,
-      autostart, tunnelMode, lastUpdateCheckAt, skippedVersion);
+  int get hashCode => Object.hash(
+      themeMode,
+      localPort,
+      networkService,
+      autostart,
+      tunnelMode,
+      lastUpdateCheckAt,
+      skippedVersion,
+      gstaticPingEnabled,
+      gstaticPingIntervalSeconds);
 }

@@ -5,6 +5,7 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'app/app_controller.dart';
+import 'app/tray_service.dart';
 import 'models/app_settings.dart';
 import 'services/subscription_service.dart';
 import 'services/config_builder.dart';
@@ -36,6 +37,7 @@ Future<void> main() async {
     geoUpdater: GeoUpdater(geoAssetDir),
   );
   await controller.init();
+  await TrayService(controller).init();
   final deepLink = DeepLinkService();
   await deepLink.init();
   runApp(SingboxApp(controller: controller, deepLink: deepLink));

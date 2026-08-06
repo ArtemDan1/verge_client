@@ -13,6 +13,7 @@ import '../models/routing_profile.dart';
 import '../models/log_entry.dart';
 import '../models/auto_select_settings.dart';
 import '../services/node_tester.dart';
+import '../services/http_probe.dart';
 import '../tunnel/test_process.dart';
 import '../services/subscription_service.dart';
 import '../services/config_builder.dart';
@@ -41,6 +42,8 @@ class AppController extends ChangeNotifier {
   final PlatformInfo _platform;
   final Future<String?> Function(String host) _resolveHost;
   final Timer Function(Duration, void Function(Timer)) _timerFactory;
+  final Future<int?> Function(String url, int? proxyPort, {Duration timeout})
+      _gstaticProbe;
   final HelperService _helper;
   final UpdateService _update;
 
@@ -193,6 +196,8 @@ class AppController extends ChangeNotifier {
     Future<int> Function()? pickPort,
     Future<bool> Function(int port)? probeSocks,
     NodeTester? nodeTester,
+    Future<int?> Function(String url, int? proxyPort, {Duration timeout})?
+        gstaticProbe,
   })  : _xrayFactory = xrayFactory ?? XrayProcess.new,
         _pickPort = pickPort ?? pickFreePort,
         _probeSocks = probeSocks ?? _defaultProbeSocks,
@@ -207,7 +212,8 @@ class AppController extends ChangeNotifier {
         _repo = repo,
         _platform = platform,
         _resolveHost = resolveHost ?? _dnsLookup,
-        _timerFactory = timerFactory ?? Timer.periodic {
+        _timerFactory = timerFactory ?? Timer.periodic,
+        _gstaticProbe = gstaticProbe ?? httpProbeLatency {
     _proxySub = _proxyTunnel.statusStream.listen((s) => _onStatus(_proxyTunnel, s));
     _tunSub = _tunTunnel.statusStream.listen((s) => _onStatus(_tunTunnel, s));
     // Тестер логирует причины провалов замера, а тестовые процессы — свой
@@ -228,6 +234,8 @@ class AppController extends ChangeNotifier {
       _connectedAt ??= DateTime.now();
     } else if (s == TunnelStatus.disconnected || s == TunnelStatus.error) {
       _connectedAt = null;
+      _gstaticPingMs = null;
+      _gstaticPingFailed = false;
     }
     // Аварийное завершение sing-box — показываем причину пользователю.
     if (s == TunnelStatus.error) {
@@ -238,6 +246,7 @@ class AppController extends ChangeNotifier {
       _clashApi.stop();
     }
     _restartHealthCheck();
+    _restartGstaticPing();
     notifyListeners();
     // Туннель поднялся — самое время обновить устаревшие наборы через прокси.
     if (s == TunnelStatus.connected &&
@@ -677,6 +686,7 @@ class AppController extends ChangeNotifier {
     _state = _state.copyWith(settings: settings);
     await _persist();
     _scheduleAutoRefresh();
+    _restartGstaticPing();
     if (modeChanged && wasActive) {
       await connect();
     }
@@ -693,10 +703,21 @@ class AppController extends ChangeNotifier {
     // Интервал мог измениться — иначе новое значение подхватилось бы только
     // со следующего подключения.
     _restartHealthCheck();
+    _restartGstaticPing();
     notifyListeners();
   }
 
   Timer? _healthTimer;
+
+  Timer? _gstaticPingTimer;
+  int? _gstaticPingMs;
+  bool _gstaticPingFailed = false;
+  bool _pingingGstatic = false;
+  int _gstaticPingGeneration = 0;
+
+  int? get gstaticPingMs => _gstaticPingMs;
+  bool get gstaticPingFailed => _gstaticPingFailed;
+  bool get isPingingGstatic => _pingingGstatic;
 
   /// Сколько проверок подряд провалилось. Один провал ничего не значит —
   /// сеть мигает; переключаемся на втором.
@@ -715,6 +736,68 @@ class AppController extends ChangeNotifier {
       Duration(seconds: _state.autoSelect.healthCheckIntervalSeconds),
       (_) => _onHealthTick(),
     );
+  }
+
+  void _restartGstaticPing() {
+    _gstaticPingTimer?.cancel();
+    _gstaticPingTimer = null;
+    if (_status != TunnelStatus.connected) return;
+    if (!_state.settings.gstaticPingEnabled) return;
+    // Первый замер — сразу, не через полный интервал: иначе бейдж пустует
+    // всё первое ожидание после подключения.
+    refreshHeroPing();
+    _gstaticPingTimer = _timerFactory(
+      Duration(seconds: _state.settings.gstaticPingIntervalSeconds),
+      (_) => refreshHeroPing(),
+    );
+  }
+
+  /// Замеряет задержку до gstatic через активное соединение. Публичный —
+  /// вызывается и таймером, и тапом по бейджу в UI. Безопасен для
+  /// конкурентных вызовов: устаревший ответ не перетирает более новый
+  /// (сравнение по generation, инкрементируемому на каждый запуск).
+  Future<void> pingGstatic() async {
+    if (_status != TunnelStatus.connected) return;
+    final generation = ++_gstaticPingGeneration;
+    _pingingGstatic = true;
+    notifyListeners();
+    // В TUN нет mixed-inbound на localPort (см. ConfigBuilder._buildTun) —
+    // трафик и так перехватывается на уровне ОС, проксировать вручную не на
+    // что; null → httpProbeLatency бьёт напрямую (DIRECT).
+    final port = _state.settings.tunnelMode == TunnelMode.tun
+        ? null
+        : _state.settings.localPort;
+    final ms = await _gstaticProbe(
+      'https://www.gstatic.com/generate_204',
+      port,
+      timeout: const Duration(seconds: 3),
+    );
+    if (generation != _gstaticPingGeneration) return; // обогнали новым тапом
+    _gstaticPingMs = ms;
+    _gstaticPingFailed = ms == null;
+    _pingingGstatic = false;
+    notifyListeners();
+  }
+
+  /// Одновременно обновляет оба сигнала бейджа: TCP-пинг активной ноды
+  /// (быстрое число, показываемое в чипе) и gstatic-health-check.
+  ///
+  /// В TUN весь системный трафик, включая наш собственный сокет, перехватывается
+  /// interface'ом и подчиняется тем же правилам роутинга sing-box, что и
+  /// остальной трафик — bypass-правило по IP ноды рассчитано на исходящее
+  /// соединение самого sing-box, а не произвольного процесса, и может не
+  /// сработать для нашего пинга. Из-за этого TCP-пинг ноды в TUN не гарантирует
+  /// честный замер (может смеряться локальный tun-in вместо реального сервера) —
+  /// поэтому там как число используется честный, хоть и более медленный,
+  /// gstatic-замер; TCP-пинг ноды считаем только в Proxy, где сырой сокет не
+  /// перехватывается системным роутингом.
+  Future<void> refreshHeroPing() async {
+    final node = selectedNode;
+    final tun = _state.settings.tunnelMode == TunnelMode.tun;
+    await Future.wait([
+      pingGstatic(),
+      if (node != null && !tun) pingNode(node),
+    ]);
   }
 
   /// Фоновая проверка активной ноды: один запрос, не перебор. Полный перебор
@@ -1095,6 +1178,7 @@ class AppController extends ChangeNotifier {
   void dispose() {
     _refreshTimer?.cancel();
     _healthTimer?.cancel();
+    _gstaticPingTimer?.cancel();
     for (final s in _testLogSubs) {
       s.cancel();
     }

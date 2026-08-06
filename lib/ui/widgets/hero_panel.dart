@@ -5,6 +5,7 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../app/app_controller.dart';
 import '../../models/app_settings.dart';
 import '../../tunnel/tunnel_controller.dart';
+import 'ping_badge.dart';
 
 /// Единая высота табов режима и селекта роутинга — чтобы стояли ровно.
 const double _kControlHeight = 40;
@@ -65,6 +66,9 @@ class _HeroPanelState extends State<HeroPanel>
       _uptimeTimer!.cancel();
       _uptimeTimer = null;
     }
+    // Бейдж пинга и текст статуса зависят от контроллера — перерисовываемся
+    // на каждое изменение, а не только на секундном тике аптайма.
+    if (mounted) setState(() {});
   }
 
   /// «MM:SS», «H:MM:SS», «Dд H:MM:SS» — без ведущих нулей у старшего разряда.
@@ -132,14 +136,49 @@ class _HeroPanelState extends State<HeroPanel>
           onHighlight: (v) => setState(() => _pressed = v),
         ),
         const SizedBox(height: 10),
-        ShadBadge(
-          backgroundColor: running ? activeGreen : null,
-          child: Text(running
-              ? _formatUptime(
-                  DateTime.now().difference(c.connectedAt ?? DateTime.now()))
-              : connecting
-                  ? 'Подключение…'
-                  : 'VPN отключён'),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            ShadBadge(
+              backgroundColor: running ? activeGreen : null,
+              child: Text(running
+                  ? _formatUptime(DateTime.now()
+                      .difference(c.connectedAt ?? DateTime.now()))
+                  : connecting
+                      ? 'Подключение…'
+                      : 'VPN отключён'),
+            ),
+            if (running && c.settings.gstaticPingEnabled) ...[
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: c.refreshHeroPing,
+                // В TUN честный TCP-пинг ноды не гарантирован (см. комментарий
+                // к AppController.refreshHeroPing) — там используем gstatic.
+                child: c.settings.tunnelMode == TunnelMode.tun
+                    ? PingBadge(
+                        loading: c.isPingingGstatic &&
+                            c.gstaticPingMs == null &&
+                            !c.gstaticPingFailed,
+                        latencyMs: c.gstaticPingMs,
+                        noInternet: c.gstaticPingFailed,
+                      )
+                    : PingBadge(
+                        loading: c.selectedNode != null &&
+                            c.isPinging(c.selectedNode!) &&
+                            c.pingFor(c.selectedNode!) == null,
+                        latencyMs: c.selectedNode == null
+                            ? null
+                            : c.pingFor(c.selectedNode!)?.latencyMs,
+                        timedOut: c.selectedNode != null &&
+                            (c.pingFor(c.selectedNode!)?.timedOut ?? false),
+                        error: c.selectedNode != null &&
+                            c.pingFor(c.selectedNode!)?.error != null,
+                        noInternet: c.gstaticPingFailed,
+                      ),
+              ),
+            ],
+          ],
         ),
         const SizedBox(height: 12),
         // Режим и роутинг на одном уровне — экономит вертикальное место.
@@ -153,6 +192,9 @@ class _HeroPanelState extends State<HeroPanel>
               height: _kControlHeight,
               child: ShadTabs<TunnelMode>(
                 value: c.settings.tunnelMode,
+                // Контента у табов нет — зазор под него только переполнял бы
+                // фиксированную высоту строки.
+                gap: 0,
                 onChanged: _switchingTun ? (_) {} : _selectMode,
                 tabs: [
                   ShadTab(
