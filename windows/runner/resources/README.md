@@ -1,14 +1,32 @@
 # Вендоренные бинарники (Windows)
 
-| Файл | Источник | Версия |
-|---|---|---|
-| sing-box.exe | github.com/SagerNet/sing-box, `sing-box-<ver>-windows-amd64.zip` | <ver> |
-| sing-box-test.exe | копия sing-box.exe | тот же |
-| xray.exe | github.com/XTLS/Xray-core, `Xray-windows-64.zip` | <ver> |
-| wintun.dll | wintun.net, `bin/amd64/wintun.dll` | <ver> |
+Версии совпадают с macOS-сборкой (`macos/Runner/Resources`) — движки должны быть
+одни и те же, иначе конфиг, собранный общим Dart-кодом, на разных платформах
+ведёт себя по-разному.
 
-`sing-box-test.exe` обязан быть отдельным файлом, а не симлинком: правило
+| Файл | Источник | Версия | SHA-256 |
+|---|---|---|---|
+| sing-box.exe | [SagerNet/sing-box](https://github.com/SagerNet/sing-box/releases), `sing-box-1.13.12-windows-amd64.zip` | 1.13.12 | `64b1dfaed6fa758295233fd0bec8b32cf2115f29773adbf38e0f026c3c7986f2` |
+| libcronet.dll | оттуда же | 1.13.12 | `c7434cfa93c3041321dd19111c4de6c52b8a9531a65661ba45425d3c51ec69e2` |
+| xray.exe | [XTLS/Xray-core](https://github.com/XTLS/Xray-core/releases), `Xray-windows-64.zip` | 26.3.27 | `15c2d007954ac53ba69b80ec91242786b3c0b71d52649165b4ca1d5cc96ef8f1` |
+| wintun.dll | [wintun.net](https://www.wintun.net/), `wintun-0.14.1.zip`, `bin/amd64/` | 0.14.1 | `e5da8447dc2c320edc0fc52fa01885c103de8c118481f683643cacc3220dafce` |
+
+`libcronet.dll` идёт в официальном архиве sing-box рядом с exe — кладём вместе
+с ним, чтобы не выяснять опытным путём, при какой конфигурации он понадобится.
+
+`wintun.dll` есть и в архиве Xray, но берём с wintun.net: там понятно, какая
+это версия.
+
+## sing-box-test.exe
+
+В репозитории его нет — копию делает сборка (см. `windows/CMakeLists.txt`).
+Тестовый прогон обязан быть отдельным файлом, а не симлинком: правило
 `find_process` в конфиге различает боевой и тестовый процесс только по имени
 исполняемого файла, а симлинки на Windows требуют прав администратора.
+Коммитить второй экземпляр 45-мегабайтного бинаря ради этого незачем.
 
-Обновление: заменить файлы, поднять версии в таблице, пересобрать.
+## Обновление
+
+Заменить файлы, пересчитать хеши (`shasum -a 256 <файл>`), поднять версии в
+таблице. Версии обязаны совпасть с macOS — обновлять обе платформы одним
+заходом.

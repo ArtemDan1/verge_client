@@ -109,9 +109,10 @@ install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
 
 # Вендоренные бинарники кладём рядом с exe: sing-box ищет wintun.dll в своей
 # папке, а пути к sing-box/xray нативный код строит от пути к самому runner.
+set(VERGE_SINGBOX "${CMAKE_CURRENT_SOURCE_DIR}/runner/resources/sing-box.exe")
 set(VERGE_RESOURCES
-  "${CMAKE_CURRENT_SOURCE_DIR}/runner/resources/sing-box.exe"
-  "${CMAKE_CURRENT_SOURCE_DIR}/runner/resources/sing-box-test.exe"
+  "${VERGE_SINGBOX}"
+  "${CMAKE_CURRENT_SOURCE_DIR}/runner/resources/libcronet.dll"
   "${CMAKE_CURRENT_SOURCE_DIR}/runner/resources/xray.exe"
   "${CMAKE_CURRENT_SOURCE_DIR}/runner/resources/wintun.dll"
 )
@@ -133,4 +134,15 @@ endforeach()
 if(VERGE_RESOURCES_PRESENT)
   install(FILES ${VERGE_RESOURCES_PRESENT} DESTINATION "${CMAKE_INSTALL_PREFIX}"
     COMPONENT Runtime)
+endif()
+
+# sing-box-test.exe — та же программа под другим именем: правило find_process в
+# конфиге отличает тестовый процесс от боевого только по имени файла, а симлинк
+# на Windows требует прав администратора. Копию делает сборка, а не репозиторий:
+# коммитить второй экземпляр 45-мегабайтного бинаря незачем.
+if(EXISTS "${VERGE_SINGBOX}")
+  install(CODE "
+    execute_process(COMMAND \"${CMAKE_COMMAND}\" -E copy_if_different
+      \"${VERGE_SINGBOX}\" \"${CMAKE_INSTALL_PREFIX}/sing-box-test.exe\")
+    " COMPONENT Runtime)
 endif()
