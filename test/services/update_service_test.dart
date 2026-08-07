@@ -94,6 +94,31 @@ void main() {
     expect(info!.pkgUrl, 'https://example/a.exe');
   });
 
+  test('находит ассет с именем, которое выкладывает CI', () async {
+    final client = MockClient((req) async {
+      return http.Response(
+        jsonEncode({
+          'tag_name': '2.0.0',
+          'html_url': 'https://example/releases/2.0.0',
+          'assets': [
+            {
+              'name': 'Verge-2.0.0-setup.exe',
+              'browser_download_url': 'https://example/setup.exe'
+            },
+            {
+              'name': 'Verge-2.0.0.pkg',
+              'browser_download_url': 'https://example/a.pkg'
+            },
+          ],
+        }),
+        200,
+      );
+    });
+    final svc = UpdateService(client: client, assetSuffix: '-setup.exe');
+    final info = await svc.checkForUpdate('1.0.0');
+    expect(info!.pkgUrl, 'https://example/setup.exe');
+  });
+
   test('по умолчанию на macOS берёт .pkg', () async {
     final client = MockClient((req) async {
       return http.Response(

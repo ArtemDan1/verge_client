@@ -25,7 +25,7 @@ flutter build windows --release
 | Файл | Источник |
 |---|---|
 | `sing-box.exe` | [SagerNet/sing-box](https://github.com/SagerNet/sing-box) releases, `sing-box-<ver>-windows-amd64.zip` |
-| `sing-box-test.exe` | побайтовая копия `sing-box.exe` под другим именем |
+| `libcronet.dll` | оттуда же, лежит в архиве рядом с exe |
 | `xray.exe` | [XTLS/Xray-core](https://github.com/XTLS/Xray-core) releases, `Xray-windows-64.zip` |
 | `wintun.dll` | [wintun.net](https://www.wintun.net/), `bin/amd64/wintun.dll` |
 
@@ -33,9 +33,12 @@ flutter build windows --release
 macOS-сборке (см. `macos/Runner/Resources`). Подробности и текущие версии —
 в `windows/runner/resources/README.md`.
 
-`sing-box-test.exe` обязан быть отдельным файлом, а не симлинком: правило
-`find_process` в конфиге различает боевой и тестовый процесс только по имени
-исполняемого файла, а симлинки на Windows требуют прав администратора.
+`sing-box-test.exe` в репозитории не хранится — его создаёт сборка, копируя
+`sing-box.exe` под другим именем (`windows/CMakeLists.txt`). Отдельный файл
+нужен потому, что правило `find_process` в конфиге различает боевой и тестовый
+процесс только по имени исполняемого файла, а симлинки на Windows требуют прав
+администратора. Коммитить второй экземпляр 43-мегабайтного бинаря ради этого
+незачем.
 
 ## Ручной чек-лист перед релизом
 
@@ -54,12 +57,51 @@ macOS-сборке (см. `macos/Runner/Resources`). Подробности и �
 10. Проверка обновлений (без установки — только что баннер появляется и ассет
     находится).
 
+## Установка
+
+Скачать `Verge-<версия>-setup.exe` из [Releases](https://github.com/ArtemDan1/verge_client/releases)
+и запустить. Windows покажет SmartScreen «Windows защитила ваш компьютер» —
+сборка не подписана сертификатом, нужно нажать «Подробнее → Выполнить в любом
+случае». Это ожидаемо, ровно как «правый клик → Открыть» на macOS.
+
+## Обновление
+
+Приложение само проверяет новые релизы и ставит обновление в один клик по
+баннеру. Вручную — просто установить поверх новую версию `-setup.exe`.
+
+## Удаление
+
+«Параметры → Приложения» или «Установка и удаление программ» в Панели
+управления.
+
+## Сборка инсталлятора локально
+
+```powershell
+flutter build windows --release
+pwsh scripts/make_installer.ps1
+```
+
+Нужен установленный Inno Setup 6 (`iscc` в `PATH`). Готовый инсталлятор
+появится в `dist\Verge-<версия>-setup.exe`.
+
+## TUN-режим
+
+Привилегированная часть — служба `VergeTunnel` (LocalSystem), ставится
+инсталлятором с автозапуском. Приложение работает без прав администратора и
+общается со службой через named pipe `\\.\pipe\verge-tunnel` кадрами
+фиксированного формата (см. `windows/service/pipe_protocol.h`) — аналог связки
+LaunchDaemon + XPC на macOS.
+
+- Конфиг sing-box для TUN лежит в `%ProgramData%\Verge\tun-config.json` —
+  пишет его служба при каждом запуске туннеля.
+- Состояние службы: `sc.exe query VergeTunnel`. Ожидается `STATE : 4 RUNNING`.
+- Если TUN недоступен в приложении (настройки показывают хелпер как
+  `notRegistered`) — служба не запущена или не установлена:
+  `sc.exe start VergeTunnel`. Если команда не находит службу — переустановить
+  приложение.
+- DNS для TUN не переопределяется приложением — это делает сам sing-box для
+  wintun-адаптера.
+
 ## Известные ограничения
 
-- **TUN-режим не реализован.** Канал `singbox/helper` — заглушка, всегда
-  отвечает `notRegistered`, UI показывает TUN недоступным. Требует отдельного
-  плана: служба `VergeTunnel`, named pipe, канал `singbox/tun` + `/events`.
-- **Нет инсталлятора.** Приложение запускается из собранной папки; схема
-  `verge://` регистрируется вручную через `reg add` (см. план разработки).
-  Поставка через Inno Setup и автообновление `-setup.exe` — отдельный план.
 - Сборка не подписана.

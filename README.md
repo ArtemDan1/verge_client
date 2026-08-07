@@ -4,9 +4,9 @@
 Подхватывает подписки, строит конфиг sing-box, поднимает туннель и управляет
 системным прокси / TUN-интерфейсом.
 
-Платформа: **macOS** (Apple Silicon и Intel) и **Windows** (10 1809+ x64, только
-system proxy — подробности в [docs/WINDOWS.md](docs/WINDOWS.md)). Каталог `ios/`
-остался от шаблона Flutter и не поддерживается.
+Платформа: **macOS** (Apple Silicon и Intel) и **Windows** (10 1809+ x64,
+system proxy и TUN — подробности в [docs/WINDOWS.md](docs/WINDOWS.md)). Каталог
+`ios/` остался от шаблона Flutter и не поддерживается.
 
 ## Возможности
 
@@ -17,8 +17,9 @@ system proxy — подробности в [docs/WINDOWS.md](docs/WINDOWS.md)). 
 - **Два режима туннеля**:
   - *System proxy* — sing-box запускается как обычный процесс, приложение
     прописывает системный прокси и DNS;
-  - *TUN* — трафик всей системы через утилиту-хелпер с root-привилегиями
-    (устанавливается .pkg-инсталлятором как LaunchDaemon).
+  - *TUN* — трафик всей системы через привилегированную службу/хелпер:
+    LaunchDaemon на macOS (.pkg-инсталлятор), служба `VergeTunnel` на Windows
+    (ставится .exe-инсталлятором, общение через named pipe).
 - **Роутинг** — профили правил direct / proxy / block на базе geosite/geoip
   rule-set'ов (встроены в `assets/rule-sets/`, обновляются онлайн). Готовые
   пресеты: всё через прокси, обход РФ, блокировка рекламы и др.
@@ -49,10 +50,12 @@ macos/
   Runner/Resources/sing-box   вендоренный бинарь sing-box
 windows/
   runner/       C++-часть (зеркало macos/Runner): system_proxy, child_process,
-                tunnel/xray/test/helper/window_control/deep_link/bypass_ping
+                tunnel/xray/test/helper/window_control/deep_link/bypass_ping/tun
                 каналы
   runner/resources/   вендоренные sing-box.exe, sing-box-test.exe, xray.exe,
                        wintun.dll — см. docs/WINDOWS.md
+  service/      служба VergeTunnel (LocalSystem): поднимает sing-box в TUN-режиме,
+                общение с приложением по named pipe — аналог Helper/ на macOS
 packaging/      plist LaunchDaemon и postinstall для .pkg
 scripts/        сборка, упаковка, установка, удаление
 assets/         rule-set'ы и брендинг

@@ -15,6 +15,7 @@ add_executable(${BINARY_NAME} WIN32
   "system_proxy.cpp"
   "child_process.cpp"
   "tunnel_channel.cpp"
+  "tun_channel.cpp"
   "xray_channel.cpp"
   "test_channels.cpp"
   "helper_channel.cpp"
@@ -47,6 +48,7 @@ target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib")
 target_link_libraries(${BINARY_NAME} PRIVATE "wininet.lib")
 target_link_libraries(${BINARY_NAME} PRIVATE "ws2_32.lib" "iphlpapi.lib")
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
+target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}/service")
 
 # Run the Flutter tool portions of the build. This must not be removed.
 add_dependencies(${BINARY_NAME} flutter_assemble)

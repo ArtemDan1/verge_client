@@ -9,6 +9,7 @@
 #include "helper_channel.h"
 #include "platform_task_runner.h"
 #include "test_channels.h"
+#include "tun_channel.h"
 #include "tunnel_channel.h"
 #include "window_control_channel.h"
 #include "xray_channel.h"
@@ -37,6 +38,7 @@ bool FlutterWindow::OnCreate() {
   // До регистрации каналов: их фоновые потоки возвращают результаты через него.
   PlatformTaskRunner::Init();
   RegisterTunnelChannel(flutter_controller_->engine());
+  RegisterTunChannel(flutter_controller_->engine());
   RegisterXrayChannel(flutter_controller_->engine());
   RegisterTestChannels(flutter_controller_->engine());
   RegisterHelperChannel(flutter_controller_->engine());
