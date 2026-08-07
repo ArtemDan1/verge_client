@@ -5,6 +5,7 @@ import '../app/app_controller.dart';
 import '../models/routing_profile.dart';
 import '../models/routing_rule.dart';
 import '../services/geo_catalog.dart';
+import 'settings/general_section.dart' show SettingsSection;
 
 class RoutingScreen extends StatelessWidget {
   final AppController controller;
@@ -198,51 +199,53 @@ class _RoutingEditor extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          _bucket(
-                              context,
-                              theme,
-                              'Исключения (перекрывают Block)',
-                              p.allowRules,
-                              (rules) => controller.updateRoutingProfile(
-                                  p.copyWith(allowRules: rules))),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text('Исключения через прокси',
-                                    style: theme.textTheme.muted),
-                              ),
-                              ShadSwitch(
-                                value: p.allowAction == RoutingFinal.proxy,
-                                onChanged: (v) => controller
-                                    .updateRoutingProfile(p.copyWith(
-                                        allowAction: v
-                                            ? RoutingFinal.proxy
-                                            : RoutingFinal.direct)),
-                              ),
-                            ],
+                          _bucketCard(
+                            context,
+                            theme,
+                            title: 'Исключения (перекрывают Block)',
+                            rules: p.allowRules,
+                            save: (rules) => controller.updateRoutingProfile(
+                                p.copyWith(allowRules: rules)),
+                            trailingSwitch: _SwitchRow(
+                              label: 'Исключения через прокси',
+                              value: p.allowAction == RoutingFinal.proxy,
+                              onChanged: (v) => controller.updateRoutingProfile(
+                                  p.copyWith(
+                                      allowAction: v
+                                          ? RoutingFinal.proxy
+                                          : RoutingFinal.direct)),
+                            ),
                           ),
-                          const SizedBox(height: 8),
-                          _bucket(context, theme, 'Direct (напрямую)',
-                              p.directRules,
-                              (rules) => controller.updateRoutingProfile(
-                                  p.copyWith(directRules: rules))),
-                          _bucket(context, theme, 'Proxy (через прокси)',
-                              p.proxyRules,
-                              (rules) => controller.updateRoutingProfile(
-                                  p.copyWith(proxyRules: rules))),
-                          _bucket(context, theme, 'Block (заблокировать)',
-                              p.blockRules,
-                              (rules) => controller.updateRoutingProfile(
-                                  p.copyWith(blockRules: rules))),
-                          const SizedBox(height: 8),
-                          Row(
+                          _bucketCard(
+                            context,
+                            theme,
+                            title: 'Direct (напрямую)',
+                            rules: p.directRules,
+                            save: (rules) => controller.updateRoutingProfile(
+                                p.copyWith(directRules: rules)),
+                          ),
+                          _bucketCard(
+                            context,
+                            theme,
+                            title: 'Proxy (через прокси)',
+                            rules: p.proxyRules,
+                            save: (rules) => controller.updateRoutingProfile(
+                                p.copyWith(proxyRules: rules)),
+                          ),
+                          _bucketCard(
+                            context,
+                            theme,
+                            title: 'Block (заблокировать)',
+                            rules: p.blockRules,
+                            save: (rules) => controller.updateRoutingProfile(
+                                p.copyWith(blockRules: rules)),
+                          ),
+                          SettingsSection(
+                            title: 'Остальное напрямую',
+                            description: 'final=direct',
                             children: [
-                              Expanded(
-                                child: Text(
-                                    'Остальное напрямую (final=direct)',
-                                    style: theme.textTheme.large),
-                              ),
-                              ShadSwitch(
+                              _SwitchRow(
+                                label: 'Остальное напрямую',
                                 value: p.finalAction == RoutingFinal.direct,
                                 onChanged: (v) =>
                                     controller.updateRoutingProfile(p.copyWith(
@@ -265,57 +268,59 @@ class _RoutingEditor extends StatelessWidget {
     );
   }
 
-  Widget _bucket(BuildContext context, ShadThemeData theme, String title,
-      List<RoutingRule> rules, void Function(List<RoutingRule>) save) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: theme.textTheme.large),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              ...rules.map((r) => _ruleChip(theme, _ruleLabel(r),
-                  () => save(rules.where((x) => x != r).toList()))),
-              ShadButton.outline(
-                size: ShadButtonSize.sm,
-                leading: const Icon(LucideIcons.plus, size: 14),
-                onPressed: () async {
-                  final cat = await _pickGeo(context, theme);
-                  if (cat != null) {
-                    save([
-                      ...rules,
-                      RoutingRule(kind: RoutingRuleKind.geo, value: cat.tag)
-                    ]);
-                  }
-                },
-                child: const Text('гео'),
-              ),
-              ShadButton.outline(
-                size: ShadButtonSize.sm,
-                leading: const Icon(LucideIcons.plus, size: 14),
-                onPressed: () async {
-                  final entry = await _askText(context, theme);
-                  if (entry != null && entry.isNotEmpty) {
-                    final kind = entry.contains('/') ||
-                            RegExp(r'^\d+\.').hasMatch(entry)
-                        ? RoutingRuleKind.ip
-                        : RoutingRuleKind.domain;
-                    save([
-                      ...rules,
-                      RoutingRule(kind: kind, value: entry)
-                    ]);
-                  }
-                },
-                child: const Text('домен/IP'),
-              ),
-            ],
-          ),
+  Widget _bucketCard(
+    BuildContext context,
+    ShadThemeData theme, {
+    required String title,
+    required List<RoutingRule> rules,
+    required void Function(List<RoutingRule>) save,
+    Widget? trailingSwitch,
+  }) {
+    return SettingsSection(
+      title: title,
+      children: [
+        if (trailingSwitch != null) ...[
+          trailingSwitch,
+          const SizedBox(height: 12),
         ],
-      ),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            ...rules.map((r) => _ruleChip(theme, _ruleLabel(r),
+                () => save(rules.where((x) => x != r).toList()))),
+            ShadButton.outline(
+              size: ShadButtonSize.sm,
+              leading: const Icon(LucideIcons.plus, size: 14),
+              onPressed: () async {
+                final cat = await _pickGeo(context, theme);
+                if (cat != null) {
+                  save([
+                    ...rules,
+                    RoutingRule(kind: RoutingRuleKind.geo, value: cat.tag)
+                  ]);
+                }
+              },
+              child: const Text('гео'),
+            ),
+            ShadButton.outline(
+              size: ShadButtonSize.sm,
+              leading: const Icon(LucideIcons.plus, size: 14),
+              onPressed: () async {
+                final entry = await _askText(context, theme);
+                if (entry != null && entry.isNotEmpty) {
+                  final kind = entry.contains('/') ||
+                          RegExp(r'^\d+\.').hasMatch(entry)
+                      ? RoutingRuleKind.ip
+                      : RoutingRuleKind.domain;
+                  save([...rules, RoutingRule(kind: kind, value: entry)]);
+                }
+              },
+              child: const Text('домен/IP'),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -396,6 +401,29 @@ class _RoutingEditor extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _SwitchRow extends StatelessWidget {
+  const _SwitchRow({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String label;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = ShadTheme.of(context);
+    return Row(
+      children: [
+        Expanded(child: Text(label, style: theme.textTheme.muted)),
+        ShadSwitch(value: value, onChanged: onChanged),
+      ],
     );
   }
 }

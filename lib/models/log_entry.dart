@@ -1,3 +1,16 @@
+/// Кто написал строку: само приложение или одно из ядер. Нужен для фильтра —
+/// смешанный поток «наши сообщения + вывод sing-box + вывод Xray» иначе
+/// нечитаем.
+enum LogOrigin { app, singbox, xray }
+
+extension LogOriginLabel on LogOrigin {
+  String get label => switch (this) {
+        LogOrigin.app => 'app',
+        LogOrigin.singbox => 'sing-box',
+        LogOrigin.xray => 'xray',
+      };
+}
+
 /// Уровень строки лога. Порядок важен: используется для фильтра «от уровня».
 enum LogLevel { trace, debug, info, warn, error }
 
@@ -24,10 +37,12 @@ class LogEntry {
     required this.level,
     required this.message,
     this.source,
+    this.origin = LogOrigin.app,
   });
 
   final DateTime time;
   final LogLevel level;
+  final LogOrigin origin;
 
   /// Подсистема sing-box (`router`, `dns`, `inbound/tun` …), если её видно.
   final String? source;
@@ -44,7 +59,8 @@ class LogEntry {
   static final _source = RegExp(r'^([a-z0-9_./\[\]-]{1,40}):\s+');
 
   /// Разбирает сырую строку. [received] — момент получения, запасное время.
-  factory LogEntry.parse(String raw, {DateTime? received}) {
+  factory LogEntry.parse(String raw,
+      {DateTime? received, LogOrigin origin = LogOrigin.app}) {
     final now = received ?? DateTime.now();
     final line = raw.replaceAll('\r', '').trimRight();
     final m = _prefix.firstMatch(line);
@@ -85,6 +101,7 @@ class LogEntry {
       level: level,
       message: rest.isEmpty ? line : rest,
       source: source,
+      origin: origin,
     );
   }
 

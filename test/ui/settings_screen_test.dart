@@ -83,6 +83,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(c.networkSettings.ipv6Enabled, isFalse);
 
+    // Секций стало больше — переключатель может быть за пределами экрана.
+    await tester.ensureVisible(find.byKey(const Key('ipv6-switch')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('ipv6-switch')));
     await tester.pumpAndSettle();
 

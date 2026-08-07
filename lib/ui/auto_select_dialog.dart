@@ -13,6 +13,12 @@ void showAutoSelectDialog(BuildContext context, AppController c) {
   );
 }
 
+/// Часы:минуты:секунды последней фоновой проверки.
+String _time(DateTime t) {
+  String two(int v) => v.toString().padLeft(2, '0');
+  return '${two(t.hour)}:${two(t.minute)}:${two(t.second)}';
+}
+
 class _AutoSelectDialog extends StatefulWidget {
   final AppController controller;
   const _AutoSelectDialog({required this.controller});
@@ -176,6 +182,14 @@ class _AutoSelectDialogState extends State<_AutoSelectDialog> {
                     : const Icon(LucideIcons.zap, size: 16),
                 child: const Text('Проверить сейчас'),
               ),
+              if (c.lastHealthCheckAt != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Последняя проверка: ${_time(c.lastHealthCheckAt!)} — '
+                  '${c.lastHealthCheckOk == true ? 'нода отвечает' : 'нет ответа'}',
+                  style: theme.textTheme.muted,
+                ),
+              ],
               if (c.lastAutoSelectResult != null) ...[
                 const SizedBox(height: 8),
                 Text(
