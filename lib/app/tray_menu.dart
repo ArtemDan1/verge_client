@@ -2,15 +2,21 @@ import 'package:flutter/foundation.dart';
 import 'package:tray_manager/tray_manager.dart';
 import '../tunnel/tunnel_controller.dart';
 
-/// Ключ Flutter-ассета. На macOS trayManager.setIcon() сам читает его через
-/// rootBundle — отдельного файла на диске не нужно.
-String trayIconAssetKeyFor(TunnelStatus status) => switch (status) {
-      TunnelStatus.connected => 'assets/tray/tray_connected.png',
-      TunnelStatus.connecting => 'assets/tray/tray_connecting.png',
-      TunnelStatus.disconnected ||
-      TunnelStatus.error =>
-        'assets/tray/tray_disconnected.png',
-    };
+/// Ключ Flutter-ассета для иконки трея.
+///
+/// Расширение зависит от платформы. На Windows tray_manager отдаёт путь в
+/// LoadImage с флагом IMAGE_ICON, а тот читает только формат .ico: с PNG вызов
+/// молча возвращает null, и у пункта в трее не оказывается значка. На macOS
+/// setIcon читает ассет через rootBundle и ждёт PNG.
+String trayIconAssetKeyFor(TunnelStatus status) {
+  final ext = defaultTargetPlatform == TargetPlatform.windows ? 'ico' : 'png';
+  final name = switch (status) {
+    TunnelStatus.connected => 'tray_connected',
+    TunnelStatus.connecting => 'tray_connecting',
+    TunnelStatus.disconnected || TunnelStatus.error => 'tray_disconnected',
+  };
+  return 'assets/tray/$name.$ext';
+}
 
 /// Чистая сборка меню трея — без обращения к trayManager, поэтому
 /// тестируется напрямую (в отличие от TrayService, который дёргает плагин).

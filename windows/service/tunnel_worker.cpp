@@ -4,6 +4,8 @@
 
 #include <shlobj.h>
 
+#include <thread>
+
 namespace {
 
 // Конфиг пишем в ProgramData, а не в %TEMP%: у LocalSystem свой временный
@@ -30,6 +32,60 @@ TunnelWorker& TunnelWorker::Instance() {
 }
 
 std::string TunnelWorker::Start(const std::string& config_json) {
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    last_config_ = config_json;
+    // Бюджет автоматических перезапусков сбрасывается только здесь, на явном
+    // запуске от пользователя.
+    adapter_retries_left_ = 3;
+    generation_++;
+  }
+  return Launch(config_json);
+}
+
+// Обработчик падения sing-box.
+//
+// «Cannot create a file when that file already exists» на configure tun
+// interface означает, что wintun-адаптер от прошлого запуска ещё жив.
+// Останавливаем мы sing-box через TerminateProcess — послать консольному
+// процессу без консоли Ctrl+C на Windows штатно нельзя, — и убитый процесс
+// снять адаптер не успевает. Драйвер убирает его сам, но не сразу.
+//
+// Ловить это по коду возврата Launch бесполезно: sing-box поднимается, живёт
+// секунд пятнадцать («open interface take too much time to finish!») и только
+// потом валится с FATAL. Стартовый грейс в 800 мс к этому моменту давно прошёл
+// и запуск уже засчитан успешным. Поэтому перезапуск живёт именно здесь.
+void TunnelWorker::OnCrash(const std::string& reason) {
+  std::string config;
+  uint64_t generation = 0;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    running_ = false;
+    stopped_reason_ = reason;
+    if (reason.find("already exists") == std::string::npos ||
+        adapter_retries_left_ <= 0) {
+      return;
+    }
+    adapter_retries_left_--;
+    config = last_config_;
+    generation = generation_;
+  }
+  // Отдельный поток обязателен: сюда нас позвал поток наблюдения ChildProcess,
+  // а Launch внутри делает Stop(), который этот же поток джойнит.
+  std::thread([this, config, generation]() {
+    // Дать драйверу убрать адаптер: в логах его освобождение занимает секунды.
+    ::Sleep(5000);
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      // Пока ждали, туннель успели остановить или запустить заново — тогда
+      // перезапускать нечего.
+      if (generation_ != generation) return;
+    }
+    Launch(config);
+  }).detach();
+}
+
+std::string TunnelWorker::Launch(const std::string& config_json) {
   // Мьютекс НЕЛЬЗЯ держать на время singbox_.Start(): при битом конфиге
   // sing-box печатает FATAL и умирает внутри стартового грейса, поток чтения
   // логов зовёт AppendLogs и встаёт на этом же мьютексе, а ChildProcess::Start
@@ -37,7 +93,6 @@ std::string TunnelWorker::Start(const std::string& config_json) {
   // намертво. Поэтому под замком только правка состояния, а запуск снаружи.
   {
     std::lock_guard<std::mutex> lock(mutex_);
-    logs_.clear();
     stopped_reason_.clear();
     running_ = false;
   }
@@ -57,35 +112,11 @@ std::string TunnelWorker::Start(const std::string& config_json) {
   if (!ok || written != config_json.size()) return "не удалось записать конфиг";
 
   singbox_.SetOnLog([this](const std::string& chunk) { AppendLogs(chunk); });
-  singbox_.SetOnCrash([this](const std::string& reason) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    running_ = false;
-    stopped_reason_ = reason;
-  });
+  singbox_.SetOnCrash([this](const std::string& reason) { OnCrash(reason); });
 
   // Путь к бинарю берём свой, а не клиентский: служба под LocalSystem не
   // должна запускать то, что ей назвал непривилегированный процесс.
-  const std::wstring args = L"run -c \"" + path + L"\"";
-  std::string err = singbox_.Start(L"sing-box.exe", args);
-
-  // «Cannot create a file when that file already exists» на configure tun
-  // interface означает, что wintun-адаптер от прошлого запуска ещё жив.
-  //
-  // Так выходит, потому что останавливаем мы sing-box через TerminateProcess:
-  // корректного способа послать консольному процессу без консоли Ctrl+C на
-  // Windows нет, а убитый процесс снять адаптер не успевает. Драйвер убирает
-  // его сам следом за закрытием хендлов, но заметно не сразу — в логах это
-  // видно как «open interface take too much time to finish!» за несколько
-  // секунд до отказа.
-  //
-  // Отсюда несколько попыток с нарастающей паузой. Помогает от гонки при
-  // быстром переподключении; адаптер, зависший всерьёз, этим не лечится — такой
-  // случай уйдёт в ошибку с исходным текстом, как и раньше.
-  for (int attempt = 1; attempt <= 3; attempt++) {
-    if (err.empty() || err.find("already exists") == std::string::npos) break;
-    ::Sleep(2000 * attempt);
-    err = singbox_.Start(L"sing-box.exe", args);
-  }
+  std::string err = singbox_.Start(L"sing-box.exe", L"run -c \"" + path + L"\"");
 
   std::lock_guard<std::mutex> lock(mutex_);
   if (!err.empty()) {
@@ -105,6 +136,9 @@ void TunnelWorker::Stop() {
   std::lock_guard<std::mutex> lock(mutex_);
   running_ = false;
   stopped_reason_.clear();
+  // Отменяем отложенный перезапуск, если он был запланирован.
+  adapter_retries_left_ = 0;
+  generation_++;
 }
 
 std::string TunnelWorker::Status() {

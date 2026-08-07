@@ -64,7 +64,15 @@ class SingboxApp extends StatelessWidget {
         darkTheme: AppTheme.dark,
         themeMode: _mode(controller.settings.themeMode),
         home: AppShell(controller: controller, deepLink: deepLink),
-        materialThemeBuilder: (context, theme) => theme,
+        // Emoji-фолбэк нужен и здесь, а не только в ShadThemeData: обычные
+        // Text без стиля (например, имена нод — Text(p.name)) берут стиль из
+        // DefaultTextStyle, который Material строит из своей textTheme, и до
+        // ShadTextTheme не доходят. Без этой строки флаги стран в именах нод
+        // на Windows так и остаются буквами.
+        materialThemeBuilder: (context, theme) => theme.copyWith(
+          textTheme:
+              theme.textTheme.apply(fontFamilyFallback: kEmojiFontFallback),
+        ),
       ),
     );
   }

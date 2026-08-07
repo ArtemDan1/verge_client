@@ -25,12 +25,22 @@ class TunnelWorker {
   TunnelWorker() = default;
 
   void AppendLogs(const std::string& chunk);
+  // Запуск процесса без сброса бюджета повторов — им пользуются и Start, и
+  // автоматический перезапуск после конфликта wintun-адаптера.
+  std::string Launch(const std::string& config_json);
+  void OnCrash(const std::string& reason);
 
   ChildProcess singbox_;
   std::mutex mutex_;
   std::deque<std::string> logs_;   // накопленные с прошлого TakeLogs
   std::string stopped_reason_;     // причина последнего падения
   bool running_ = false;
+  std::string last_config_;        // для автоматического перезапуска
+  int adapter_retries_left_ = 0;
+  // Растёт на каждом Start и Stop. Отложенный перезапуск сверяется с ним и
+  // отменяется, если за время паузы туннель успели остановить или запустить
+  // заново — иначе он воскресил бы выключенный пользователем туннель.
+  uint64_t generation_ = 0;
 };
 
 #endif  // VERGE_TUNNEL_WORKER_H_
