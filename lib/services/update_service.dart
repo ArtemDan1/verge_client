@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
 import 'package:path_provider/path_provider.dart';
+import 'trusted_roots.dart';
 import 'version_compare.dart';
 
 class UpdateInfo {
@@ -23,7 +25,7 @@ class UpdateService {
     this.repo = 'verge_client',
     String? assetSuffix,
     String? downloadFileName,
-  })  : _client = client ?? http.Client(),
+  })  : _injectedClient = client,
         // Windows получает инсталлятор Inno Setup, macOS — .pkg.
         assetSuffix =
             assetSuffix ?? (Platform.isWindows ? '-setup.exe' : '.pkg'),
@@ -32,16 +34,34 @@ class UpdateService {
                 ? 'Verge-update-setup.exe'
                 : 'SingboxFlutter-update.pkg');
 
-  final http.Client _client;
+  final http.Client? _injectedClient;
+  http.Client? _defaultClient;
   final String owner;
   final String repo;
   final String assetSuffix;
   final String downloadFileName;
 
+  /// Клиент, которым ходим на GitHub.
+  ///
+  /// На Windows — с бандленными корневыми сертификатами: системное хранилище
+  /// там наполняется лениво и на api.github.com спотыкается, см. [TrustedRoots].
+  /// В тестах клиент подставляется через конструктор, и эта ветка не работает.
+  Future<http.Client> _client() async {
+    final injected = _injectedClient;
+    if (injected != null) return injected;
+    final cached = _defaultClient;
+    if (cached != null) return cached;
+    final hc = await TrustedRoots.httpClient();
+    final created = hc != null ? IOClient(hc) : http.Client();
+    _defaultClient = created;
+    return created;
+  }
+
   Future<UpdateInfo?> checkForUpdate(String currentVersion) async {
     final uri =
         Uri.parse('https://api.github.com/repos/$owner/$repo/releases/latest');
-    final res = await _client
+    final client = await _client();
+    final res = await client
         .get(uri, headers: const {'Accept': 'application/vnd.github+json'});
     // 404 = в репозитории нет опубликованных релизов (черновики/pre-release не
     // считаются) → обновлений нет, это не ошибка.
@@ -74,7 +94,8 @@ class UpdateService {
   /// Качает .pkg в [targetDir] (по умолчанию системная temp). Возвращает путь.
   Future<String> downloadPkg(String url,
       {void Function(double progress)? onProgress, Directory? targetDir}) async {
-    final resp = await _client.send(http.Request('GET', Uri.parse(url)));
+    final client = await _client();
+    final resp = await client.send(http.Request('GET', Uri.parse(url)));
     if (resp.statusCode != 200) {
       throw Exception('download ${resp.statusCode}');
     }

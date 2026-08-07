@@ -84,6 +84,7 @@ flutter:
     - assets/rule-sets/
     - assets/branding/
     - assets/tray/
+    - assets/certs/
 
   # Флаги стран приходят в именах нод из подписки обычными emoji (пара
   # regional indicator). В системном шрифте Windows глифов флагов нет —
