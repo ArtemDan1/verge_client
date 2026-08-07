@@ -1,11 +1,12 @@
-# Verge — sing-box клиент для macOS
+# Verge — sing-box клиент для macOS и Windows
 
 Десктопный VPN-клиент на Flutter поверх [sing-box](https://github.com/SagerNet/sing-box).
 Подхватывает подписки, строит конфиг sing-box, поднимает туннель и управляет
 системным прокси / TUN-интерфейсом.
 
-Платформа: **macOS** (Apple Silicon и Intel). Каталоги `ios/` и `windows/`
-остались от шаблона Flutter и не поддерживаются.
+Платформа: **macOS** (Apple Silicon и Intel) и **Windows** (10 1809+ x64, только
+system proxy — подробности в [docs/WINDOWS.md](docs/WINDOWS.md)). Каталог `ios/`
+остался от шаблона Flutter и не поддерживается.
 
 ## Возможности
 
@@ -46,6 +47,12 @@ macos/
                 каналы TUN/helper/deep-link
   Helper/       привилегированный helper-демон (XPC)
   Runner/Resources/sing-box   вендоренный бинарь sing-box
+windows/
+  runner/       C++-часть (зеркало macos/Runner): system_proxy, child_process,
+                tunnel/xray/test/helper/window_control/deep_link/bypass_ping
+                каналы
+  runner/resources/   вендоренные sing-box.exe, sing-box-test.exe, xray.exe,
+                       wintun.dll — см. docs/WINDOWS.md
 packaging/      plist LaunchDaemon и postinstall для .pkg
 scripts/        сборка, упаковка, установка, удаление
 assets/         rule-set'ы и брендинг

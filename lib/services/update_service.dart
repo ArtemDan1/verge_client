@@ -21,11 +21,22 @@ class UpdateService {
     http.Client? client,
     this.owner = 'ArtemDan1',
     this.repo = 'verge_client',
-  }) : _client = client ?? http.Client();
+    String? assetSuffix,
+    String? downloadFileName,
+  })  : _client = client ?? http.Client(),
+        // Windows получает инсталлятор Inno Setup, macOS — .pkg.
+        assetSuffix =
+            assetSuffix ?? (Platform.isWindows ? '-setup.exe' : '.pkg'),
+        downloadFileName = downloadFileName ??
+            (Platform.isWindows
+                ? 'Verge-update-setup.exe'
+                : 'SingboxFlutter-update.pkg');
 
   final http.Client _client;
   final String owner;
   final String repo;
+  final String assetSuffix;
+  final String downloadFileName;
 
   Future<UpdateInfo?> checkForUpdate(String currentVersion) async {
     final uri =
@@ -43,7 +54,11 @@ class UpdateService {
     final assets =
         ((json['assets'] as List?) ?? const []).cast<Map<String, dynamic>>();
     final pkg = assets.firstWhere(
-      (a) => (a['name'] as String?)?.toLowerCase().endsWith('.pkg') == true,
+      (a) =>
+          (a['name'] as String?)
+              ?.toLowerCase()
+              .endsWith(assetSuffix.toLowerCase()) ==
+          true,
       orElse: () => const <String, dynamic>{},
     );
     final pkgUrl = pkg['browser_download_url'] as String?;
@@ -69,7 +84,7 @@ class UpdateService {
     // создаёт её: вне сэндбокса папки может не быть, и openWrite падает
     // PathNotFoundException.
     await dir.create(recursive: true);
-    final file = File('${dir.path}/SingboxFlutter-update.pkg');
+    final file = File('${dir.path}/$downloadFileName');
     final sink = file.openWrite();
     var received = 0;
     await for (final chunk in resp.stream) {

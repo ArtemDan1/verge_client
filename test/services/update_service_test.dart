@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -67,4 +68,50 @@ void main() {
     final path = await svc.downloadPkg('https://gh/x.pkg', targetDir: missing);
     expect(File(path).readAsStringSync(), 'PKGDATA');
   });
+
+  test('выбирает ассет по заданному суффиксу', () async {
+    final client = MockClient((req) async {
+      return http.Response(
+        jsonEncode({
+          'tag_name': '2.0.0',
+          'html_url': 'https://example/releases/2.0.0',
+          'assets': [
+            {
+              'name': 'Verge-2.0.0.pkg',
+              'browser_download_url': 'https://example/a.pkg'
+            },
+            {
+              'name': 'Verge-2.0.0-setup.exe',
+              'browser_download_url': 'https://example/a.exe'
+            },
+          ],
+        }),
+        200,
+      );
+    });
+    final svc = UpdateService(client: client, assetSuffix: '-setup.exe');
+    final info = await svc.checkForUpdate('1.0.0');
+    expect(info!.pkgUrl, 'https://example/a.exe');
+  });
+
+  test('по умолчанию на macOS берёт .pkg', () async {
+    final client = MockClient((req) async {
+      return http.Response(
+        jsonEncode({
+          'tag_name': '2.0.0',
+          'html_url': 'https://example/releases/2.0.0',
+          'assets': [
+            {
+              'name': 'Verge-2.0.0.pkg',
+              'browser_download_url': 'https://example/a.pkg'
+            },
+          ],
+        }),
+        200,
+      );
+    });
+    final svc = UpdateService(client: client);
+    final info = await svc.checkForUpdate('1.0.0');
+    expect(info!.pkgUrl, 'https://example/a.pkg');
+  }, skip: Platform.isWindows ? 'macOS-специфичный дефолт' : false);
 }

@@ -106,3 +106,14 @@ install(DIRECTORY "${PROJECT_BUILD_DIR}/${FLUTTER_ASSET_DIR_NAME}"
 install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
   CONFIGURATIONS Profile;Release
   COMPONENT Runtime)
+
+# Вендоренные бинарники кладём рядом с exe: sing-box ищет wintun.dll в своей
+# папке, а пути к sing-box/xray нативный код строит от пути к самому runner.
+set(VERGE_RESOURCES
+  "${CMAKE_CURRENT_SOURCE_DIR}/runner/resources/sing-box.exe"
+  "${CMAKE_CURRENT_SOURCE_DIR}/runner/resources/sing-box-test.exe"
+  "${CMAKE_CURRENT_SOURCE_DIR}/runner/resources/xray.exe"
+  "${CMAKE_CURRENT_SOURCE_DIR}/runner/resources/wintun.dll"
+)
+install(FILES ${VERGE_RESOURCES} DESTINATION "${CMAKE_INSTALL_PREFIX}"
+  COMPONENT Runtime)

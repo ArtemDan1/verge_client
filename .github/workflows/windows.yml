@@ -1,0 +1,41 @@
+name: Windows
+
+on:
+  push:
+    branches: [dev, 'feat/**', 'fix/**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.44.1
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      # --no-fatal-infos: в проекте есть предсуществующие info-замечания
+      # (prefer_initializing_formals и т.п.), а без флага analyze падает и на них.
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
+
+      # Раньше тестов: смысл этого workflow — увидеть ошибки компилятора
+      # Windows-части, и красный тест не должен до них не дать дойти.
+      - name: Build
+        run: flutter build windows --release
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verge-windows-x64
+          path: build/windows/x64/runner/Release/
+          retention-days: 14
+
+      - name: Test
+        run: flutter test

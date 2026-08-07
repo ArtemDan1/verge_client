@@ -50,7 +50,21 @@ class TrayService with TrayListener {
 
   Future<void> _showWindow() => _windowControl.show();
 
-  void _quit() => exit(0);
+  /// Выход из трея — единственный способ закрыть приложение на Windows
+  /// (крестик там прячет окно). Раньше это был голый `exit(0)`, и нативная
+  /// часть не успевала прибраться: системный прокси оставался прописанным в
+  /// реестре и указывал на убитый вместе с процессом sing-box — интернет
+  /// пропадал до следующего запуска Verge. Поэтому сначала штатное отключение,
+  /// и только потом выход.
+  Future<void> _quit() async {
+    try {
+      await _controller.disconnect().timeout(const Duration(seconds: 3));
+    } catch (_) {
+      // Отключиться не вышло — выходим всё равно: держать пользователя в
+      // приложении из-за неудачной уборки хуже.
+    }
+    exit(0);
+  }
 
   @override
   void onTrayIconMouseDown() {

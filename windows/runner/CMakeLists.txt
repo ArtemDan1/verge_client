@@ -11,6 +11,16 @@ add_executable(${BINARY_NAME} WIN32
   "main.cpp"
   "utils.cpp"
   "win32_window.cpp"
+  "platform_task_runner.cpp"
+  "system_proxy.cpp"
+  "child_process.cpp"
+  "tunnel_channel.cpp"
+  "xray_channel.cpp"
+  "test_channels.cpp"
+  "helper_channel.cpp"
+  "window_control_channel.cpp"
+  "deep_link_channel.cpp"
+  "bypass_ping_channel.cpp"
   "${FLUTTER_MANAGED_DIR}/generated_plugin_registrant.cc"
   "Runner.rc"
   "runner.exe.manifest"
@@ -34,6 +44,8 @@ target_compile_definitions(${BINARY_NAME} PRIVATE "NOMINMAX")
 # dependencies here.
 target_link_libraries(${BINARY_NAME} PRIVATE flutter flutter_wrapper_app)
 target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib")
+target_link_libraries(${BINARY_NAME} PRIVATE "wininet.lib")
+target_link_libraries(${BINARY_NAME} PRIVATE "ws2_32.lib" "iphlpapi.lib")
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
 # Run the Flutter tool portions of the build. This must not be removed.
