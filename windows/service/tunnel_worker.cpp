@@ -65,7 +65,25 @@ std::string TunnelWorker::Start(const std::string& config_json) {
 
   // Путь к бинарю берём свой, а не клиентский: служба под LocalSystem не
   // должна запускать то, что ей назвал непривилегированный процесс.
-  std::string err = singbox_.Start(L"sing-box.exe", L"run -c \"" + path + L"\"");
+  const std::wstring args = L"run -c \"" + path + L"\"";
+  std::string err = singbox_.Start(L"sing-box.exe", args);
+
+  // «Cannot create a file when that file already exists» на configure tun
+  // interface означает, что wintun-адаптер от прошлого запуска ещё жив.
+  //
+  // Так выходит, потому что останавливаем мы sing-box через TerminateProcess:
+  // корректного способа послать консольному процессу без консоли Ctrl+C на
+  // Windows нет, а убитый процесс снять адаптер не успевает. Драйвер убирает
+  // его сам следом за закрытием хендлов, но не мгновенно — если пользователь
+  // переподключился быстро, новый процесс попадает в этот промежуток.
+  //
+  // Поэтому одна повторная попытка после паузы. Помогает именно от гонки;
+  // адаптер, зависший всерьёз, ею не лечится — такой случай уйдёт в ошибку с
+  // исходным текстом, как и раньше.
+  if (!err.empty() && err.find("already exists") != std::string::npos) {
+    ::Sleep(1500);
+    err = singbox_.Start(L"sing-box.exe", args);
+  }
 
   std::lock_guard<std::mutex> lock(mutex_);
   if (!err.empty()) {

@@ -51,7 +51,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
 
   FlutterWindow window(project);
   Win32Window::Point origin(10, 10);
-  Win32Window::Size size(1280, 720);
+  // Размер логический: Win32Window домножает его на масштаб экрана, так что на
+  // типичных 125-150% окно выходит заметно шире, чем те же числа дают на
+  // macOS. Отсюда меньшая ширина, чем в шаблоне Flutter (было 1280x720).
+  Win32Window::Size size(1060, 720);
   if (!window.Create(L"Verge", origin, size)) {
     return EXIT_FAILURE;
   }

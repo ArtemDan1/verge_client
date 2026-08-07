@@ -14,6 +14,7 @@
 #include <flutter/standard_method_codec.h>
 
 #include <climits>
+#include <cwctype>
 #include <memory>
 #include <optional>
 #include <string>
@@ -32,29 +33,63 @@ const EncodableValue* Find(const EncodableMap& map, const char* key) {
   return it == map.end() ? nullptr : &it->second;
 }
 
-// Индекс физического интерфейса с активным IPv4-адресом. Туннельные адаптеры
-// (IF_TYPE_TUNNEL, wintun с описанием sing-box) пропускаем — ради обхода
-// именно их всё и затевается. 0 означает «не нашли»: тогда сокет никуда не
-// привязываем и замер идёт обычным путём (лучше не совсем честное число, чем
-// никакого).
+// true, если в строке есть подстрока (обе сравниваются без учёта регистра).
+bool ContainsNoCaseW(const wchar_t* haystack, const wchar_t* needle) {
+  if (haystack == nullptr) return false;
+  std::wstring hay(haystack);
+  for (auto& c : hay) c = static_cast<wchar_t>(::towlower(c));
+  return hay.find(needle) != std::wstring::npos;
+}
+
+// Виртуальный ли это адаптер туннеля.
+//
+// По одному лишь IfType их не отсечь: wintun-адаптер, который поднимает
+// sing-box, докладывается как IF_TYPE_PROPVIRTUAL, а иногда и как обычный
+// Ethernet — IF_TYPE_TUNNEL он не выставляет. Поэтому смотрим ещё и на имена:
+// драйвер описывает себя «Wintun Userspace Tunnel», а адаптеру sing-box даёт
+// имя своего inbound'а.
+bool IsTunnelAdapter(const IP_ADAPTER_ADDRESSES* a) {
+  if (a->IfType == IF_TYPE_TUNNEL || a->IfType == IF_TYPE_PROP_VIRTUAL) {
+    return true;
+  }
+  return ContainsNoCaseW(a->Description, L"wintun") ||
+         ContainsNoCaseW(a->Description, L"tap-windows") ||
+         ContainsNoCaseW(a->FriendlyName, L"wintun") ||
+         ContainsNoCaseW(a->FriendlyName, L"sing-box") ||
+         ContainsNoCaseW(a->FriendlyName, L"verge");
+}
+
+// Индекс физического интерфейса с активным IPv4-адресом.
+//
+// Туннельные адаптеры пропускаем — ради обхода именно их всё и затевается.
+// Отбор строго по «не туннель», а не по метрике саму по себе: в TUN-режиме
+// именно туннельный адаптер получает наименьшую метрику (так он и перехватывает
+// трафик), и выбор по метрике вернул бы его — замер тогда показывал бы задержку
+// до входа в туннель, те самые 2-3 мс вместо реального пинга до сервера.
+//
+// 0 означает «не нашли»: тогда сокет никуда не привязываем и замер идёт обычным
+// путём (лучше не совсем честное число, чем никакого).
 DWORD PhysicalInterfaceIndex() {
   ULONG size = 15000;
   std::vector<char> buf(size);
   auto* addrs = reinterpret_cast<IP_ADAPTER_ADDRESSES*>(buf.data());
   ULONG flags = GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST |
                 GAA_FLAG_SKIP_DNS_SERVER;
-  if (::GetAdaptersAddresses(AF_INET, flags, nullptr, addrs, &size) !=
-      NO_ERROR) {
-    return 0;
+  ULONG rc = ::GetAdaptersAddresses(AF_INET, flags, nullptr, addrs, &size);
+  if (rc == ERROR_BUFFER_OVERFLOW) {
+    // GetAdaptersAddresses вернул нужный размер в size — пробуем ещё раз.
+    buf.assign(size, 0);
+    addrs = reinterpret_cast<IP_ADAPTER_ADDRESSES*>(buf.data());
+    rc = ::GetAdaptersAddresses(AF_INET, flags, nullptr, addrs, &size);
   }
+  if (rc != NO_ERROR) return 0;
+
   DWORD best_index = 0;
   ULONG best_metric = ULONG_MAX;
   for (auto* a = addrs; a != nullptr; a = a->Next) {
     if (a->OperStatus != IfOperStatusUp) continue;
-    if (a->IfType == IF_TYPE_SOFTWARE_LOOPBACK ||
-        a->IfType == IF_TYPE_TUNNEL) {
-      continue;
-    }
+    if (a->IfType == IF_TYPE_SOFTWARE_LOOPBACK) continue;
+    if (IsTunnelAdapter(a)) continue;
     if (a->FirstUnicastAddress == nullptr) continue;
     if (a->Ipv4Metric < best_metric) {
       best_metric = a->Ipv4Metric;
