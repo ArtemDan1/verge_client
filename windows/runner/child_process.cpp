@@ -23,6 +23,20 @@ std::string Trim(const std::string& s) {
   return s.substr(b, e - b + 1);
 }
 
+// Сужение wchar_t → char через конструктор std::string от итераторов даёт
+// C4244, а в сборке Flutter предупреждения трактуются как ошибки. Да и по сути
+// оно неверно: имя файла вне ASCII превратилось бы в мусор.
+std::string Narrow(const std::wstring& s) {
+  if (s.empty()) return "";
+  int len = ::WideCharToMultiByte(CP_UTF8, 0, s.c_str(),
+                                  static_cast<int>(s.size()), nullptr, 0,
+                                  nullptr, nullptr);
+  std::string out(static_cast<size_t>(len), '\0');
+  ::WideCharToMultiByte(CP_UTF8, 0, s.c_str(), static_cast<int>(s.size()),
+                        out.data(), len, nullptr, nullptr);
+  return out;
+}
+
 bool ContainsNoCase(const std::string& hay, const std::string& needle) {
   auto it = std::search(hay.begin(), hay.end(), needle.begin(), needle.end(),
                         [](char a, char b) {
@@ -133,7 +147,7 @@ std::string ChildProcess::Start(const std::wstring& exe_name,
   ::CloseHandle(write_end);
   if (!ok) {
     ::CloseHandle(read_end);
-    return "не удалось запустить " + std::string(exe_name.begin(), exe_name.end());
+    return "не удалось запустить " + Narrow(exe_name);
   }
 
   // Job Object: процесс умрёт вместе с нами, даже если нас убьют.

@@ -1,10 +1,17 @@
+// Winsock — самым первым включением в файле, до любых заголовков Flutter.
+// windows.h тянет за собой winsock.h версии 1.1, а тот конфликтует с
+// winsock2.h: sockaddr объявляется дважды, AF_IPX и половина констант
+// переопределяются. Заголовки Flutter включают windows.h, поэтому порядок
+// здесь значимый, а не косметический. iphlpapi.h тоже обязан идти после
+// winsock2.h — он опирается на его типы.
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <iphlpapi.h>
+
 #include "bypass_ping_channel.h"
 
 #include <flutter/method_channel.h>
 #include <flutter/standard_method_codec.h>
-#include <iphlpapi.h>
-#include <winsock2.h>
-#include <ws2tcpip.h>
 
 #include <memory>
 #include <optional>
