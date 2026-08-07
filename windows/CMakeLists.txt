@@ -115,5 +115,22 @@ set(VERGE_RESOURCES
   "${CMAKE_CURRENT_SOURCE_DIR}/runner/resources/xray.exe"
   "${CMAKE_CURRENT_SOURCE_DIR}/runner/resources/wintun.dll"
 )
-install(FILES ${VERGE_RESOURCES} DESTINATION "${CMAKE_INSTALL_PREFIX}"
-  COMPONENT Runtime)
+#
+# Отсутствующий бинарник не валит сборку, а печатает предупреждение: без них
+# компилируемость Windows-части всё равно проверяема, и CI остаётся полезен,
+# пока бинарники не легли в репозиторий. Собранное так приложение НЕ рабочее —
+# подключение упадёт с «не удалось запустить sing-box.exe».
+set(VERGE_RESOURCES_PRESENT)
+foreach(resource ${VERGE_RESOURCES})
+  if(EXISTS "${resource}")
+    list(APPEND VERGE_RESOURCES_PRESENT "${resource}")
+  else()
+    message(WARNING "Нет вендоренного бинарника: ${resource}. "
+                    "Сборка будет неработоспособной. "
+                    "См. windows/runner/resources/README.md")
+  endif()
+endforeach()
+if(VERGE_RESOURCES_PRESENT)
+  install(FILES ${VERGE_RESOURCES_PRESENT} DESTINATION "${CMAKE_INSTALL_PREFIX}"
+    COMPONENT Runtime)
+endif()
