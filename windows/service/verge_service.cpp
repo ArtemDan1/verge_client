@@ -35,16 +35,26 @@ void SetState(DWORD state, DWORD exit_code = NO_ERROR) {
   ::SetServiceStatus(g_status_handle, &g_status);
 }
 
-void WINAPI HandlerEx(DWORD control, DWORD, LPVOID, LPVOID) {
-  if (control == SERVICE_CONTROL_STOP || control == SERVICE_CONTROL_SHUTDOWN) {
-    SetState(SERVICE_STOP_PENDING);
-    // Туннель гасим сами: осиротевший sing-box под LocalSystem продолжил бы
-    // держать wintun-адаптер и весь трафик системы после остановки службы.
-    TunnelWorker::Instance().Stop();
-    ::SetEvent(g_stop_event);
-    // Событие само по себе цикл приёма не разбудит: он стоит в блокирующем
-    // ConnectNamedPipe. Подключаемся к себе, чтобы вызов вернулся.
-    WakeAcceptLoop();
+// Возвращает NO_ERROR для обработанных команд и ERROR_CALL_NOT_IMPLEMENTED для
+// остальных — этого требует контракт LPHANDLER_FUNCTION_EX.
+DWORD WINAPI HandlerEx(DWORD control, DWORD, LPVOID, LPVOID) {
+  switch (control) {
+    case SERVICE_CONTROL_STOP:
+    case SERVICE_CONTROL_SHUTDOWN:
+      SetState(SERVICE_STOP_PENDING);
+      // Туннель гасим сами: осиротевший sing-box под LocalSystem продолжил бы
+      // держать wintun-адаптер и весь трафик системы после остановки службы.
+      TunnelWorker::Instance().Stop();
+      ::SetEvent(g_stop_event);
+      // Событие само по себе цикл приёма не разбудит: он стоит в блокирующем
+      // ConnectNamedPipe. Подключаемся к себе, чтобы вызов вернулся.
+      WakeAcceptLoop();
+      return NO_ERROR;
+    // SCM опрашивает состояние этой командой; отвечать на неё обязательно.
+    case SERVICE_CONTROL_INTERROGATE:
+      return NO_ERROR;
+    default:
+      return ERROR_CALL_NOT_IMPLEMENTED;
   }
 }
 
