@@ -151,31 +151,22 @@ class _HeroPanelState extends State<HeroPanel>
             ),
             if (running && c.settings.gstaticPingEnabled) ...[
               const SizedBox(width: 8),
-              GestureDetector(
+              // Число в чипе — всегда пинг до ноды: в TUN он меряется мимо
+              // туннеля (см. AppController.refreshHeroPing), поэтому честен в
+              // обоих режимах. gstatic остаётся признаком «есть ли интернет».
+              PingBadge(
                 onTap: c.refreshHeroPing,
-                // В TUN честный TCP-пинг ноды не гарантирован (см. комментарий
-                // к AppController.refreshHeroPing) — там используем gstatic.
-                child: c.settings.tunnelMode == TunnelMode.tun
-                    ? PingBadge(
-                        loading: c.isPingingGstatic &&
-                            c.gstaticPingMs == null &&
-                            !c.gstaticPingFailed,
-                        latencyMs: c.gstaticPingMs,
-                        noInternet: c.gstaticPingFailed,
-                      )
-                    : PingBadge(
-                        loading: c.selectedNode != null &&
-                            c.isPinging(c.selectedNode!) &&
-                            c.pingFor(c.selectedNode!) == null,
-                        latencyMs: c.selectedNode == null
-                            ? null
-                            : c.pingFor(c.selectedNode!)?.latencyMs,
-                        timedOut: c.selectedNode != null &&
-                            (c.pingFor(c.selectedNode!)?.timedOut ?? false),
-                        error: c.selectedNode != null &&
-                            c.pingFor(c.selectedNode!)?.error != null,
-                        noInternet: c.gstaticPingFailed,
-                      ),
+                loading: c.selectedNode != null &&
+                    c.isPinging(c.selectedNode!) &&
+                    c.pingFor(c.selectedNode!) == null,
+                latencyMs: c.selectedNode == null
+                    ? null
+                    : c.pingFor(c.selectedNode!)?.latencyMs,
+                timedOut: c.selectedNode != null &&
+                    (c.pingFor(c.selectedNode!)?.timedOut ?? false),
+                error: c.selectedNode != null &&
+                    c.pingFor(c.selectedNode!)?.error != null,
+                noInternet: c.gstaticPingFailed,
               ),
             ],
           ],

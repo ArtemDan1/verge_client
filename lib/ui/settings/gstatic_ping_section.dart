@@ -4,8 +4,8 @@ import '../../app/app_controller.dart';
 import '../../models/app_settings.dart';
 import 'general_section.dart';
 
-/// Вкл/выкл и интервал фонового пинга gstatic (бейдж у таймера). Независим
-/// от Автовыбора — просто индикатор активного соединения.
+/// Вкл/выкл, интервал и адрес фонового пинга активного соединения (бейдж у
+/// таймера). Независим от Автовыбора — просто индикатор активного соединения.
 class GstaticPingSection extends StatefulWidget {
   const GstaticPingSection({super.key, required this.controller});
   final AppController controller;
@@ -15,19 +15,77 @@ class GstaticPingSection extends StatefulWidget {
 }
 
 class _GstaticPingSectionState extends State<GstaticPingSection> {
-  // Локальное отображаемое значение во время протаскивания слайдера — чтобы
-  // подпись менялась вживую, не дожидаясь commit на onChangeEnd.
-  int? _dragging;
+  late final TextEditingController _interval;
+  late final TextEditingController _url;
+  final _intervalFocus = FocusNode();
+  final _urlFocus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    final s = widget.controller.settings;
+    _interval =
+        TextEditingController(text: '${s.gstaticPingIntervalSeconds}');
+    _url = TextEditingController(text: s.gstaticPingUrl);
+    // Коммит и по потере фокуса, а не только по Enter: уход на другой экран
+    // забирает фокус, и без этого набранное значение просто терялось.
+    _intervalFocus.addListener(() {
+      if (!_intervalFocus.hasFocus) _commitInterval(_interval.text);
+    });
+    _urlFocus.addListener(() {
+      if (!_urlFocus.hasFocus) _commitUrl(_url.text);
+    });
+  }
+
+  @override
+  void dispose() {
+    // Секцию сносят раньше, чем слушатели успеют сработать (смена экрана
+    // размонтирует виджет) — фиксируем набранное здесь же.
+    _commitInterval(_interval.text);
+    _commitUrl(_url.text);
+    _intervalFocus.dispose();
+    _urlFocus.dispose();
+    _interval.dispose();
+    _url.dispose();
+    super.dispose();
+  }
+
+  void _commitInterval(String raw) {
+    final s = widget.controller.settings;
+    final parsed = int.tryParse(raw.trim());
+    // Мусор и значения вне диапазона откатываем к сохранённому: молча
+    // подставлять дефолт хуже, чем оставить как было.
+    if (parsed == null || parsed < AppSettings.minGstaticPingIntervalSeconds) {
+      _interval.text = '${s.gstaticPingIntervalSeconds}';
+      return;
+    }
+    final value = AppSettings.clampGstaticPingInterval(parsed);
+    if (value != parsed) _interval.text = '$value';
+    if (value == s.gstaticPingIntervalSeconds) return;
+    widget.controller
+        .updateSettings(s.copyWith(gstaticPingIntervalSeconds: value));
+  }
+
+  void _commitUrl(String raw) {
+    final s = widget.controller.settings;
+    final value = raw.trim();
+    final uri = Uri.tryParse(value);
+    if (value.isEmpty || uri == null || !uri.hasScheme || uri.host.isEmpty) {
+      _url.text = s.gstaticPingUrl;
+      return;
+    }
+    if (value == s.gstaticPingUrl) return;
+    widget.controller.updateSettings(s.copyWith(gstaticPingUrl: value));
+  }
 
   @override
   Widget build(BuildContext context) {
     final c = widget.controller;
     final s = c.settings;
     final theme = ShadTheme.of(context);
-    final shownInterval = _dragging ?? s.gstaticPingIntervalSeconds;
     return SettingsSection(
       title: 'Пинг активного соединения',
-      description: 'Бейдж задержки до gstatic рядом с таймером подключения',
+      description: 'Бейдж задержки рядом с таймером подключения',
       children: [
         Row(
           children: [
@@ -42,23 +100,36 @@ class _GstaticPingSectionState extends State<GstaticPingSection> {
           ],
         ),
         if (s.gstaticPingEnabled) ...[
-          const SizedBox(height: 16),
-          Text('Интервал обновления, $shownInterval с',
-              style: theme.textTheme.muted),
+          const SizedBox(height: 20),
+          Text('Интервал обновления, с', style: theme.textTheme.large),
           const SizedBox(height: 8),
-          ShadSlider(
-            initialValue: s.gstaticPingIntervalSeconds.toDouble(),
-            min: AppSettings.minGstaticPingIntervalSeconds.toDouble(),
-            max: AppSettings.maxGstaticPingIntervalSeconds.toDouble(),
-            divisions: (AppSettings.maxGstaticPingIntervalSeconds -
-                    AppSettings.minGstaticPingIntervalSeconds) ~/
-                5,
-            onChanged: (v) => setState(() => _dragging = v.round()),
-            onChangeEnd: (v) {
-              setState(() => _dragging = null);
-              c.updateSettings(
-                  s.copyWith(gstaticPingIntervalSeconds: v.round()));
-            },
+          ShadInput(
+            key: const Key('gstaticPingInterval'),
+            controller: _interval,
+            focusNode: _intervalFocus,
+            keyboardType: TextInputType.number,
+            onSubmitted: _commitInterval,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'От ${AppSettings.minGstaticPingIntervalSeconds} до '
+            '${AppSettings.maxGstaticPingIntervalSeconds} с, '
+            'по умолчанию ${AppSettings.defaultGstaticPingIntervalSeconds}',
+            style: theme.textTheme.muted,
+          ),
+          const SizedBox(height: 20),
+          Text('Адрес проверки', style: theme.textTheme.large),
+          const SizedBox(height: 8),
+          ShadInput(
+            key: const Key('gstaticPingUrl'),
+            controller: _url,
+            onSubmitted: _commitUrl,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'В TUN-режиме до этого адреса проверяется наличие интернета мимо '
+            'туннеля; в Proxy — задержка через локальный прокси',
+            style: theme.textTheme.muted,
           ),
         ],
       ],

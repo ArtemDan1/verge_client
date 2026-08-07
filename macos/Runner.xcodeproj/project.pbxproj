@@ -30,6 +30,7 @@
 		3A69E3562FD5D0E600D413D8 /* HelperChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A69E3532FD5D0E600D413D8 /* HelperChannel.swift */; };
 		3A69E3572FD5D0E600D413D8 /* HelperProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A69E3542FD5D0E600D413D8 /* HelperProtocol.swift */; };
 		3A69E3582FD5D0E600D413D8 /* TunChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A69E3552FD5D0E600D413D8 /* TunChannel.swift */; };
+		3AB19A022FE0110000AA0002 /* BypassPingChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AB19A012FE0110000AA0001 /* BypassPingChannel.swift */; };
 		3A69E3592FD5D11700D413D8 /* HelperProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A69E3542FD5D0E600D413D8 /* HelperProtocol.swift */; };
 		3A69E35B2FD5D19F00D413D8 /* com.singboxclient.helper in CopyFiles */ = {isa = PBXBuildFile; fileRef = 3A3D52BC2FD0958B00C12FF5 /* com.singboxclient.helper */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		3A69E35E2FD5D20400D413D8 /* com.singboxclient.helper.plist in CopyFiles */ = {isa = PBXBuildFile; fileRef = 3A69E35D2FD5D20400D413D8 /* com.singboxclient.helper.plist */; };
@@ -135,6 +136,7 @@
 		3A69E3532FD5D0E600D413D8 /* HelperChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperChannel.swift; sourceTree = "<group>"; };
 		3A69E3542FD5D0E600D413D8 /* HelperProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperProtocol.swift; sourceTree = "<group>"; };
 		3A69E3552FD5D0E600D413D8 /* TunChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TunChannel.swift; sourceTree = "<group>"; };
+		3AB19A012FE0110000AA0001 /* BypassPingChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BypassPingChannel.swift; sourceTree = "<group>"; };
 		3A69E35D2FD5D20400D413D8 /* com.singboxclient.helper.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = com.singboxclient.helper.plist; path = Helper/com.singboxclient.helper.plist; sourceTree = "<group>"; };
 		78E0A7A72DC9AD7400C4905E /* FlutterGeneratedPluginSwiftPackage */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = FlutterGeneratedPluginSwiftPackage; path = ephemeral/Packages/FlutterGeneratedPluginSwiftPackage; sourceTree = "<group>"; };
 		7AFA3C8E1D35360C0083082E /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
@@ -254,6 +256,7 @@
 				3A69E3532FD5D0E600D413D8 /* HelperChannel.swift */,
 				3A69E3542FD5D0E600D413D8 /* HelperProtocol.swift */,
 				3A69E3552FD5D0E600D413D8 /* TunChannel.swift */,
+				3AB19A012FE0110000AA0001 /* BypassPingChannel.swift */,
 				33CC10F02044A3C60003C045 /* AppDelegate.swift */,
 				33CC11122044BFA00003C045 /* MainFlutterWindow.swift */,
 				AE001001000000000000BBB1 /* SystemProxy.swift */,
@@ -507,6 +510,7 @@
 				3A69E3562FD5D0E600D413D8 /* HelperChannel.swift in Sources */,
 				3A69E3572FD5D0E600D413D8 /* HelperProtocol.swift in Sources */,
 				3A69E3582FD5D0E600D413D8 /* TunChannel.swift in Sources */,
+				3AB19A022FE0110000AA0002 /* BypassPingChannel.swift in Sources */,
 				AE001001000000000000AAA1 /* SystemProxy.swift in Sources */,
 				AE001001000000000000AAA4 /* SystemDNS.swift in Sources */,
 				AE001001000000000000AAA2 /* SingboxProcess.swift in Sources */,

@@ -110,10 +110,10 @@ void main() {
     controller.dispose();
   });
 
-  testWidgets('в TUN показывает честный gstatic-пинг, а не пинг ноды',
+  testWidgets('в TUN показывает пинг ноды, замеренный мимо туннеля',
       (t) async {
-    var gstaticCalls = 0;
-    var nodeCalls = 0;
+    var bypassCalls = 0;
+    var plainSocketCalls = 0;
     final tun = FakeTunnel();
     final controller = AppController(
       subscription: SubscriptionService(
@@ -124,14 +124,19 @@ void main() {
       repo: InMemoryStateRepository(),
       platform: FakePlatformInfo(),
       resolveHost: (_) async => '9.9.9.9',
-      gstaticProbe: (url, port, {timeout = const Duration(seconds: 3)}) async {
-        gstaticCalls++;
-        return 33;
-      },
+      // Интернет есть — значит на чипе должно быть число, а не «нет интернета».
+      bypassProbe: (host, port, {timeout = const Duration(seconds: 3)}) async =>
+          7,
+      gstaticProbe: (url, port, {timeout = const Duration(seconds: 3)}) async =>
+          33,
       pingService: PingService(
         connect: (host, port, {timeout}) async {
-          nodeCalls++;
-          throw const SocketException('should not be called in TUN');
+          plainSocketCalls++;
+          throw const SocketException('обычный сокет в TUN меряет туннель');
+        },
+        bypassPing: (host, port, {timeout = const Duration(seconds: 3)}) async {
+          bypassCalls++;
+          return 21;
         },
       ),
     );
@@ -148,10 +153,9 @@ void main() {
     await t.pump();
     await t.pump();
 
-    // Число из честного (медленного) gstatic-замера, а не из пинга ноды.
-    expect(find.text('33 мс'), findsOneWidget);
-    expect(nodeCalls, 0);
-    expect(gstaticCalls, greaterThanOrEqualTo(1));
+    expect(find.text('21 мс'), findsOneWidget);
+    expect(bypassCalls, greaterThanOrEqualTo(1));
+    expect(plainSocketCalls, 0);
 
     controller.dispose();
   });

@@ -133,11 +133,15 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
   }
 
   Widget _pingBadge(AppController c, NodeConfig node) {
+    void reping() => c.pingNode(node);
     if (c.isPinging(node)) return const PingBadge(loading: true);
     final res = c.pingFor(node);
-    if (res == null) return const PingBadge();
-    if (res.latencyMs != null) return PingBadge(latencyMs: res.latencyMs);
-    return PingBadge(timedOut: res.timedOut, error: !res.timedOut);
+    if (res == null) return PingBadge(onTap: reping);
+    if (res.latencyMs != null) {
+      return PingBadge(latencyMs: res.latencyMs, onTap: reping);
+    }
+    return PingBadge(
+        timedOut: res.timedOut, error: !res.timedOut, onTap: reping);
   }
 
   @override

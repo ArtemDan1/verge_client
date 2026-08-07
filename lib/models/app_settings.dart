@@ -25,9 +25,14 @@ class AppSettings {
   final bool gstaticPingEnabled;
   final int gstaticPingIntervalSeconds;
 
-  static const defaultGstaticPingIntervalSeconds = 20;
-  static const minGstaticPingIntervalSeconds = 5;
-  static const maxGstaticPingIntervalSeconds = 60;
+  /// Адрес, до которого меряется пинг активного соединения. Меняется в
+  /// настройках: у gstatic бывают свои проблемы с доступностью.
+  final String gstaticPingUrl;
+
+  static const defaultGstaticPingIntervalSeconds = 60;
+  static const minGstaticPingIntervalSeconds = 1;
+  static const maxGstaticPingIntervalSeconds = 3600;
+  static const defaultGstaticPingUrl = 'https://www.gstatic.com/generate_204';
 
   static int clampGstaticPingInterval(int seconds) => seconds.clamp(
       minGstaticPingIntervalSeconds, maxGstaticPingIntervalSeconds);
@@ -42,6 +47,7 @@ class AppSettings {
     this.skippedVersion,
     this.gstaticPingEnabled = true,
     this.gstaticPingIntervalSeconds = defaultGstaticPingIntervalSeconds,
+    this.gstaticPingUrl = defaultGstaticPingUrl,
   });
 
   AppSettings copyWith({
@@ -54,6 +60,7 @@ class AppSettings {
     String? skippedVersion,
     bool? gstaticPingEnabled,
     int? gstaticPingIntervalSeconds,
+    String? gstaticPingUrl,
   }) =>
       AppSettings(
         themeMode: themeMode ?? this.themeMode,
@@ -67,6 +74,9 @@ class AppSettings {
         gstaticPingIntervalSeconds: gstaticPingIntervalSeconds == null
             ? this.gstaticPingIntervalSeconds
             : clampGstaticPingInterval(gstaticPingIntervalSeconds),
+        gstaticPingUrl: (gstaticPingUrl == null || gstaticPingUrl.trim().isEmpty)
+            ? this.gstaticPingUrl
+            : gstaticPingUrl.trim(),
       );
 
   Map<String, dynamic> toJson() => {
@@ -79,6 +89,7 @@ class AppSettings {
         'skippedVersion': skippedVersion,
         'gstaticPingEnabled': gstaticPingEnabled,
         'gstaticPingIntervalSeconds': gstaticPingIntervalSeconds,
+        'gstaticPingUrl': gstaticPingUrl,
       };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -97,6 +108,10 @@ class AppSettings {
                 as num?)
                 ?.toInt() ??
             defaultGstaticPingIntervalSeconds,
+        gstaticPingUrl:
+            (json['gstaticPingUrl'] as String?)?.trim().isNotEmpty == true
+                ? (json['gstaticPingUrl'] as String).trim()
+                : defaultGstaticPingUrl,
       );
 
   @override
@@ -110,7 +125,8 @@ class AppSettings {
       other.lastUpdateCheckAt == lastUpdateCheckAt &&
       other.skippedVersion == skippedVersion &&
       other.gstaticPingEnabled == gstaticPingEnabled &&
-      other.gstaticPingIntervalSeconds == gstaticPingIntervalSeconds;
+      other.gstaticPingIntervalSeconds == gstaticPingIntervalSeconds &&
+      other.gstaticPingUrl == gstaticPingUrl;
 
   @override
   int get hashCode => Object.hash(
@@ -122,5 +138,6 @@ class AppSettings {
       lastUpdateCheckAt,
       skippedVersion,
       gstaticPingEnabled,
-      gstaticPingIntervalSeconds);
+      gstaticPingIntervalSeconds,
+      gstaticPingUrl);
 }

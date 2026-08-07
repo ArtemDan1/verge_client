@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show TextInputAction;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:singbox_client/app/app_controller.dart';
@@ -30,7 +31,7 @@ void main() {
 
     await t.pumpWidget(_wrap(AnimatedBuilder(
       animation: c,
-      builder: (_, __) => GstaticPingSection(controller: c),
+      builder: (_, _) => GstaticPingSection(controller: c),
     )));
     await t.pump();
 
@@ -44,38 +45,103 @@ void main() {
     c.dispose();
   });
 
-  testWidgets('слайдер скрыт, когда пинг выключен', (t) async {
+  testWidgets('поля скрыты, когда пинг выключен', (t) async {
     final c = _build();
     await c.init();
     await c.updateSettings(c.settings.copyWith(gstaticPingEnabled: false));
 
     await t.pumpWidget(_wrap(AnimatedBuilder(
       animation: c,
-      builder: (_, __) => GstaticPingSection(controller: c),
+      builder: (_, _) => GstaticPingSection(controller: c),
     )));
     await t.pump();
 
-    expect(find.byType(ShadSlider), findsNothing);
+    expect(find.byKey(const Key('gstaticPingInterval')), findsNothing);
+    expect(find.byKey(const Key('gstaticPingUrl')), findsNothing);
 
     c.dispose();
   });
 
-  testWidgets('слайдер отпущенный на новом значении сохраняет интервал',
+  testWidgets('введённый интервал сохраняется по Enter', (t) async {
+    final c = _build();
+    await c.init();
+
+    await t.pumpWidget(_wrap(AnimatedBuilder(
+      animation: c,
+      builder: (_, _) => GstaticPingSection(controller: c),
+    )));
+    await t.pump();
+
+    await t.enterText(find.byKey(const Key('gstaticPingInterval')), '5');
+    await t.testTextInput.receiveAction(TextInputAction.done);
+    await t.pump();
+
+    expect(c.settings.gstaticPingIntervalSeconds, 5);
+
+    c.dispose();
+  });
+
+  testWidgets('интервал сохраняется при потере фокуса (уход на другой экран)',
       (t) async {
     final c = _build();
     await c.init();
 
     await t.pumpWidget(_wrap(AnimatedBuilder(
       animation: c,
-      builder: (_, __) => GstaticPingSection(controller: c),
+      builder: (_, _) => GstaticPingSection(controller: c),
     )));
     await t.pump();
 
-    final slider = t.widget<ShadSlider>(find.byType(ShadSlider));
-    slider.onChangeEnd!(40);
+    await t.enterText(find.byKey(const Key('gstaticPingInterval')), '120');
+    // Экран сменился — поле потеряло фокус, но не значение.
+    await t.pumpWidget(_wrap(const SizedBox()));
     await t.pump();
 
-    expect(c.settings.gstaticPingIntervalSeconds, 40);
+    expect(c.settings.gstaticPingIntervalSeconds, 120);
+
+    c.dispose();
+  });
+
+  testWidgets('интервал меньше минимума откатывается к сохранённому',
+      (t) async {
+    final c = _build();
+    await c.init();
+
+    await t.pumpWidget(_wrap(AnimatedBuilder(
+      animation: c,
+      builder: (_, _) => GstaticPingSection(controller: c),
+    )));
+    await t.pump();
+
+    await t.enterText(find.byKey(const Key('gstaticPingInterval')), '0');
+    await t.testTextInput.receiveAction(TextInputAction.done);
+    await t.pump();
+
+    expect(c.settings.gstaticPingIntervalSeconds, 60);
+
+    c.dispose();
+  });
+
+  testWidgets('адрес проверки сохраняется, а мусор отбрасывается', (t) async {
+    final c = _build();
+    await c.init();
+
+    await t.pumpWidget(_wrap(AnimatedBuilder(
+      animation: c,
+      builder: (_, _) => GstaticPingSection(controller: c),
+    )));
+    await t.pump();
+
+    await t.enterText(
+        find.byKey(const Key('gstaticPingUrl')), 'https://example.com/204');
+    await t.testTextInput.receiveAction(TextInputAction.done);
+    await t.pump();
+    expect(c.settings.gstaticPingUrl, 'https://example.com/204');
+
+    await t.enterText(find.byKey(const Key('gstaticPingUrl')), 'не-адрес');
+    await t.testTextInput.receiveAction(TextInputAction.done);
+    await t.pump();
+    expect(c.settings.gstaticPingUrl, 'https://example.com/204');
 
     c.dispose();
   });

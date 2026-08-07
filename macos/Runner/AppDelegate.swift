@@ -10,6 +10,7 @@ class AppDelegate: FlutterAppDelegate {
   private let xrayChannel = XrayChannel()
   private let singboxTestChannel = SingboxTestChannel()
   private let xrayTestChannel = XrayTestChannel()
+  private let bypassPingChannel = BypassPingChannel()
 
   override func applicationDidFinishLaunching(_ notification: Notification) {
     let controller = mainFlutterWindow?.contentViewController
@@ -21,6 +22,7 @@ class AppDelegate: FlutterAppDelegate {
     xrayChannel.register(with: controller.registrar(forPlugin: "XrayChannel"))
     singboxTestChannel.register(with: controller.registrar(forPlugin: "SingboxTestChannel"))
     xrayTestChannel.register(with: controller.registrar(forPlugin: "XrayTestChannel"))
+    bypassPingChannel.register(with: controller.registrar(forPlugin: "BypassPingChannel"))
     WindowControlChannel.register(with: controller.registrar(forPlugin: "WindowControlChannel"))
     super.applicationDidFinishLaunching(notification)
   }

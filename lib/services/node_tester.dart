@@ -104,12 +104,18 @@ class NodeTester {
     _probe = probe ?? (url, port, timeout) => _defaultProbe(url, port, timeout, _onLog);
   }
 
+  /// [bypassTunnel] — мерить TCP мимо туннеля. В поднятом TUN обычный сокет
+  /// перехватывается utun и меряет туннель, а не сервер: префильтр тогда
+  /// сравнивает ноды по одному и тому же локальному интерфейсу. HTTP-фазы это
+  /// не касается — тестовый процесс выпускается мимо туннеля правилом
+  /// роутинга.
   Future<List<NodeTestResult>> test(
     List<NodeConfig> nodes, {
     required String url,
     NetworkSettings network = const NetworkSettings(),
+    bool bypassTunnel = false,
   }) async {
-    final tcp = await _tcpPhase(nodes);
+    final tcp = await _tcpPhase(nodes, bypassTunnel: bypassTunnel);
 
     // Ноды сравниваются по значению, поэтому нумеруем их позициями: две
     // одинаковые ноды в профиле иначе схлопнулись бы в один ключ и получили
@@ -168,13 +174,14 @@ class NodeTester {
 
   /// Задержки по позициям нод, а не по самим нодам: NodeConfig сравнивается
   /// по значению, и дубликаты в профиле потеряли бы свой результат.
-  Future<List<int?>> _tcpPhase(List<NodeConfig> nodes) async {
+  Future<List<int?>> _tcpPhase(List<NodeConfig> nodes,
+      {bool bypassTunnel = false}) async {
     final out = List<int?>.filled(nodes.length, null);
     var i = 0;
     Future<void> worker() async {
       while (i < nodes.length) {
         final at = i++;
-        final res = await _ping.ping(nodes[at]);
+        final res = await _ping.ping(nodes[at], bypassTunnel: bypassTunnel);
         out[at] = res.latencyMs;
       }
     }

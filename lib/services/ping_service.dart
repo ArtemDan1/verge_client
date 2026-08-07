@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import '../models/node_config.dart';
+import 'bypass_ping.dart';
 
 /// Устанавливает TCP-соединение до host:port. Инъектируется в тестах.
 typedef SocketConnector = Future<Socket> Function(
@@ -21,10 +22,34 @@ class PingResult {
 
 class PingService {
   final SocketConnector _connect;
-  PingService({SocketConnector? connect}) : _connect = connect ?? _defaultConnect;
+  final BypassPinger _bypass;
+  final UdpPinger _udpPing;
+  PingService({
+    SocketConnector? connect,
+    BypassPinger? bypassPing,
+    UdpPinger? udpPing,
+  })  : _connect = connect ?? _defaultConnect,
+        _bypass = bypassPing ?? bypassTcpPing,
+        _udpPing = udpPing ?? quicUdpPing;
 
+  /// [bypassTunnel] — мерить мимо туннеля (нужно в TUN-режиме, где обычный
+  /// сокет перехватывается utun и меряет туннель, а не сервер).
   Future<PingResult> ping(NodeConfig node,
-      {Duration timeout = const Duration(seconds: 3)}) async {
+      {Duration timeout = const Duration(seconds: 3),
+      bool bypassTunnel = false}) async {
+    // hysteria2 живёт поверх QUIC: TCP-порта у сервера нет вовсе, и обычный
+    // connect всегда давал бы таймаут на живой ноде.
+    if (node.protocol == NodeProtocol.hysteria2) {
+      final ms = await _udpPing(node.host, node.port,
+          timeout: timeout, bypassTunnel: bypassTunnel);
+      return ms == null ? const PingResult.timeout() : PingResult.ok(ms);
+    }
+    if (bypassTunnel) {
+      final ms = await _bypass(node.host, node.port, timeout: timeout);
+      // Нативный замер не различает отказ и таймаут — показываем таймаут:
+      // для пользователя разница только в слове на чипе.
+      return ms == null ? const PingResult.timeout() : PingResult.ok(ms);
+    }
     final sw = Stopwatch()..start();
     try {
       final socket = await _connect(node.host, node.port, timeout: timeout);

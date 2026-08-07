@@ -155,4 +155,37 @@ void main() {
 
     expect(await tester.check(_node('a'), url: 'https://example.com'), isFalse);
   });
+
+  test('bypassTunnel прокидывается в TCP-префильтр', () async {
+    var bypassCalls = 0;
+    var plainCalls = 0;
+    NodeTester tester() => NodeTester(
+          ping: PingService(
+            connect: (host, port, {timeout}) async {
+              plainCalls++;
+              return _FakeSocket();
+            },
+            bypassPing: (host, port,
+                {timeout = const Duration(seconds: 3)}) async {
+              bypassCalls++;
+              return 10;
+            },
+          ),
+          startSingbox: (_) async {},
+          stopSingbox: () async {},
+          startXray: (_) async {},
+          stopXray: () async {},
+          pickPort: () async => 9000,
+          probe: (url, port, timeout) async => 42,
+        );
+
+    await tester()
+        .test([_node('a')], url: 'https://example.com', bypassTunnel: true);
+    expect(bypassCalls, 1);
+    expect(plainCalls, 0);
+
+    await tester().test([_node('a')], url: 'https://example.com');
+    expect(bypassCalls, 1, reason: 'без флага меряем обычным сокетом');
+    expect(plainCalls, 1);
+  });
 }
