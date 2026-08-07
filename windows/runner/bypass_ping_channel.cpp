@@ -13,6 +13,7 @@
 #include <flutter/method_channel.h>
 #include <flutter/standard_method_codec.h>
 
+#include <climits>
 #include <memory>
 #include <optional>
 #include <string>
@@ -47,7 +48,7 @@ DWORD PhysicalInterfaceIndex() {
     return 0;
   }
   DWORD best_index = 0;
-  ULONG best_metric = MAXULONG;
+  ULONG best_metric = ULONG_MAX;
   for (auto* a = addrs; a != nullptr; a = a->Next) {
     if (a->OperStatus != IfOperStatusUp) continue;
     if (a->IfType == IF_TYPE_SOFTWARE_LOOPBACK ||
