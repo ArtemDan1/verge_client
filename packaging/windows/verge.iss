@@ -84,6 +84,12 @@ Filename: "{sys}\sc.exe"; \
 Filename: "{sys}\sc.exe"; \
   Parameters: "description VergeTunnel ""Привилегированная часть Verge: поднимает TUN-туннель"""; \
   Flags: runhidden
+; Автоперезапуск при сбое: без службы TUN-режим недоступен целиком, и
+; единичное падение не должно требовать переустановки. Счётчик сбоев
+; сбрасывается раз в сутки.
+Filename: "{sys}\sc.exe"; \
+  Parameters: "failure VergeTunnel reset= 86400 actions= restart/5000/restart/5000/restart/5000"; \
+  Flags: runhidden
 Filename: "{sys}\sc.exe"; Parameters: "start VergeTunnel"; Flags: runhidden
 
 Filename: "{app}\{#AppExeName}"; Description: "Запустить {#AppName}"; \

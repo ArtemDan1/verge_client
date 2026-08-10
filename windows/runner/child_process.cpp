@@ -37,6 +37,16 @@ std::string Narrow(const std::wstring& s) {
   return out;
 }
 
+// Обработчик-заглушка на время рассылки Ctrl+Break.
+//
+// Вернуть TRUE значит «событие обработано» — система не применяет к нам
+// действие по умолчанию, то есть не завершает процесс. Настоящая функция здесь
+// обязательна: SetConsoleCtrlHandler(nullptr, TRUE) подавляет ТОЛЬКО Ctrl+C, а
+// Ctrl+Break этим способом не заглушить, и процесс всё равно будет убит.
+BOOL WINAPI IgnoreConsoleCtrl(DWORD type) {
+  return type == CTRL_BREAK_EVENT || type == CTRL_C_EVENT;
+}
+
 bool ContainsNoCase(const std::string& hay, const std::string& needle) {
   auto it = std::search(hay.begin(), hay.end(), needle.begin(), needle.end(),
                         [](char a, char b) {
@@ -221,14 +231,18 @@ bool ChildProcess::StopGracefully(DWORD timeout_ms) {
   ::FreeConsole();
   if (!::AttachConsole(pid_)) return false;
 
-  // Событие рассылается всем на этой консоли, включая нас. Глушим свою
-  // реакцию, иначе служба завершится вместе с ребёнком.
-  ::SetConsoleCtrlHandler(nullptr, TRUE);
+  // Событие рассылается всем на этой консоли, включая нас, а по умолчанию оно
+  // означает «завершить процесс». Без своего обработчика служба убивала бы себя
+  // при каждой остановке туннеля.
+  if (!::SetConsoleCtrlHandler(IgnoreConsoleCtrl, TRUE)) {
+    ::FreeConsole();
+    return false;
+  }
   BOOL sent = ::GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT, 0);
   bool exited =
       sent && ::WaitForSingleObject(process_, timeout_ms) == WAIT_OBJECT_0;
   ::FreeConsole();
-  ::SetConsoleCtrlHandler(nullptr, FALSE);
+  ::SetConsoleCtrlHandler(IgnoreConsoleCtrl, FALSE);
   return exited;
 }
 
