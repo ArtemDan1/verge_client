@@ -22,7 +22,7 @@ class TunnelWorker {
   std::string TakeLogs();
 
  private:
-  TunnelWorker() = default;
+  TunnelWorker();
 
   void AppendLogs(const std::string& chunk);
   // Запуск процесса без сброса бюджета повторов — им пользуются и Start, и

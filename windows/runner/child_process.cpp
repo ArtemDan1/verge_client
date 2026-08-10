@@ -141,9 +141,14 @@ std::string ChildProcess::Start(const std::wstring& exe_name,
   si.hStdOutput = write_end;
   si.hStdError = write_end;
   PROCESS_INFORMATION pi{};
-  BOOL ok = ::CreateProcessW(exe.c_str(), mutable_cmd.data(), nullptr, nullptr,
-                             TRUE, CREATE_NO_WINDOW | CREATE_SUSPENDED, nullptr,
-                             nullptr, &si, &pi);
+  // CREATE_NEW_PROCESS_GROUP — чтобы процессу можно было адресно послать
+  // Ctrl+Break (см. StopGracefully). Ctrl+C в такой группе отключён, но нам он
+  // и не нужен. CREATE_NO_WINDOW оставляет процессу консоль, просто без окна, —
+  // именно к ней мы потом и цепляемся.
+  BOOL ok = ::CreateProcessW(
+      exe.c_str(), mutable_cmd.data(), nullptr, nullptr, TRUE,
+      CREATE_NO_WINDOW | CREATE_SUSPENDED | CREATE_NEW_PROCESS_GROUP, nullptr,
+      nullptr, &si, &pi);
   ::CloseHandle(write_end);
   if (!ok) {
     ::CloseHandle(read_end);
@@ -162,6 +167,7 @@ std::string ChildProcess::Start(const std::wstring& exe_name,
   ::CloseHandle(pi.hThread);
 
   process_ = pi.hProcess;
+  pid_ = pi.dwProcessId;
   log_thread_ = std::thread(&ChildProcess::PumpLogs, this, read_end);
 
   // Проверка живости: если конфиг битый, процесс успеет упасть за grace.
@@ -200,17 +206,48 @@ void ChildProcess::WatchExit(HANDLE process) {
   if (on_crash_) on_crash_(CrashReason(code));
 }
 
+// Просит процесс завершиться самому.
+//
+// Единственный способ послать консольному процессу без окна сигнал завершения
+// на Windows: подцепиться к ЕГО консоли (при CREATE_NO_WINDOW она есть, нет
+// только окна) и разослать по ней Ctrl+Break. Go, на котором написаны sing-box
+// и xray, доставляет это в программу как os.Interrupt, и sing-box успевает
+// закрыть wintun-адаптер — ради чего всё и делается.
+bool ChildProcess::StopGracefully(DWORD timeout_ms) {
+  if (process_ == nullptr || pid_ == 0) return false;
+
+  // Своя консоль, если была, мешает: AttachConsole работает только когда
+  // процесс ни к какой консоли не привязан.
+  ::FreeConsole();
+  if (!::AttachConsole(pid_)) return false;
+
+  // Событие рассылается всем на этой консоли, включая нас. Глушим свою
+  // реакцию, иначе служба завершится вместе с ребёнком.
+  ::SetConsoleCtrlHandler(nullptr, TRUE);
+  BOOL sent = ::GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT, 0);
+  bool exited =
+      sent && ::WaitForSingleObject(process_, timeout_ms) == WAIT_OBJECT_0;
+  ::FreeConsole();
+  ::SetConsoleCtrlHandler(nullptr, FALSE);
+  return exited;
+}
+
 void ChildProcess::Stop() {
   stopping_ = true;
   if (process_ != nullptr) {
-    ::TerminateProcess(process_, 0);
-    ::WaitForSingleObject(process_, 3000);
+    // Восемь секунд: в логах освобождение tun-интерфейса занимает секунды, и
+    // обрывать его на полпути — значит вернуться к тому же конфликту адаптера.
+    if (!graceful_ || !StopGracefully(8000)) {
+      ::TerminateProcess(process_, 0);
+      ::WaitForSingleObject(process_, 3000);
+    }
   }
   if (log_thread_.joinable()) log_thread_.join();
   if (watch_thread_.joinable()) watch_thread_.detach();
   if (process_ != nullptr) {
     ::CloseHandle(process_);
     process_ = nullptr;
+    pid_ = 0;
   }
   if (job_ != nullptr) {
     ::CloseHandle(job_);

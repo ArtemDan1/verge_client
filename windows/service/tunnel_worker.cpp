@@ -26,6 +26,13 @@ constexpr size_t kLogLimit = 500;
 
 }  // namespace
 
+TunnelWorker::TunnelWorker() {
+  // Именно в TUN-режиме важно, чтобы sing-box завершался сам: убитый он не
+  // снимает wintun-адаптер, и следующий запуск падает с «Cannot create a file
+  // when that file already exists».
+  singbox_.SetGracefulStop(true);
+}
+
 TunnelWorker& TunnelWorker::Instance() {
   static TunnelWorker instance;
   return instance;

@@ -25,6 +25,14 @@ class ChildProcess {
   void SetOnLog(std::function<void(const std::string&)> cb) { on_log_ = cb; }
   void SetOnCrash(std::function<void(const std::string&)> cb) { on_crash_ = cb; }
 
+  // Просить процесс завершиться самому, а не убивать сразу.
+  //
+  // Нужно для TUN: убитый sing-box не снимает wintun-адаптер, и следующий
+  // запуск падает с «configure tun interface: Cannot create a file when that
+  // file already exists». Для proxy-режима смысла нет — там убирать нечего, а
+  // возня с консолью процессу с UI ни к чему.
+  void SetGracefulStop(bool enabled) { graceful_ = enabled; }
+
   // Пустая строка — успех, иначе причина ошибки (уже человекочитаемая).
   std::string Start(const std::wstring& exe_name, const std::wstring& args);
   void Stop();
@@ -44,11 +52,16 @@ class ChildProcess {
   // process_ не дожидаясь этого потока, и общий хэндл система успела бы отдать
   // под другой объект.
   void WatchExit(HANDLE process);
+  // Ctrl+Break в консоль процесса и ожидание его выхода. false — послать не
+  // вышло или процесс не успел завершиться, тогда остаётся TerminateProcess.
+  bool StopGracefully(DWORD timeout_ms);
   void AppendTail(const std::string& chunk);
   std::string CrashReason(DWORD exit_code);
 
   HANDLE job_ = nullptr;
   HANDLE process_ = nullptr;
+  DWORD pid_ = 0;
+  bool graceful_ = false;
   std::thread log_thread_;
   std::thread watch_thread_;
   std::atomic<bool> stopping_{false};
