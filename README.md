@@ -64,7 +64,7 @@ Verge — настольный клиент для безопасного и у�
 |---|---|
 | Подписки | HTTP/HTTPS URL, base64-списки |
 | Готовые конфигурации | sing-box JSON, Xray/V2Ray JSON |
-| Share-ссылки | `vless://`, `vmess://`, `trojan://`, `ss://`, `hysteria2://`, `naive+https://` |
+| Share-ссылки | `vless://`, `hysteria2://`, `hy2://`, `naive+https://` |
 | Интеграции | `verge://import/...` |
 
 Поддержка конкретного транспорта определяется актуальными возможностями встроенных версий sing-box и Xray.
