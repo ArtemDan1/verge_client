@@ -5,6 +5,7 @@ import 'package:flutter/material.dart' show SelectionArea, Colors;
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../app/app_controller.dart';
 import '../models/log_entry.dart';
+import '../theme/app_theme.dart';
 
 class LogsScreen extends StatefulWidget {
   const LogsScreen({super.key, required this.controller});
@@ -231,7 +232,12 @@ class _LogRow extends StatelessWidget {
     final theme = ShadTheme.of(context);
     final muted = theme.colorScheme.mutedForeground;
     final color = _levelColor(entry.level, theme);
-    const mono = TextStyle(fontFamily: 'monospace', fontSize: 12, height: 1.45);
+    const mono = TextStyle(
+      fontFamily: kMonoFontFamily,
+      fontFamilyFallback: kMonoFontFallback,
+      fontSize: 12,
+      height: 1.45,
+    );
 
     return Container(
       decoration: BoxDecoration(
@@ -299,7 +305,8 @@ class _LogRow extends StatelessWidget {
         child: Text(
           label,
           style: TextStyle(
-            fontFamily: 'monospace',
+            fontFamily: kMonoFontFamily,
+            fontFamilyFallback: kMonoFontFallback,
             fontSize: 10,
             fontWeight: FontWeight.w700,
             letterSpacing: 0.4,

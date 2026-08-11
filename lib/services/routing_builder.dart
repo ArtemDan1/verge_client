@@ -1,5 +1,6 @@
 import '../models/routing_profile.dart';
 import '../models/routing_rule.dart';
+import '../platform/process_names.dart';
 import 'geo_catalog.dart';
 
 class RoutingFragment {
@@ -42,7 +43,10 @@ class RoutingBuilder {
   }
 
   RoutingFragment build(RoutingProfile profile,
-      {String? serverIp, bool tun = false, String? geoAssetDir}) {
+      {String? serverIp,
+      bool tun = false,
+      String? geoAssetDir,
+      List<String>? bypassProcessNames}) {
     final rules = <Map<String, dynamic>>[];
     final ruleSets = <String, Map<String, dynamic>>{};
 
@@ -54,7 +58,8 @@ class RoutingBuilder {
       // через сам туннель и показывал бы «всё хорошо» на мёртвой ноде.
       // Боевой процесс называется `sing-box` и под правило не попадает.
       rules.add({
-        'process_name': ['xray', 'sing-box-test'],
+        'process_name':
+            bypassProcessNames ?? [xrayProcessName, singboxTestProcessName],
         'outbound': 'direct'
       });
       if (serverIp != null && serverIp.isNotEmpty) {

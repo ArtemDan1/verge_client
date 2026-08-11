@@ -4,6 +4,7 @@ import 'package:flutter/material.dart'
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
+import '../../theme/app_theme.dart';
 
 /// Разбирает и форматирует JSON с отступом в 2 пробела, пробрасывая
 /// FormatException наружу. Отдельно от [prettyPrintJson], чтобы вызывающий мог
@@ -60,7 +61,8 @@ class _JsonEditorState extends State<JsonEditor> {
   final _gutterScroll = ScrollController();
 
   static const _textStyle = TextStyle(
-    fontFamily: 'monospace',
+    fontFamily: kMonoFontFamily,
+    fontFamilyFallback: kMonoFontFallback,
     fontSize: 13,
     height: 1.4,
   );

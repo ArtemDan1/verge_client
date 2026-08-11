@@ -51,6 +51,7 @@ add_subdirectory(${FLUTTER_MANAGED_DIR})
 
 # Application build; see runner/CMakeLists.txt.
 add_subdirectory("runner")
+add_subdirectory("service")
 
 
 # Generated plugin build rules, which manage building the plugins and adding
@@ -73,6 +74,13 @@ set(INSTALL_BUNDLE_DATA_DIR "${CMAKE_INSTALL_PREFIX}/data")
 set(INSTALL_BUNDLE_LIB_DIR "${CMAKE_INSTALL_PREFIX}")
 
 install(TARGETS ${BINARY_NAME} RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}"
+  COMPONENT Runtime)
+
+# Служба ставится рядом с приложением: инсталлятор забирает весь каталог Release
+# целиком, а `sc create` указывает на {app}\verge_service.exe. Строка обязана
+# быть здесь, а не в service/CMakeLists.txt: там CMAKE_INSTALL_PREFIX ещё
+# держит дефолтное значение.
+install(TARGETS verge_service RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}"
   COMPONENT Runtime)
 
 install(FILES "${FLUTTER_ICU_DATA_FILE}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
@@ -106,3 +114,43 @@ install(DIRECTORY "${PROJECT_BUILD_DIR}/${FLUTTER_ASSET_DIR_NAME}"
 install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
   CONFIGURATIONS Profile;Release
   COMPONENT Runtime)
+
+# Вендоренные бинарники кладём рядом с exe: sing-box ищет wintun.dll в своей
+# папке, а пути к sing-box/xray нативный код строит от пути к самому runner.
+set(VERGE_SINGBOX "${CMAKE_CURRENT_SOURCE_DIR}/runner/resources/sing-box.exe")
+set(VERGE_RESOURCES
+  "${VERGE_SINGBOX}"
+  "${CMAKE_CURRENT_SOURCE_DIR}/runner/resources/libcronet.dll"
+  "${CMAKE_CURRENT_SOURCE_DIR}/runner/resources/xray.exe"
+  "${CMAKE_CURRENT_SOURCE_DIR}/runner/resources/wintun.dll"
+)
+#
+# Отсутствующий бинарник не валит сборку, а печатает предупреждение: без них
+# компилируемость Windows-части всё равно проверяема, и CI остаётся полезен,
+# пока бинарники не легли в репозиторий. Собранное так приложение НЕ рабочее —
+# подключение упадёт с «не удалось запустить sing-box.exe».
+set(VERGE_RESOURCES_PRESENT)
+foreach(resource ${VERGE_RESOURCES})
+  if(EXISTS "${resource}")
+    list(APPEND VERGE_RESOURCES_PRESENT "${resource}")
+  else()
+    message(WARNING "Нет вендоренного бинарника: ${resource}. "
+                    "Сборка будет неработоспособной. "
+                    "См. windows/runner/resources/README.md")
+  endif()
+endforeach()
+if(VERGE_RESOURCES_PRESENT)
+  install(FILES ${VERGE_RESOURCES_PRESENT} DESTINATION "${CMAKE_INSTALL_PREFIX}"
+    COMPONENT Runtime)
+endif()
+
+# sing-box-test.exe — та же программа под другим именем: правило find_process в
+# конфиге отличает тестовый процесс от боевого только по имени файла, а симлинк
+# на Windows требует прав администратора. Копию делает сборка, а не репозиторий:
+# коммитить второй экземпляр 45-мегабайтного бинаря незачем.
+if(EXISTS "${VERGE_SINGBOX}")
+  install(CODE "
+    execute_process(COMMAND \"${CMAKE_COMMAND}\" -E copy_if_different
+      \"${VERGE_SINGBOX}\" \"${CMAKE_INSTALL_PREFIX}/sing-box-test.exe\")
+    " COMPONENT Runtime)
+endif()
