@@ -139,4 +139,29 @@ void main() {
     final info = await svc.checkForUpdate('1.0.0');
     expect(info!.pkgUrl, 'https://example/a.pkg');
   }, skip: Platform.isWindows ? 'macOS-специфичный дефолт' : false);
+
+  test('windows-суффикс .exe находит ассет с произвольным именем', () async {
+    final client = MockClient((req) async {
+      return http.Response(
+        jsonEncode({
+          'tag_name': '1.1.0',
+          'html_url': 'https://example/releases/1.1.0',
+          'assets': [
+            {
+              'name': 'Verge_1.1.0_macos_universal.pkg',
+              'browser_download_url': 'https://example/a.pkg'
+            },
+            {
+              'name': 'Verge_1.1.0_windows_x64.exe',
+              'browser_download_url': 'https://example/a.exe'
+            },
+          ],
+        }),
+        200,
+      );
+    });
+    final svc = UpdateService(client: client, assetSuffix: '.exe');
+    final info = await svc.checkForUpdate('1.0.0');
+    expect(info!.pkgUrl, 'https://example/a.exe');
+  });
 }

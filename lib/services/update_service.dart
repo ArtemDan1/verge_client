@@ -26,9 +26,12 @@ class UpdateService {
     String? assetSuffix,
     String? downloadFileName,
   })  : _injectedClient = client,
-        // Windows получает инсталлятор Inno Setup, macOS — .pkg.
-        assetSuffix =
-            assetSuffix ?? (Platform.isWindows ? '-setup.exe' : '.pkg'),
+        // Windows получает инсталлятор Inno Setup, macOS — .pkg. Суффикс на
+        // Windows намеренно широкий («.exe», а не «-setup.exe»): имя ассета в
+        // релизе задаёт человек, и у v1.1.0 оно было
+        // «Verge_1.1.0_windows_x64.exe» — проверка обновлений молча отвечала
+        // «установлена последняя версия». В релизе всё равно ровно один .exe.
+        assetSuffix = assetSuffix ?? (Platform.isWindows ? '.exe' : '.pkg'),
         downloadFileName = downloadFileName ??
             (Platform.isWindows
                 ? 'Verge-update-setup.exe'
@@ -108,12 +111,25 @@ class UpdateService {
     final file = File('${dir.path}/$downloadFileName');
     final sink = file.openWrite();
     var received = 0;
-    await for (final chunk in resp.stream) {
-      sink.add(chunk);
+    var lastPercent = -1;
+    // pipe, а не `await for` + `sink.add`: add ничего не ждёт, и на медленном
+    // диске (Windows с антивирусом на пути записи) сеть наливает быстрее, чем
+    // файл успевает писаться — очередь буферов растёт в памяти и приложение
+    // начинает захлёбываться. pipe держит backpressure.
+    //
+    // Прогресс отдаём только на смене целого процента: колбэк дёргает
+    // notifyListeners(), и на каждый чанк это сотни перестроений UI в секунду.
+    await resp.stream.map((chunk) {
       received += chunk.length;
-      if (total > 0 && onProgress != null) onProgress(received / total);
-    }
-    await sink.close();
+      if (total > 0 && onProgress != null) {
+        final percent = received * 100 ~/ total;
+        if (percent != lastPercent) {
+          lastPercent = percent;
+          onProgress(received / total);
+        }
+      }
+      return chunk;
+    }).pipe(sink);
     return file.path;
   }
 }

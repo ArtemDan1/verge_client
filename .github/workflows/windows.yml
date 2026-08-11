@@ -57,8 +57,9 @@ jobs:
       - name: Test
         run: flutter test
 
-      # Только по тегу. Ассет обязан оканчиваться на -setup.exe: именно этот
-      # суффикс ищет UpdateService (lib/services/update_service.dart).
+      # Только по тегу. Ассет обязан оканчиваться на .exe и быть в релизе
+      # единственным .exe: именно так его ищет UpdateService
+      # (lib/services/update_service.dart).
       - name: Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
