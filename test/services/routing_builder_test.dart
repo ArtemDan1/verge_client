@@ -86,6 +86,18 @@ void main() {
     expect(f.rules[3]['domain_suffix'], ['x.com']);
   });
 
+  test('bypass-правила можно переопределить именами процессов', () {
+    final f = builder.build(
+      profile(),
+      tun: true,
+      bypassProcessNames: const ['xray.exe', 'sing-box-test.exe'],
+    );
+    expect(
+      (f.rules[0]['process_name'] as List).cast<String>(),
+      containsAll(['xray.exe', 'sing-box-test.exe']),
+    );
+  });
+
   test('TUN: трафик тестового sing-box идёт мимо туннеля', () {
     final frag = builder.build(profile(), tun: true);
     final names = frag.rules

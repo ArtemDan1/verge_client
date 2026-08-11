@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tray_manager/tray_manager.dart';
 import 'package:singbox_client/app/tray_menu.dart';
@@ -20,6 +21,15 @@ void main() {
     test('error -> серая иконка (как disconnected)', () {
       expect(trayIconAssetKeyFor(TunnelStatus.error),
           'assets/tray/tray_disconnected.png');
+    });
+
+    test('на Windows отдаёт .ico: PNG там LoadImage не читает', () {
+      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      expect(trayIconAssetKeyFor(TunnelStatus.connected),
+          'assets/tray/tray_connected.ico');
+      expect(trayIconAssetKeyFor(TunnelStatus.error),
+          'assets/tray/tray_disconnected.ico');
     });
   });
 
