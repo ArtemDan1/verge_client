@@ -12,6 +12,21 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 /// очередь не доходит.
 const List<String> kEmojiFontFallback = ['NotoColorEmoji'];
 
+/// Моноширинный шрифт для логов и JSON-редактора.
+///
+/// Имя 'monospace' — псевдоним Android/Fuchsia; на Windows оно не резолвится,
+/// и текст уезжает в системный шрифт с растянутыми пробелами между цифрами
+/// (время в логе выглядело как «0 9 : 0 2 : 1 0»). Поэтому перечисляем
+/// реальные семейства: сначала macOS, затем Windows, в конце — общий алиас.
+const String kMonoFontFamily = 'SF Mono';
+const List<String> kMonoFontFallback = [
+  'Menlo',
+  'Consolas',
+  'Cascadia Mono',
+  'Courier New',
+  'monospace',
+];
+
 /// Нейтральная (neutral) тема shadcn, без яркого акцентного цвета.
 class AppTheme {
   AppTheme._();
