@@ -152,7 +152,8 @@ void main() {
     expect(f.ruleSets.first['tag'], 'geosite-category-ru');
     expect(f.ruleSets.first['type'], 'remote');
     expect(f.ruleSets.first['url'], endsWith('geosite-category-ru.srs'));
-    expect(f.ruleSets.first['download_detour'], 'proxy');
+    expect(f.ruleSets.first['http_client'], {'detour': 'proxy'});
+    expect(f.ruleSets.first.containsKey('download_detour'), isFalse);
   });
 
   test('с geoAssetDir набор подключается локально (type: local, path)', () {

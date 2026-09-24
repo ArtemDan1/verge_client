@@ -37,7 +37,10 @@ class RoutingBuilder {
       'tag': cat.tag,
       'format': 'binary',
       'url': cat.srsUrl,
-      'download_detour': 'proxy',
+      // С 1.14 `download_detour` deprecated (удалят в 1.16): detour задаётся
+      // через inline HTTP-клиент. Без явного клиента sing-box 1.14 ещё и
+      // ругается на implicit default HTTP client.
+      'http_client': {'detour': 'proxy'},
       'update_interval': '7d',
     };
   }

@@ -103,7 +103,7 @@ class FakePlatformInfo extends PlatformInfo {
   }
 
   @override
-  Future<String> singboxVersion() async => '1.13.12';
+  Future<String> singboxVersion() async => '1.14.1';
 
   @override
   Future<String> xrayVersion() async => '26.3.27';
