@@ -135,7 +135,7 @@ final class TunnelChannel: NSObject, FlutterStreamHandler {
     p.waitUntilExit()
     let out = String(
       data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-    // первая строка вида "sing-box version 1.13.12"
+    // первая строка вида "sing-box version 1.14.1"
     let first = out.split(separator: "\n").first.map(String.init) ?? out
     return first.replacingOccurrences(of: "sing-box version ", with: "")
         .trimmingCharacters(in: .whitespacesAndNewlines)

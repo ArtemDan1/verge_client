@@ -11,7 +11,7 @@ void main() {
         .setMockMethodCallHandler(channel, (call) async {
       switch (call.method) {
         case 'singboxVersion':
-          return '1.13.12';
+          return '1.14.1';
         case 'xrayVersion':
           return '26.3.27';
         case 'listNetworkServices':
@@ -23,7 +23,7 @@ void main() {
     });
 
     final info = PlatformInfo();
-    expect(await info.singboxVersion(), '1.13.12');
+    expect(await info.singboxVersion(), '1.14.1');
     expect(await info.xrayVersion(), '26.3.27');
     expect(await info.listNetworkServices(), ['Wi-Fi', 'Ethernet']);
     expect(await info.defaultService(), 'Wi-Fi');

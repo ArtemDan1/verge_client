@@ -39,7 +39,7 @@ void EmitStatus(const std::string& value, const std::string& message) {
   }));
 }
 
-// "sing-box version 1.13.12" → "1.13.12"
+// "sing-box version 1.14.1" → "1.14.1"
 std::string ParseSingboxVersion(const std::string& out) {
   const std::string prefix = "sing-box version ";
   size_t line_end = out.find('\n');
