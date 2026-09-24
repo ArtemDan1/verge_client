@@ -279,7 +279,21 @@ class ConfigBuilder {
     // Адрес прокси-сервера резолвим напрямую — иначе bootstrap-петля
     // (proxy-dns ходит через ещё не поднятый прокси).
     out['domain_resolver'] = 'direct-dns';
+    // `{...raw}` — неглубокая копия: без своей копии tls правки ниже меняли бы
+    // rawOutbound самой ноды.
     if (out['tls'] is Map) {
+      out['tls'] = Map<String, dynamic>.from(out['tls'] as Map);
+    }
+    if (out['tls'] is Map && out['type'] == 'naive') {
+      // TLS у naive делает Chromium (cronet), а не Go: sing-box падает с FATAL
+      // «insecure/fragment is not supported on naive outbound». Глобальные
+      // TLS-настройки к naive неприменимы — не пишем их и вычищаем из raw.
+      (out['tls'] as Map<String, dynamic>)
+        ..remove('insecure')
+        ..remove('fragment')
+        ..remove('fragment_fallback_delay')
+        ..remove('record_fragment');
+    } else if (out['tls'] is Map) {
       final tls = out['tls'] as Map<String, dynamic>;
       // Пропуск проверки сертификата — осознанное понижение безопасности,
       // поэтому пишем ключ только когда он явно включён.

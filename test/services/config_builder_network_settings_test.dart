@@ -124,4 +124,35 @@ void main() {
         .firstWhere((o) => o['tag'] == 'proxy');
     expect((out['tls'] as Map?)?.containsKey('fragment') ?? false, isFalse);
   });
+
+  // sing-box отвергает эти ключи у naive с FATAL — TLS там делает cronet.
+  test('naive: insecure и fragment не пишутся и вычищаются из raw', () {
+    const settings = NetworkSettings(
+      tlsSkipCertVerify: true,
+      tlsFragmentEnabled: true,
+      tlsRecordFragment: true,
+    );
+    const params = NodeConfig(
+      name: 'n', protocol: NodeProtocol.naive, host: 'h', port: 443,
+      params: {'username': 'u', 'password': 'p'},
+    );
+    const raw = NodeConfig(
+      name: 'r', protocol: NodeProtocol.naive, host: 'h', port: 443,
+      params: {},
+      rawOutbound: {
+        'type': 'naive', 'server': 'h', 'server_port': 443,
+        'tls': {'enabled': true, 'insecure': true, 'fragment': true,
+            'fragment_fallback_delay': '1s', 'record_fragment': true},
+      },
+    );
+    for (final node in [params, raw]) {
+      final tls = const ConfigBuilder(network: settings)
+          .outboundFor(node)['tls'] as Map;
+      expect(tls['enabled'], isTrue);
+      for (final k in ['insecure', 'fragment', 'fragment_fallback_delay',
+          'record_fragment']) {
+        expect(tls.containsKey(k), isFalse, reason: '${node.name}: $k');
+      }
+    }
+  });
 }
