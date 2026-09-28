@@ -1,17 +1,18 @@
 import 'dart:io';
 import 'package:tray_manager/tray_manager.dart';
+import '../tunnel/tunnel_controller.dart';
+import '../ui/tray_popover.dart';
 import 'app_controller.dart';
 import 'tray_menu.dart';
-import 'window_control_channel.dart';
-import '../tunnel/tunnel_controller.dart';
+import 'tray_popover_controller.dart';
 
-/// Иконка и меню в строке меню macOS: статус подключения — формой плитки,
-/// клик — то же самое меню (Подключиться/Отключиться, Открыть, Закрыть).
+/// Значок в строке меню / области уведомлений. Статус подключения — формой
+/// плитки. Левый клик — мини-окно трея (тумблер, сервер, режим), правый —
+/// короткое меню: Открыть Verge · Подключиться/Отключиться · Выйти.
 class TrayService with TrayListener {
-  TrayService(this._controller, [WindowControlChannel? windowControl])
-      : _windowControl = windowControl ?? WindowControlChannel();
+  TrayService(this._controller, this._popover);
   final AppController _controller;
-  final WindowControlChannel _windowControl;
+  final TrayPopoverController _popover;
   TunnelStatus? _lastRenderedStatus;
 
   Future<void> init() async {
@@ -53,7 +54,7 @@ class TrayService with TrayListener {
     }
   }
 
-  Future<void> _showWindow() => _windowControl.show();
+  Future<void> _showWindow() => _popover.openMain();
 
   /// Выход из трея — единственный способ закрыть приложение на Windows
   /// (крестик там прячет окно). Раньше это был голый `exit(0)`, и нативная
@@ -73,6 +74,13 @@ class TrayService with TrayListener {
 
   @override
   void onTrayIconMouseDown() {
+    _popover.toggle(TrayPopover.heightFor(_controller));
+  }
+
+  @override
+  void onTrayIconRightMouseDown() {
+    // Меню и мини-окно вместе не показываем.
+    if (_popover.isOpen) _popover.close();
     trayManager.popUpContextMenu();
   }
 

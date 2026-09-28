@@ -331,11 +331,15 @@ class ConnectToggle extends StatefulWidget {
     required this.running,
     required this.connecting,
     required this.onTap,
+    this.scale = 1,
   });
 
   final bool running;
   final bool connecting;
   final VoidCallback onTap;
+
+  /// Масштаб: 1 — карточка на главной, меньше — мини-окно трея.
+  final double scale;
 
   @override
   State<ConnectToggle> createState() => _ConnectToggleState();
@@ -388,9 +392,9 @@ class _ConnectToggleState extends State<ConnectToggle> {
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 250),
               curve: Curves.easeOut,
-              width: 96,
-              height: 54,
-              padding: const EdgeInsets.all(5),
+              width: 96 * widget.scale,
+              height: 54 * widget.scale,
+              padding: EdgeInsets.all(5 * widget.scale),
               decoration: BoxDecoration(
                 color: track,
                 borderRadius: BorderRadius.circular(999),
@@ -400,8 +404,8 @@ class _ConnectToggleState extends State<ConnectToggle> {
                 curve: Curves.easeOutBack,
                 alignment: align,
                 child: Container(
-                  width: 44,
-                  height: 44,
+                  width: 44 * widget.scale,
+                  height: 44 * widget.scale,
                   decoration: BoxDecoration(
                     color: knob,
                     shape: BoxShape.circle,
@@ -414,7 +418,8 @@ class _ConnectToggleState extends State<ConnectToggle> {
                     ],
                   ),
                   alignment: Alignment.center,
-                  child: Icon(LucideIcons.power, size: 18, color: knobFg),
+                  child: Icon(LucideIcons.power,
+                      size: 18 * widget.scale, color: knobFg),
                 ),
               ),
             ),

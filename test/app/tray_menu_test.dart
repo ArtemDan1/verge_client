@@ -62,14 +62,14 @@ void main() {
       expect(toggle.disabled, isTrue);
     });
 
-    test('содержит «Открыть», разделитель и «Закрыть» в этом порядке', () {
+    test('«Открыть Verge», подключение, разделитель и «Выйти» по порядку', () {
       final menu = build(TunnelStatus.disconnected);
       final keys = menu.items!.map((i) => i.key).toList();
-      expect(keys, ['toggle_connection', 'show_window', null, 'quit']);
+      expect(keys, ['show_window', 'toggle_connection', null, 'quit']);
       final showWindow = menu.items!.firstWhere((i) => i.key == 'show_window');
-      expect(showWindow.label, 'Открыть');
+      expect(showWindow.label, 'Открыть Verge');
       final quit = menu.items!.firstWhere((i) => i.key == 'quit');
-      expect(quit.label, 'Закрыть');
+      expect(quit.label, 'Выйти');
     });
 
     test('клик по «Подключиться» вызывает onToggleConnection', () {
@@ -85,7 +85,7 @@ void main() {
       expect(calls, 1);
     });
 
-    test('клик по «Открыть» вызывает onShowWindow', () {
+    test('клик по «Открыть Verge» вызывает onShowWindow', () {
       var calls = 0;
       final menu = buildTrayMenu(
         status: TunnelStatus.disconnected,
@@ -98,7 +98,7 @@ void main() {
       expect(calls, 1);
     });
 
-    test('клик по «Закрыть» вызывает onQuit', () {
+    test('клик по «Выйти» вызывает onQuit', () {
       var calls = 0;
       final menu = buildTrayMenu(
         status: TunnelStatus.disconnected,

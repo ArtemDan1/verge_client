@@ -45,8 +45,14 @@ class AppDelegate: FlutterAppDelegate {
   // activate, что уже делает пункт "Открыть" в трее (WindowControlChannel).
   override func applicationShouldHandleReopen(
       _ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-    mainFlutterWindow?.makeKeyAndOrderFront(nil)
-    NSApp.activate(ignoringOtherApps: true)
+    // Через showMainWindow: если открыто мини-окно трея, оно сначала
+    // вернёт окну обычный вид.
+    if let window = mainFlutterWindow as? MainFlutterWindow {
+      window.showMainWindow()
+    } else {
+      mainFlutterWindow?.makeKeyAndOrderFront(nil)
+      NSApp.activate(ignoringOtherApps: true)
+    }
     return true
   }
 

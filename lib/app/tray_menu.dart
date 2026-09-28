@@ -18,8 +18,11 @@ String trayIconAssetKeyFor(TunnelStatus status) {
   return 'assets/tray/$name.$ext';
 }
 
-/// Чистая сборка меню трея — без обращения к trayManager, поэтому
-/// тестируется напрямую (в отличие от TrayService, который дёргает плагин).
+/// Короткое меню по правому клику (левый открывает мини-окно трея):
+/// Открыть Verge · Подключиться/Отключиться · Выйти.
+///
+/// Чистая сборка — без обращения к trayManager, поэтому тестируется напрямую
+/// (в отличие от TrayService, который дёргает плагин).
 Menu buildTrayMenu({
   required TunnelStatus status,
   required VoidCallback onToggleConnection,
@@ -30,20 +33,20 @@ Menu buildTrayMenu({
       status == TunnelStatus.connecting || status == TunnelStatus.connected;
   return Menu(items: [
     MenuItem(
+      key: 'show_window',
+      label: 'Открыть Verge',
+      onClick: (_) => onShowWindow(),
+    ),
+    MenuItem(
       key: 'toggle_connection',
       label: busyOrConnected ? 'Отключиться' : 'Подключиться',
       disabled: status == TunnelStatus.connecting,
       onClick: (_) => onToggleConnection(),
     ),
-    MenuItem(
-      key: 'show_window',
-      label: 'Открыть',
-      onClick: (_) => onShowWindow(),
-    ),
     MenuItem.separator(),
     MenuItem(
       key: 'quit',
-      label: 'Закрыть',
+      label: 'Выйти',
       onClick: (_) => onQuit(),
     ),
   ]);

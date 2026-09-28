@@ -1,5 +1,9 @@
 #include "flutter_window.h"
 
+#include <dwmapi.h>
+#include <flutter_windows.h>
+
+#include <algorithm>
 #include <optional>
 
 #include "flutter/generated_plugin_registrant.h"
@@ -42,7 +46,8 @@ bool FlutterWindow::OnCreate() {
   RegisterXrayChannel(flutter_controller_->engine());
   RegisterTestChannels(flutter_controller_->engine());
   RegisterHelperChannel(flutter_controller_->engine());
-  RegisterWindowControlChannel(flutter_controller_->engine(), GetHandle());
+  window_channel_ =
+      CreateWindowControlChannel(flutter_controller_->engine(), this);
   RegisterDeepLinkChannel(flutter_controller_->engine());
   RegisterBypassPingChannel(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
@@ -60,6 +65,7 @@ bool FlutterWindow::OnCreate() {
 }
 
 void FlutterWindow::OnDestroy() {
+  window_channel_ = nullptr;
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }
@@ -94,19 +100,137 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
       // Крестик прячет окно в трей, а не завершает приложение. Выход — только
       // через пункт меню трея: он на стороне Dart отключает туннель и зовёт
       // exit(0), минуя цикл сообщений, поэтому уборка обязана случиться там.
-      ::ShowWindow(hwnd, SW_HIDE);
+      if (in_popover_) {
+        ExitPopover(/*show_main=*/false, /*notify=*/true);
+      } else {
+        ::ShowWindow(hwnd, SW_HIDE);
+      }
       return 0;
+    case WM_ACTIVATE:
+      // Мини-окно трея закрывается, как только пользователь кликнул мимо.
+      if (in_popover_ && LOWORD(wparam) == WA_INACTIVE) {
+        ExitPopover(/*show_main=*/false, /*notify=*/true);
+        return 0;
+      }
+      break;
     case WM_COPYDATA: {
       auto* data = reinterpret_cast<COPYDATASTRUCT*>(lparam);
       if (data != nullptr && data->dwData == kDeepLinkCopyDataId &&
           data->lpData != nullptr) {
         DeliverDeepLink(std::string(static_cast<const char*>(data->lpData)));
-        ::ShowWindow(hwnd, SW_SHOW);
-        ::SetForegroundWindow(hwnd);
+        ShowMain();
       }
       return TRUE;
     }
   }
 
   return Win32Window::MessageHandler(hwnd, message, wparam, lparam);
+}
+
+void FlutterWindow::ShowMain() {
+  if (in_popover_) {
+    // Dart переключит интерфейс обратно на главный экран по уведомлению.
+    ExitPopover(/*show_main=*/true, /*notify=*/true);
+    return;
+  }
+  HWND hwnd = GetHandle();
+  ::ShowWindow(hwnd, SW_SHOW);
+  ::ShowWindow(hwnd, SW_RESTORE);
+  ::SetForegroundWindow(hwnd);
+}
+
+// DWMWA_WINDOW_CORNER_PREFERENCE и его значения есть только в свежих SDK —
+// числа из документации, чтобы собиралось и на старом. Windows 10 атрибут
+// просто игнорирует.
+static constexpr DWORD kDwmCornerPreference = 33;
+static constexpr int kDwmCornerDefault = 0;
+static constexpr int kDwmCornerRound = 2;
+
+void FlutterWindow::ShowPopover(double width, double height) {
+  HWND hwnd = GetHandle();
+  if (!in_popover_) {
+    saved_placement_.length = sizeof(WINDOWPLACEMENT);
+    ::GetWindowPlacement(hwnd, &saved_placement_);
+    saved_style_ = ::GetWindowLongPtr(hwnd, GWL_STYLE);
+    saved_ex_style_ = ::GetWindowLongPtr(hwnd, GWL_EXSTYLE);
+    was_visible_ = ::IsWindowVisible(hwnd) && !::IsIconic(hwnd);
+    // Прячем ДО флага: скрытие активного окна шлёт WM_ACTIVATE(WA_INACTIVE),
+    // и с уже выставленным флагом мини-окно тут же закрылось бы.
+    ::ShowWindow(hwnd, SW_HIDE);
+    in_popover_ = true;
+    // Без рамки и заголовка; TOOLWINDOW — без кнопки на панели задач.
+    ::SetWindowLongPtr(hwnd, GWL_STYLE,
+                       (saved_style_ & ~WS_OVERLAPPEDWINDOW) | WS_POPUP);
+    ::SetWindowLongPtr(hwnd, GWL_EXSTYLE, saved_ex_style_ | WS_EX_TOOLWINDOW);
+    int corner = kDwmCornerRound;
+    ::DwmSetWindowAttribute(hwnd, kDwmCornerPreference, &corner,
+                            sizeof(corner));
+  }
+
+  // Клик по значку только что был — курсор над ним. Прижимаемся к той
+  // стороне рабочей области, где стоит панель задач.
+  POINT cursor;
+  ::GetCursorPos(&cursor);
+  HMONITOR monitor = ::MonitorFromPoint(cursor, MONITOR_DEFAULTTONEAREST);
+  MONITORINFO info{};
+  info.cbSize = sizeof(info);
+  ::GetMonitorInfo(monitor, &info);
+  const RECT work = info.rcWork;
+  const double scale = FlutterDesktopGetDpiForMonitor(monitor) / 96.0;
+  const int w = static_cast<int>(width * scale);
+  const int h = static_cast<int>(height * scale);
+  const int margin = static_cast<int>(8 * scale);
+
+  int x = cursor.x - w / 2;
+  int y = cursor.y - h - margin;
+  if (cursor.y >= work.bottom) {
+    y = work.bottom - h - margin;  // панель задач снизу
+  } else if (cursor.y < work.top) {
+    y = work.top + margin;  // сверху
+  }
+  if (cursor.x >= work.right) {
+    x = work.right - w - margin;  // справа
+  } else if (cursor.x < work.left) {
+    x = work.left + margin;  // слева
+  }
+  x = std::clamp<int>(x, work.left + margin,
+                      std::max<int>(work.left + margin,
+                                    work.right - w - margin));
+  y = std::clamp<int>(y, work.top + margin,
+                      std::max<int>(work.top + margin,
+                                    work.bottom - h - margin));
+
+  ::SetWindowPos(hwnd, HWND_TOPMOST, x, y, w, h,
+                 SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+  ::SetForegroundWindow(hwnd);
+}
+
+void FlutterWindow::ExitPopover(bool show_main, bool notify) {
+  HWND hwnd = GetHandle();
+  if (!in_popover_) {
+    if (show_main) ShowMain();
+    return;
+  }
+  in_popover_ = false;
+  ::ShowWindow(hwnd, SW_HIDE);
+  ::SetWindowLongPtr(hwnd, GWL_STYLE, saved_style_);
+  ::SetWindowLongPtr(hwnd, GWL_EXSTYLE, saved_ex_style_);
+  int corner = kDwmCornerDefault;
+  ::DwmSetWindowAttribute(hwnd, kDwmCornerPreference, &corner, sizeof(corner));
+  ::SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED | SWP_NOACTIVATE);
+  WINDOWPLACEMENT placement = saved_placement_;
+  placement.showCmd = SW_HIDE;
+  ::SetWindowPlacement(hwnd, &placement);
+
+  if (notify && window_channel_) {
+    window_channel_->InvokeMethod("popoverDismissed", nullptr);
+  }
+  if (show_main) {
+    ShowMain();
+  } else if (was_visible_) {
+    // Главное окно было открыто до мини-окна — возвращаем его, но фокус не
+    // отбираем: пользователь только что кликнул в другое место.
+    ::ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+  }
 }

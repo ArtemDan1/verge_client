@@ -18,13 +18,23 @@ import 'about_screen.dart';
 class AppShell extends StatefulWidget {
   final AppController controller;
   final DeepLinkService deepLink;
-  const AppShell({super.key, required this.controller, required this.deepLink});
+
+  /// Выбранный раздел, живущий дольше самого AppShell: пока открыто мини-окно
+  /// трея, главный экран размонтирован, и без этого после возврата всегда
+  /// открывалась бы «Главная».
+  final ValueNotifier<int>? navIndex;
+  const AppShell({
+    super.key,
+    required this.controller,
+    required this.deepLink,
+    this.navIndex,
+  });
   @override
   State<AppShell> createState() => _AppShellState();
 }
 
 class _AppShellState extends State<AppShell> {
-  int _index = 0;
+  late int _index = widget.navIndex?.value ?? 0;
   StreamSubscription<String>? _alertSub;
   StreamSubscription<ImportRequest>? _importSub;
 
@@ -114,7 +124,10 @@ class _AppShellState extends State<AppShell> {
                         valueListenable: widget.controller.traffic,
                         builder: (context, traffic, _) => Sidebar(
                           index: _index,
-                          onSelect: (i) => setState(() => _index = i),
+                          onSelect: (i) => setState(() {
+                            _index = i;
+                            widget.navIndex?.value = i;
+                          }),
                           connectionCount: conns.length,
                           traffic: traffic,
                           hasUpdate: widget.controller.availableUpdate !=
