@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
+import 'widgets/paper.dart';
 import '../app/app_controller.dart';
 import '../models/auto_select_settings.dart';
 import '../tunnel/tunnel_controller.dart';
@@ -174,11 +175,7 @@ class _AutoSelectDialogState extends State<_AutoSelectDialog> {
                         c.autoSelectBest();
                       },
                 leading: c.isAutoSelecting
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: ShadProgress(),
-                      )
+                    ? const Spinner()
                     : const Icon(LucideIcons.zap, size: 16),
                 child: const Text('Проверить сейчас'),
               ),

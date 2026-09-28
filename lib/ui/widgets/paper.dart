@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart' show CircularProgressIndicator;
 import 'package:flutter/widgets.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
@@ -276,6 +277,39 @@ class IconAction extends StatelessWidget {
         padding: EdgeInsets.zero,
         onPressed: onPressed,
         child: Icon(icon, size: 16),
+      ),
+    );
+  }
+}
+
+/// Маленький круговой индикатор для кнопок («Обновить гео», «Проверить
+/// сейчас»). ShadProgress для этого не годится: он линейный, и в квадрате
+/// 16×16 превращался в дёргающийся обрубок полоски.
+class Spinner extends StatelessWidget {
+  const Spinner({super.key, this.size = 16, this.color});
+
+  final double size;
+
+  /// По умолчанию — цвет текста/иконок вокруг (кнопки задают его через
+  /// IconTheme).
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = color ??
+        IconTheme.of(context).color ??
+        ShadTheme.of(context).colorScheme.foreground;
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Padding(
+        padding: EdgeInsets.all(size * 0.08),
+        child: CircularProgressIndicator(
+          strokeWidth: size <= 16 ? 2 : 2.5,
+          strokeCap: StrokeCap.round,
+          color: c,
+          backgroundColor: c.withValues(alpha: 0.18),
+        ),
       ),
     );
   }

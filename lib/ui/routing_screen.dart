@@ -74,11 +74,7 @@ class _RoutingScreenState extends State<RoutingScreen> {
                           ? null
                           : () => controller.updateGeoAssets(),
                       leading: controller.isUpdatingGeo
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: ShadProgress(),
-                            )
+                          ? const Spinner()
                           : const Icon(LucideIcons.cloudDownload, size: 16),
                       child: const Text('Обновить гео'),
                     ),

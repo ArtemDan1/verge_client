@@ -4,6 +4,8 @@ import '../app/app_controller.dart';
 import '../services/link_opener.dart';
 import '../theme/app_theme.dart';
 import '../theme/verge_palette.dart';
+import 'widgets/paper.dart';
+import 'widgets/update_banner.dart';
 import 'widgets/verge_logo.dart';
 
 const _repoUrl = 'https://github.com/ArtemDan1/verge_client';
@@ -157,9 +159,7 @@ class _UpdateBlockState extends State<_UpdateBlock> {
   Widget build(BuildContext context) {
     final c = widget.controller;
     final theme = ShadTheme.of(context);
-    final palette = VergePalette.of(context);
     final info = c.availableUpdate;
-    final downloading = c.updateDownloadProgress != null;
 
     if (info == null) {
       return Row(
@@ -171,7 +171,9 @@ class _UpdateBlockState extends State<_UpdateBlock> {
                     await c.checkForUpdate();
                     if (mounted) setState(() => _checked = true);
                   },
-            leading: const Icon(LucideIcons.refreshCw, size: 16),
+            leading: c.isCheckingUpdate
+                ? const Spinner()
+                : const Icon(LucideIcons.refreshCw, size: 16),
             child: Text(
                 c.isCheckingUpdate ? 'Проверка…' : 'Проверить обновления'),
           ),
@@ -182,57 +184,6 @@ class _UpdateBlockState extends State<_UpdateBlock> {
       );
     }
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: palette.accentSoft,
-        border: Border.all(color: palette.accentSoftBorder),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'ДОСТУПНО ОБНОВЛЕНИЕ',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.5,
-              color: palette.accentText,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Доступна версия ${info.version}',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.4,
-              color: theme.colorScheme.foreground,
-            ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              ShadButton(
-                backgroundColor: palette.accent,
-                foregroundColor: const Color(0xFFFFFFFF),
-                onPressed: downloading ? null : c.downloadAndInstallUpdate,
-                leading: const Icon(LucideIcons.download, size: 16),
-                child: Text(downloading
-                    ? 'Загрузка ${((c.updateDownloadProgress ?? 0) * 100).round()}%'
-                    : 'Скачать и установить'),
-              ),
-              const SizedBox(width: 8),
-              ShadButton.link(
-                onPressed: () => openLink('$_repoUrl/releases'),
-                foregroundColor: palette.accentText,
-                child: const Text('Что в релизе'),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
+    return UpdateCard(controller: c, inline: true);
   }
 }

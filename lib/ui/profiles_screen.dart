@@ -922,7 +922,7 @@ class _AutoSelectButton extends StatelessWidget {
     final c = controller;
     final on = c.autoSelect.isActive;
     final leading = c.isAutoSelecting
-        ? const SizedBox(width: 14, height: 14, child: ShadProgress())
+        ? const Spinner(size: 14)
         : const Icon(LucideIcons.zap, size: 14);
     final label = Text(on ? 'Автовыбор: вкл' : 'Автовыбор');
     void open() => showAutoSelectDialog(context, c);

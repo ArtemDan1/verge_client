@@ -110,10 +110,9 @@ class _AppShellState extends State<AppShell> {
         final palette = VergePalette.of(context);
         return Scaffold(
           backgroundColor: palette.chrome,
-          body: Column(
+          body: Stack(
             children: [
-              UpdateBanner(controller: widget.controller),
-              Expanded(
+              Positioned.fill(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -158,6 +157,14 @@ class _AppShellState extends State<AppShell> {
                   ],
                 ),
               ),
+              // Карточка обновления — поверх контента в углу, не сдвигая его.
+              // На «О приложении» свой блок обновления, там её не дублируем.
+              if (_index != aboutIndex)
+                Positioned(
+                  right: 26,
+                  bottom: 26,
+                  child: UpdateBanner(controller: widget.controller),
+                ),
             ],
           ),
         );
