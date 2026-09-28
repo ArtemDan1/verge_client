@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show ValueListenable;
+import 'package:flutter/material.dart' show SelectionArea, showGeneralDialog;
 import 'package:flutter/widgets.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
@@ -224,47 +226,33 @@ class _ConnectionsScreenState extends State<ConnectionsScreen> {
     );
   }
 
+  /// Детали соединения — выдвижная панель справа, как в макете. Раньше это
+  /// был ShadSheet, который растягивался на всё окно.
   void _showDetails(ConnectionInfo c) {
-    showShadSheet(
+    showGeneralDialog<void>(
       context: context,
-      side: ShadSheetSide.right,
-      builder: (ctx) => ShadSheet(
-        title: Text(c.title),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _row('ID', c.id),
-              _row('Начало', c.start.toLocal().toString()),
-              _row('Длительность', formatDuration(c.durationAt(_now))),
-              _row('Приложение', c.appName ?? '—'),
-              _row('Путь процесса', c.processPath.isEmpty ? '—' : c.processPath),
-              _row('Сеть', '${c.network}${c.sniffedType.isEmpty ? '' : ' / ${c.sniffedType}'}'),
-              _row('Источник', c.source),
-              _row('Назначение', '${c.destinationIP}:${c.destinationPort}'),
-              _row('Домен', c.host.isEmpty ? '—' : c.host),
-              _row('Цепочка', c.chainLabel.isEmpty ? '—' : c.chainLabel),
-              _row('Правило', c.rule.isEmpty ? '—' : c.rule),
-              _row('Payload', c.rulePayload.isEmpty ? '—' : c.rulePayload),
-              _row('Отправлено', formatBytes(c.upload)),
-              _row('Получено', formatBytes(c.download)),
-            ],
-          ),
+      barrierDismissible: true,
+      barrierLabel: 'Закрыть',
+      barrierColor: const Color(0x33000000),
+      transitionDuration: const Duration(milliseconds: 220),
+      pageBuilder: (ctx, _, _) => Align(
+        alignment: Alignment.centerRight,
+        child: _ConnectionDrawer(
+          initial: c,
+          connections: widget.controller.connections,
         ),
       ),
+      transitionBuilder: (ctx, animation, _, child) {
+        final curved =
+            CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+        return SlideTransition(
+          position: Tween(begin: const Offset(1, 0), end: Offset.zero)
+              .animate(curved),
+          child: child,
+        );
+      },
     );
   }
-
-  Widget _row(String label, String value) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(width: 130, child: Text(label)),
-            Expanded(child: Text(value)),
-          ],
-        ),
-      );
 }
 
 class _KindPill extends StatelessWidget {
@@ -567,6 +555,269 @@ class _ConnectionRowState extends State<_ConnectionRow> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Панель деталей соединения. Следит за живым списком соединений: байты и
+/// длительность обновляются, а закрытое соединение помечается, но панель не
+/// пропадает из-под курсора.
+class _ConnectionDrawer extends StatefulWidget {
+  const _ConnectionDrawer({required this.initial, required this.connections});
+
+  final ConnectionInfo initial;
+  final ValueListenable<List<ConnectionInfo>> connections;
+
+  @override
+  State<_ConnectionDrawer> createState() => _ConnectionDrawerState();
+}
+
+class _ConnectionDrawerState extends State<_ConnectionDrawer> {
+  late ConnectionInfo _conn = widget.initial;
+  bool _closed = false;
+  late final Timer _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.connections.addListener(_sync);
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted && !_closed) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker.cancel();
+    widget.connections.removeListener(_sync);
+    super.dispose();
+  }
+
+  void _sync() {
+    ConnectionInfo? fresh;
+    for (final c in widget.connections.value) {
+      if (c.id == _conn.id) {
+        fresh = c;
+        break;
+      }
+    }
+    setState(() {
+      if (fresh != null) {
+        _conn = fresh;
+      } else {
+        _closed = true;
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = ShadTheme.of(context);
+    final palette = VergePalette.of(context);
+    final c = _conn;
+    final dot = switch (c.outboundKind) {
+      OutboundKind.proxy => palette.accent,
+      OutboundKind.direct => palette.success,
+      OutboundKind.block => palette.danger,
+    };
+    String orDash(String v) => v.isEmpty ? '—' : v;
+    final rows = <(String, String, bool)>[
+      ('Приложение', c.appName ?? '—', false),
+      ('Путь процесса', orDash(c.processPath), true),
+      (
+        'Сеть',
+        '${c.network}${c.sniffedType.isEmpty ? '' : ' / ${c.sniffedType}'}',
+        true
+      ),
+      ('Источник', c.source, true),
+      ('Назначение', '${c.destinationIP}:${c.destinationPort}', true),
+      ('Домен', orDash(c.host), true),
+      ('Цепочка', orDash(c.chainLabel), false),
+      ('Правило', orDash(c.rule), true),
+      ('Payload', orDash(c.rulePayload), true),
+      ('Длительность', formatDuration(c.durationAt(DateTime.now())), true),
+      ('Начало', _time(c.start.toLocal()), true),
+      ('ID', c.id, true),
+    ];
+    return DefaultTextStyle(
+      style: TextStyle(
+        fontFamily: kUiFontFamily,
+        fontSize: 13,
+        color: theme.colorScheme.foreground,
+      ),
+      child: Container(
+        width: 380,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          color: palette.panel,
+          border: Border(left: BorderSide(color: palette.panelBorder)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x33000000),
+              blurRadius: 40,
+              offset: Offset(-8, 0),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 12, 0),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(top: 7),
+                      child: Container(
+                        width: 9,
+                        height: 9,
+                        decoration:
+                            BoxDecoration(color: dot, shape: BoxShape.circle),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            c.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 17, fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 4),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              _RouteChip(c.outboundKind),
+                              if (_closed)
+                                Text('соединение закрыто',
+                                    style: theme.textTheme.muted
+                                        .copyWith(fontSize: 12)),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    ShadButton.ghost(
+                      width: 32,
+                      height: 32,
+                      padding: EdgeInsets.zero,
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Icon(LucideIcons.x, size: 18),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _TrafficTile(
+                        label: 'Отправлено',
+                        value: formatBytes(c.upload),
+                        color: palette.accentText,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _TrafficTile(
+                        label: 'Получено',
+                        value: formatBytes(c.download),
+                        color: palette.successText,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: SelectionArea(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                    children: [
+                      for (final (label, value, mono) in rows)
+                        Container(
+                          padding: const EdgeInsets.symmetric(vertical: 9),
+                          decoration: BoxDecoration(
+                            border: Border(
+                                bottom: BorderSide(color: palette.divider)),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SizedBox(
+                                width: 112,
+                                child: Text(label,
+                                    style: theme.textTheme.muted
+                                        .copyWith(fontSize: 12)),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  value,
+                                  style: mono
+                                      ? monoStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w400,
+                                          color: theme.colorScheme.foreground)
+                                      : const TextStyle(fontSize: 13),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  static String _time(DateTime t) {
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '${two(t.day)}.${two(t.month)}.${t.year} '
+        '${two(t.hour)}:${two(t.minute)}:${two(t.second)}';
+  }
+}
+
+class _TrafficTile extends StatelessWidget {
+  const _TrafficTile({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = ShadTheme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: VergePalette.of(context).surface,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: theme.textTheme.muted.copyWith(fontSize: 11)),
+          const SizedBox(height: 2),
+          Text(value, style: monoStyle(fontSize: 15, color: color)),
+        ],
       ),
     );
   }
