@@ -65,7 +65,7 @@ class _TunSectionState extends State<TunSection> {
             style: TextStyle(color: theme.colorScheme.destructive),
           ),
           const SizedBox(height: 16),
-          Text('Адрес интерфейса', style: theme.textTheme.large),
+          Text('Адрес интерфейса', style: theme.textTheme.small),
           const SizedBox(height: 8),
           ShadInput(
             initialValue: n.tunAddressV4,
@@ -73,7 +73,7 @@ class _TunSectionState extends State<TunSection> {
                 .updateNetworkSettings(n.copyWith(tunAddressV4: v.trim())),
           ),
           const SizedBox(height: 24),
-          Text('MTU', style: theme.textTheme.large),
+          Text('MTU', style: theme.textTheme.small),
           const SizedBox(height: 8),
           ShadInput(
             initialValue: '${n.tunMtu}',
@@ -87,7 +87,7 @@ class _TunSectionState extends State<TunSection> {
             },
           ),
           const SizedBox(height: 24),
-          Text('Сетевой стек', style: theme.textTheme.large),
+          Text('Сетевой стек', style: theme.textTheme.small),
           const SizedBox(height: 8),
           ShadSelect<TunStack>(
             minWidth: 240,
@@ -107,7 +107,7 @@ class _TunSectionState extends State<TunSection> {
           Row(
             children: [
               Expanded(
-                child: Text('Строгий маршрут', style: theme.textTheme.large),
+                child: Text('Строгий маршрут', style: theme.textTheme.small),
               ),
               ShadSwitch(
                 value: n.tunStrictRoute,
@@ -121,7 +121,7 @@ class _TunSectionState extends State<TunSection> {
             children: [
               Expanded(
                 child:
-                    Text('Маршрут по умолчанию', style: theme.textTheme.large),
+                    Text('Маршрут по умолчанию', style: theme.textTheme.small),
               ),
               ShadSwitch(
                 value: n.tunAutoRoute,

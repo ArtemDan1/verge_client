@@ -21,7 +21,7 @@ class DnsSection extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Перехват DNS в TUN', style: theme.textTheme.large),
+                  Text('Перехват DNS в TUN', style: theme.textTheme.small),
                   Text(
                     'Заворачивает весь трафик на порт 53 в DNS-движок. Без '
                     'него запросы уходят на DNS провайдера и цензурируются',
@@ -39,7 +39,7 @@ class DnsSection extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 24),
-        Text('DNS для прокси', style: theme.textTheme.large),
+        Text('DNS для прокси', style: theme.textTheme.small),
         const SizedBox(height: 8),
         ShadInput(
           initialValue: n.proxyDnsServer,
@@ -47,7 +47,7 @@ class DnsSection extends StatelessWidget {
               n.copyWith(proxyDnsServer: v.trim())),
         ),
         const SizedBox(height: 24),
-        Text('DNS для прямых соединений', style: theme.textTheme.large),
+        Text('DNS для прямых соединений', style: theme.textTheme.small),
         const SizedBox(height: 8),
         ShadInput(
           initialValue: n.directDnsServer,

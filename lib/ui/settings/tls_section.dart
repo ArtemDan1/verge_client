@@ -31,7 +31,7 @@ class TlsSection extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Пропустить проверку сертификата',
-                      style: theme.textTheme.large),
+                      style: theme.textTheme.small),
                   Text(
                     'Понижает безопасность: соединение перестаёт защищать от '
                     'подмены сервера. Включать только для отладки',
@@ -55,7 +55,7 @@ class TlsSection extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Фрагментация TLS', style: theme.textTheme.large),
+                  Text('Фрагментация TLS', style: theme.textTheme.small),
                   Text(
                     fragmentSupported
                         ? 'Режет TLS-хендшейк на части, чтобы обойти файрволы '
@@ -86,7 +86,7 @@ class TlsSection extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Фрагментация по TLS-записям',
-                        style: theme.textTheme.large),
+                        style: theme.textTheme.small),
                     Text(
                       'Дешевле по производительности — стоит пробовать первым',
                       style: theme.textTheme.muted,
@@ -102,7 +102,7 @@ class TlsSection extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          Text('Задержка резервного варианта', style: theme.textTheme.large),
+          Text('Задержка резервного варианта', style: theme.textTheme.small),
           const SizedBox(height: 8),
           ShadInput(
             initialValue: n.tlsFragmentFallbackDelay,

@@ -5,7 +5,7 @@ import 'tray_menu.dart';
 import 'window_control_channel.dart';
 import '../tunnel/tunnel_controller.dart';
 
-/// Иконка и меню в строке меню macOS: статус подключения — цветом точки,
+/// Иконка и меню в строке меню macOS: статус подключения — формой плитки,
 /// клик — то же самое меню (Подключиться/Отключиться, Открыть, Закрыть).
 class TrayService with TrayListener {
   TrayService(this._controller, [WindowControlChannel? windowControl])
@@ -29,7 +29,12 @@ class TrayService with TrayListener {
   Future<void> _render() async {
     final status = _controller.status;
     _lastRenderedStatus = status;
-    await trayManager.setIcon(trayIconAssetKeyFor(status));
+    // На macOS иконки — монохромные template-образы: система сама
+    // перекрашивает их под светлую/тёмную строку меню. На Windows — цветные.
+    await trayManager.setIcon(
+      trayIconAssetKeyFor(status),
+      isTemplate: Platform.isMacOS,
+    );
     await trayManager.setContextMenu(buildTrayMenu(
       status: status,
       onToggleConnection: _toggleConnection,

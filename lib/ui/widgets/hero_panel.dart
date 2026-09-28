@@ -195,9 +195,14 @@ class _HeroPanelState extends State<HeroPanel> {
                       options: const [
                         SegmentedOption(
                           value: TunnelMode.systemProxy,
-                          label: 'Системный прокси',
+                          label: 'Прокси',
+                          icon: LucideIcons.globe,
                         ),
-                        SegmentedOption(value: TunnelMode.tun, label: 'TUN'),
+                        SegmentedOption(
+                          value: TunnelMode.tun,
+                          label: 'TUN',
+                          icon: LucideIcons.network,
+                        ),
                       ],
                     ),
                     if (c.routingProfiles.isNotEmpty) ...[

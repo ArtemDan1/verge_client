@@ -218,6 +218,10 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                             Padding(
                               padding: const EdgeInsets.only(bottom: 10),
                               child: _ProfileCard(
+                                key: ValueKey(p.id),
+                                // Активный профиль сразу раскрыт: его сервера
+                                // нужны чаще всего.
+                                expanded: p.id == c.activeProfileId,
                                 header: _profileHeader(c, theme, p),
                                 body: _profileBody(context, c, theme, p),
                                 id: p.id,
@@ -237,7 +241,7 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
     final isActive = p.id == c.activeProfileId;
     final announce = p.subscriptionMeta?.announce;
     // Мета одной строкой: кол-во нод · трафик · срок.
-    final meta = <String>['${p.nodes.length} нод'];
+    final meta = <String>[_nodesLabel(p.nodes.length)];
     final traffic = _trafficLine(p.subscriptionInfo);
     if (traffic != null) meta.add(traffic);
 
@@ -350,12 +354,15 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
 /// Карточка профиля: шапка (раскрывает список) и таблица нод.
 class _ProfileCard extends StatelessWidget {
   const _ProfileCard({
+    super.key,
     required this.id,
+    required this.expanded,
     required this.header,
     required this.body,
   });
 
   final String id;
+  final bool expanded;
   final Widget header;
   final Widget body;
 
@@ -370,6 +377,7 @@ class _ProfileCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
       ),
       child: ShadAccordion<String>.multiple(
+        initialValue: expanded ? [id] : null,
         children: [
           ShadAccordionItem<String>(
             value: id,
@@ -411,7 +419,7 @@ class _ActiveBadge extends StatelessWidget {
 
 // Колонки таблицы нод — общие для шапки и строк, чтобы стояли ровно.
 const _kRadioWidth = 30.0;
-const _kEngineWidth = 44.0;
+const _kEngineWidth = 58.0;
 const _kLatencyWidth = 136.0;
 const _kMenuWidth = 32.0;
 
@@ -1073,4 +1081,15 @@ Future<void> _editRefreshInterval(
   // Мусор в поле трактуем как «не менять»: молча ставить null было бы хуже.
   if (result.isNotEmpty && (hours == null || hours < 1)) return;
   await c.setProfileRefreshInterval(p.id, hours == null ? null : hours * 60);
+}
+
+/// «1 сервер», «3 сервера», «12 серверов».
+String _nodesLabel(int n) {
+  final mod10 = n % 10, mod100 = n % 100;
+  final word = mod10 == 1 && mod100 != 11
+      ? 'сервер'
+      : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)
+          ? 'сервера'
+          : 'серверов';
+  return '$n $word';
 }

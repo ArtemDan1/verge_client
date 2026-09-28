@@ -21,7 +21,7 @@ class NetworkSection extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('IPv6', style: theme.textTheme.large),
+                  Text('IPv6', style: theme.textTheme.small),
                   Text(
                     'Выключен по умолчанию: многие серверы ходят только по '
                     'IPv4, и IPv6-соединения зависают вместо отката',

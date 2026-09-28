@@ -6,19 +6,19 @@ import 'package:singbox_client/tunnel/tunnel_controller.dart';
 
 void main() {
   group('trayIconAssetKeyFor', () {
-    test('connected -> зелёная иконка', () {
+    test('connected -> залитая плитка', () {
       expect(trayIconAssetKeyFor(TunnelStatus.connected),
           'assets/tray/tray_connected.png');
     });
-    test('connecting -> жёлтая иконка', () {
+    test('connecting -> пунктирная плитка', () {
       expect(trayIconAssetKeyFor(TunnelStatus.connecting),
           'assets/tray/tray_connecting.png');
     });
-    test('disconnected -> серая иконка', () {
+    test('disconnected -> пустая плитка', () {
       expect(trayIconAssetKeyFor(TunnelStatus.disconnected),
           'assets/tray/tray_disconnected.png');
     });
-    test('error -> серая иконка (как disconnected)', () {
+    test('error -> пустая плитка (как disconnected)', () {
       expect(trayIconAssetKeyFor(TunnelStatus.error),
           'assets/tray/tray_disconnected.png');
     });

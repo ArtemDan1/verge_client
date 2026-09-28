@@ -7,9 +7,6 @@ import '../../theme/verge_palette.dart';
 /// Заголовок + рамка секции настроек. Общий для всех секций, чтобы экран
 /// читался как список карточек, а не как одна длинная колонка.
 ///
-/// Секции подписывают поля стилем `large` shadcn (18px) — для карточки
-/// настроек это крупно. Вместо правки каждой секции здесь локально
-/// переопределяем `large`/`muted` под размеры дизайна «Бумага».
 class SettingsSection extends StatelessWidget {
   const SettingsSection({
     super.key,
@@ -27,12 +24,6 @@ class SettingsSection extends StatelessWidget {
     final theme = ShadTheme.of(context);
     final palette = VergePalette.of(context);
     final text = theme.textTheme;
-    final local = theme.copyWith(
-      textTheme: text.copyWith(
-        large: text.large.copyWith(fontSize: 14, fontWeight: FontWeight.w500),
-        muted: text.muted.copyWith(fontSize: 13),
-      ),
-    );
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
       child: Column(
@@ -57,12 +48,9 @@ class SettingsSection extends StatelessWidget {
               border: Border.all(color: palette.panelBorder),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: ShadTheme(
-              data: local,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: children,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: children,
             ),
           ),
         ],
@@ -91,7 +79,7 @@ class GeneralSection extends StatelessWidget {
     return SettingsSection(
       title: 'Общие',
       children: [
-        Text('Тема', style: theme.textTheme.large),
+        Text('Тема', style: theme.textTheme.small),
         const SizedBox(height: 10),
         Row(
           children: [
@@ -113,7 +101,7 @@ class GeneralSection extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 24),
-        Text('Локальный порт прокси', style: theme.textTheme.large),
+        Text('Локальный порт прокси', style: theme.textTheme.small),
         const SizedBox(height: 8),
         ShadInput(
           initialValue: '${s.localPort}',
@@ -132,7 +120,7 @@ class GeneralSection extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Автозапуск', style: theme.textTheme.large),
+                  Text('Автозапуск', style: theme.textTheme.small),
                   Text('Подключать последнюю ноду при старте',
                       style: theme.textTheme.muted),
                 ],

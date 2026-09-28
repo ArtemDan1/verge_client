@@ -105,6 +105,7 @@ class _AppShellState extends State<AppShell> {
               UpdateBanner(controller: widget.controller),
               Expanded(
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     ValueListenableBuilder<List<ConnectionInfo>>(
                       valueListenable: widget.controller.connections,

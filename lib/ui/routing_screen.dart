@@ -210,10 +210,14 @@ class RoutingScreen extends StatelessWidget {
   }
 
   String _summary(RoutingProfile p) {
-    final d = p.directRules.length, x = p.proxyRules.length, b = p.blockRules.length;
     final a = p.allowRules.length;
     final allow = a > 0 ? 'исключений $a · ' : '';
-    return '${allow}direct $d · proxy $x · block $b · final ${p.finalAction.name}';
+    final rest = p.finalAction == RoutingFinal.direct
+        ? 'остальное напрямую'
+        : 'остальное через прокси';
+    return '$allowнапрямую ${p.directRules.length} · '
+        'прокси ${p.proxyRules.length} · '
+        'блок ${p.blockRules.length} · $rest';
   }
 
   void _openEditor(BuildContext context, RoutingProfile p) {
@@ -521,6 +525,7 @@ class _RuleMixBar extends StatelessWidget {
     return SizedBox(
       height: 8,
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           for (var i = 0; i < parts.length; i++) ...[
             if (i > 0) const SizedBox(width: 3),

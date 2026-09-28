@@ -90,7 +90,7 @@ class _GstaticPingSectionState extends State<GstaticPingSection> {
         Row(
           children: [
             Expanded(
-              child: Text('Показывать пинг', style: theme.textTheme.large),
+              child: Text('Показывать пинг', style: theme.textTheme.small),
             ),
             ShadSwitch(
               value: s.gstaticPingEnabled,
@@ -101,7 +101,7 @@ class _GstaticPingSectionState extends State<GstaticPingSection> {
         ),
         if (s.gstaticPingEnabled) ...[
           const SizedBox(height: 20),
-          Text('Интервал обновления, с', style: theme.textTheme.large),
+          Text('Интервал обновления, с', style: theme.textTheme.small),
           const SizedBox(height: 8),
           ShadInput(
             key: const Key('gstaticPingInterval'),
@@ -118,7 +118,7 @@ class _GstaticPingSectionState extends State<GstaticPingSection> {
             style: theme.textTheme.muted,
           ),
           const SizedBox(height: 20),
-          Text('Адрес проверки', style: theme.textTheme.large),
+          Text('Адрес проверки', style: theme.textTheme.small),
           const SizedBox(height: 8),
           ShadInput(
             key: const Key('gstaticPingUrl'),
