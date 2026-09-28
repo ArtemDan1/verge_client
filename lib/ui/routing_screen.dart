@@ -5,7 +5,9 @@ import '../app/app_controller.dart';
 import '../models/routing_profile.dart';
 import '../models/routing_rule.dart';
 import '../services/geo_catalog.dart';
+import '../theme/verge_palette.dart';
 import 'settings/general_section.dart' show SettingsSection;
+import 'widgets/paper.dart';
 
 class RoutingScreen extends StatelessWidget {
   final AppController controller;
@@ -13,18 +15,17 @@ class RoutingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = ShadTheme.of(context);
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) => Padding(
-        padding: const EdgeInsets.all(16),
+        padding: kScreenPadding,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                Text('Роутинг', style: theme.textTheme.large),
-                const Spacer(),
+            ScreenHeader(
+              title: 'Роутинг',
+              subtitle: _geoStatus(context),
+              actions: [
                 if (controller.canUpdateGeo)
                   ShadButton.outline(
                     onPressed: controller.isUpdatingGeo
@@ -32,13 +33,10 @@ class RoutingScreen extends StatelessWidget {
                         : () => controller.updateGeoAssets(),
                     leading: controller.isUpdatingGeo
                         ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: ShadProgress())
+                            width: 16, height: 16, child: ShadProgress())
                         : const Icon(LucideIcons.cloudDownload, size: 16),
                     child: const Text('Обновить гео'),
                   ),
-                const SizedBox(width: 8),
                 ShadButton(
                   onPressed: () =>
                       controller.addRoutingProfile('Новый профиль'),
@@ -47,20 +45,24 @@ class RoutingScreen extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            _geoStatus(theme),
-            const SizedBox(height: 8),
+            const SizedBox(height: 18),
             Expanded(
               child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    for (final p in controller.routingProfiles)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: _profileRow(context, theme, p),
-                      ),
-                  ],
+                child: LayoutBuilder(
+                  builder: (context, box) {
+                    // Три карточки в ряд на обычной ширине окна, две — на узкой.
+                    final cols = box.maxWidth > 640 ? 3 : 2;
+                    const gap = 12.0;
+                    final w = (box.maxWidth - gap * (cols - 1)) / cols;
+                    return Wrap(
+                      spacing: gap,
+                      runSpacing: gap,
+                      children: [
+                        for (final p in controller.routingProfiles)
+                          SizedBox(width: w, child: _profileCard(context, p)),
+                      ],
+                    );
+                  },
                 ),
               ),
             ),
@@ -70,72 +72,134 @@ class RoutingScreen extends StatelessWidget {
     );
   }
 
-  Widget _geoStatus(ShadThemeData theme) {
-    if (!controller.canUpdateGeo) return const SizedBox.shrink();
+  Widget _geoStatus(BuildContext context) {
+    if (!controller.canUpdateGeo) {
+      return const Text('Что идёт через VPN, что напрямую, а что блокируется');
+    }
     final at = controller.geoUpdatedAt;
     final err = controller.geoUpdateError;
     final subtitle = err ??
         (at == null
             ? 'ещё не обновлялись — вшитые версии'
             : 'обновлены ${_ago(at)}');
-    return Row(
-      children: [
-        const Icon(LucideIcons.globe, size: 18),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text('Гео-наборы (.srs): $subtitle',
-              style: theme.textTheme.muted.copyWith(
-                  color: err != null ? theme.colorScheme.destructive : null)),
-        ),
-      ],
-    );
+    return Text('Гео-наборы (.srs): $subtitle',
+        style: err != null
+            ? TextStyle(color: VergePalette.of(context).dangerText)
+            : null);
   }
 
-  Widget _profileRow(BuildContext context, ShadThemeData theme, RoutingProfile p) {
+  Widget _profileCard(BuildContext context, RoutingProfile p) {
+    final theme = ShadTheme.of(context);
+    final palette = VergePalette.of(context);
+    final dark = theme.brightness == Brightness.dark;
     final active = p.id == controller.activeRoutingProfileId;
-    return GestureDetector(
-      onTap: () => controller.selectRoutingProfile(p.id),
-      child: ShadCard(
-        backgroundColor: active ? theme.colorScheme.accent : null,
-        child: Row(
-          children: [
-            Icon(active ? LucideIcons.circleCheck : LucideIcons.circle,
-                size: 18),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+    final selectedBorder = dark ? palette.accentText : palette.accent;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () => controller.selectRoutingProfile(p.id),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: EdgeInsets.all(active ? 15 : 16),
+          decoration: BoxDecoration(
+            color: active ? palette.accentSoft : palette.panel,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: active ? selectedBorder : palette.panelBorder,
+              width: active ? 2 : 1,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _RuleMixBar(profile: p),
+              const SizedBox(height: 12),
+              Row(
                 children: [
-                  Text(p.name),
-                  Text(_summary(p), style: theme.textTheme.muted),
+                  Flexible(
+                    child: Text(p.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w600)),
+                  ),
+                  if (active) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 7, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: palette.accent,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: const Text('активен',
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFFFFFFFF))),
+                    ),
+                  ],
                 ],
               ),
-            ),
-            if (p.isBuiltIn)
-              const Padding(
-                padding: EdgeInsets.only(right: 4),
-                child: Icon(LucideIcons.lock, size: 16),
+              const SizedBox(height: 4),
+              Text(_summary(p),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.muted.copyWith(fontSize: 12)),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  if (p.isBuiltIn) ...[
+                    Icon(LucideIcons.lock,
+                        size: 14, color: theme.colorScheme.mutedForeground),
+                    const SizedBox(width: 6),
+                    Text('Встроенный',
+                        style: theme.textTheme.muted.copyWith(fontSize: 12)),
+                  ],
+                  const Spacer(),
+                  _cardAction(
+                    icon: LucideIcons.copy,
+                    tooltip: 'Дублировать',
+                    onPressed: () => controller.cloneRoutingProfile(p.id),
+                  ),
+                  if (!p.isBuiltIn) ...[
+                    _cardAction(
+                      icon: LucideIcons.pencil,
+                      tooltip: 'Редактировать',
+                      onPressed: () => _openEditor(context, p),
+                    ),
+                    _cardAction(
+                      icon: LucideIcons.trash2,
+                      tooltip: 'Удалить',
+                      color: palette.dangerText,
+                      onPressed: () => controller.removeRoutingProfile(p.id),
+                    ),
+                  ],
+                ],
               ),
-            ShadButton.ghost(
-              onPressed: () => controller.cloneRoutingProfile(p.id),
-              leading: const Icon(LucideIcons.copy, size: 16),
-            ),
-            if (!p.isBuiltIn)
-              ShadButton.ghost(
-                onPressed: () => _openEditor(context, p),
-                leading: const Icon(LucideIcons.pencil, size: 16),
-              ),
-            if (!p.isBuiltIn)
-              ShadButton.ghost(
-                onPressed: () => controller.removeRoutingProfile(p.id),
-                leading: Icon(LucideIcons.trash2,
-                    size: 16, color: theme.colorScheme.destructive),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
+
+  Widget _cardAction({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onPressed,
+    Color? color,
+  }) =>
+      ShadTooltip(
+        builder: (_) => Text(tooltip),
+        child: ShadButton.ghost(
+          width: 30,
+          height: 30,
+          padding: EdgeInsets.zero,
+          onPressed: onPressed,
+          child: Icon(icon, size: 15, color: color),
+        ),
+      );
 
   String _ago(DateTime t) {
     final d = DateTime.now().difference(t);
@@ -178,7 +242,7 @@ class _RoutingEditor extends StatelessWidget {
           color: theme.colorScheme.background,
           child: SafeArea(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: kScreenPadding,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -190,7 +254,11 @@ class _RoutingEditor extends StatelessWidget {
                         child: const Text('Назад'),
                       ),
                       const SizedBox(width: 8),
-                      Text(p.name, style: theme.textTheme.h4),
+                      Text(p.name,
+                          style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.4)),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -328,7 +396,8 @@ class _RoutingEditor extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.only(left: 12, right: 6, top: 4, bottom: 4),
       decoration: BoxDecoration(
-        color: theme.colorScheme.secondary,
+        color: theme.colorScheme.background,
+        border: Border.all(color: theme.colorScheme.border),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
@@ -424,6 +493,49 @@ class _SwitchRow extends StatelessWidget {
         Expanded(child: Text(label, style: theme.textTheme.muted)),
         ShadSwitch(value: value, onChanged: onChanged),
       ],
+    );
+  }
+}
+
+/// Полоска соотношения правил профиля: прокси · напрямую · блок. У профиля
+/// без правил она целиком цвета итогового действия.
+class _RuleMixBar extends StatelessWidget {
+  const _RuleMixBar({required this.profile});
+  final RoutingProfile profile;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = VergePalette.of(context);
+    final proxy = palette.accent;
+    final direct = palette.success;
+    final block = palette.danger;
+    final p = profile;
+    final parts = <(int, Color)>[
+      (p.proxyRules.length, proxy),
+      (p.directRules.length + p.allowRules.length, direct),
+      (p.blockRules.length, block),
+    ].where((e) => e.$1 > 0).toList();
+    if (parts.isEmpty) {
+      parts.add((1, p.finalAction == RoutingFinal.direct ? direct : proxy));
+    }
+    return SizedBox(
+      height: 8,
+      child: Row(
+        children: [
+          for (var i = 0; i < parts.length; i++) ...[
+            if (i > 0) const SizedBox(width: 3),
+            Expanded(
+              flex: parts[i].$1,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: parts[i].$2,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

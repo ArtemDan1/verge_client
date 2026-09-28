@@ -1,7 +1,12 @@
 import 'package:flutter/widgets.dart';
-import 'package:flutter/material.dart' show SelectableText;
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../app/app_controller.dart';
+import '../services/link_opener.dart';
+import '../theme/app_theme.dart';
+import '../theme/verge_palette.dart';
+import 'widgets/verge_logo.dart';
+
+const _repoUrl = 'https://github.com/ArtemDan1/verge_client';
 
 class AboutScreen extends StatelessWidget {
   final AppController controller;
@@ -10,45 +15,126 @@ class AboutScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
+    final palette = VergePalette.of(context);
     final c = controller;
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(48),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('О приложении', style: theme.textTheme.large),
-          const SizedBox(height: 12),
-          ShadCard(
-            title: const Text('Verge'),
-            child: Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  FutureBuilder<String>(
-                    future: c.platform.appVersion(),
-                    builder: (context, snap) =>
-                        Text('Версия приложения: ${snap.data ?? '…'}'),
+          SizedBox(
+            width: 280,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const VergeMark(size: 120),
+                const SizedBox(height: 18),
+                Text(
+                  'Verge',
+                  style: TextStyle(
+                    fontSize: 34,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -1,
+                    color: theme.colorScheme.foreground,
                   ),
-                  const SizedBox(height: 8),
-                  FutureBuilder<String>(
-                    future: c.platform.singboxVersion(),
-                    builder: (context, snap) =>
-                        Text('Версия sing-box: ${snap.data ?? '…'}'),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Прокси-клиент для macOS и Windows на базе sing-box и Xray.',
+                  style: theme.textTheme.muted
+                      .copyWith(fontSize: 15, height: 1.5),
+                ),
+                const SizedBox(height: 18),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    ShadButton.outline(
+                      size: ShadButtonSize.sm,
+                      onPressed: () => openLink(_repoUrl),
+                      child: const Text('GitHub'),
+                    ),
+                    ShadButton.outline(
+                      size: ShadButtonSize.sm,
+                      onPressed: () => openLink('$_repoUrl/releases'),
+                      child: const Text('Что нового'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 40),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _UpdateBlock(controller: c),
+                const SizedBox(height: 16),
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: palette.panelBorder),
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                  const SizedBox(height: 8),
-                  FutureBuilder<String>(
-                    future: c.platform.xrayVersion(),
-                    builder: (context, snap) =>
-                        Text('Версия Xray: ${snap.data ?? '…'}'),
+                  child: Column(
+                    children: [
+                      _VersionRow(
+                          label: 'Версия приложения',
+                          version: c.platform.appVersion(),
+                          first: true),
+                      _VersionRow(
+                          label: 'sing-box',
+                          version: c.platform.singboxVersion()),
+                      _VersionRow(
+                          label: 'Xray', version: c.platform.xrayVersion()),
+                    ],
                   ),
-                  const SizedBox(height: 12),
-                  _UpdateBlock(controller: c),
-                  const SizedBox(height: 12),
-                  const SelectableText(
-                      'https://github.com/ArtemDan1/verge_client'),
-                ],
-              ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VersionRow extends StatelessWidget {
+  const _VersionRow({
+    required this.label,
+    required this.version,
+    this.first = false,
+  });
+
+  final String label;
+  final Future<String> version;
+  final bool first;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = ShadTheme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+      decoration: BoxDecoration(
+        border: first
+            ? null
+            : Border(
+                top: BorderSide(color: VergePalette.of(context).divider)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(label,
+                style: theme.textTheme.muted.copyWith(fontSize: 14)),
+          ),
+          FutureBuilder<String>(
+            future: version,
+            builder: (context, snap) => Text(
+              snap.data ?? '…',
+              style: monoStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                  color: theme.colorScheme.foreground),
             ),
           ),
         ],
@@ -71,28 +157,13 @@ class _UpdateBlockState extends State<_UpdateBlock> {
   Widget build(BuildContext context) {
     final c = widget.controller;
     final theme = ShadTheme.of(context);
+    final palette = VergePalette.of(context);
     final info = c.availableUpdate;
     final downloading = c.updateDownloadProgress != null;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (info != null) ...[
-          Text('Доступна версия ${info.version}', style: theme.textTheme.large),
-          const SizedBox(height: 8),
-          ShadButton(
-            onPressed: downloading ? null : c.downloadAndInstallUpdate,
-            leading: const Icon(LucideIcons.download, size: 16),
-            child: Text(downloading
-                ? 'Загрузка ${((c.updateDownloadProgress ?? 0) * 100).round()}%'
-                : 'Скачать и установить'),
-          ),
-        ] else ...[
-          if (_checked && !c.isCheckingUpdate)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child:
-                  Text('У вас последняя версия', style: theme.textTheme.muted),
-            ),
+
+    if (info == null) {
+      return Row(
+        children: [
           ShadButton.outline(
             onPressed: c.isCheckingUpdate
                 ? null
@@ -104,8 +175,64 @@ class _UpdateBlockState extends State<_UpdateBlock> {
             child: Text(
                 c.isCheckingUpdate ? 'Проверка…' : 'Проверить обновления'),
           ),
+          const SizedBox(width: 12),
+          if (_checked && !c.isCheckingUpdate)
+            Text('У вас последняя версия', style: theme.textTheme.muted),
         ],
-      ],
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: palette.accentSoft,
+        border: Border.all(color: palette.accentSoftBorder),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'ДОСТУПНО ОБНОВЛЕНИЕ',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
+              color: palette.accentText,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Доступна версия ${info.version}',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.4,
+              color: theme.colorScheme.foreground,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              ShadButton(
+                backgroundColor: palette.accent,
+                foregroundColor: const Color(0xFFFFFFFF),
+                onPressed: downloading ? null : c.downloadAndInstallUpdate,
+                leading: const Icon(LucideIcons.download, size: 16),
+                child: Text(downloading
+                    ? 'Загрузка ${((c.updateDownloadProgress ?? 0) * 100).round()}%'
+                    : 'Скачать и установить'),
+              ),
+              const SizedBox(width: 8),
+              ShadButton.link(
+                onPressed: () => openLink('$_repoUrl/releases'),
+                foregroundColor: palette.accentText,
+                child: const Text('Что в релизе'),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

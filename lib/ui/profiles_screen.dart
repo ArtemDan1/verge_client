@@ -891,7 +891,7 @@ class _ProfileMenuState extends State<_ProfileMenu> {
   }
 }
 
-/// Кнопка автовыбора. Залита, когда фича включена и есть отмеченные
+/// Кнопка автовыбора. Залита кобальтом, когда фича включена и есть отмеченные
 /// профили, — иначе включённое состояние никак не отличить от выключенного.
 class _AutoSelectButton extends StatelessWidget {
   const _AutoSelectButton({required this.controller});
@@ -906,9 +906,12 @@ class _AutoSelectButton extends StatelessWidget {
         : const Icon(LucideIcons.zap, size: 14);
     final label = Text(on ? 'Автовыбор: вкл' : 'Автовыбор');
     void open() => showAutoSelectDialog(context, c);
+    final palette = VergePalette.of(context);
     return on
         ? ShadButton(
             size: ShadButtonSize.sm,
+            backgroundColor: palette.accent,
+            foregroundColor: const Color(0xFFFFFFFF),
             onPressed: open,
             leading: leading,
             child: label,
