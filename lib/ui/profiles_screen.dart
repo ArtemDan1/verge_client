@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart' show CircularProgressIndicator;
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../app/app_controller.dart';
@@ -9,10 +10,12 @@ import '../models/subscription_info.dart';
 import '../services/engine_selector.dart';
 import '../services/link_opener.dart';
 import '../services/node_display.dart';
+import '../theme/app_theme.dart';
+import '../theme/verge_palette.dart';
 import 'auto_select_dialog.dart';
 import 'widgets/engine_badge.dart';
 import 'widgets/hero_panel.dart';
-import 'widgets/ping_badge.dart';
+import 'widgets/paper.dart';
 import 'add_profile_dialog.dart';
 import 'edit_node_dialog.dart';
 
@@ -132,16 +135,17 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
     return parts.isEmpty ? null : parts.join(' · ');
   }
 
-  Widget _pingBadge(AppController c, NodeConfig node) {
+  /// Ячейка задержки ноды: полоска + число, клик — перезамер.
+  Widget _latencyCell(AppController c, NodeConfig node) {
     void reping() => c.pingNode(node);
-    if (c.isPinging(node)) return const PingBadge(loading: true);
+    if (c.isPinging(node)) return const _LatencyCell.loading();
     final res = c.pingFor(node);
-    if (res == null) return PingBadge(onTap: reping);
+    if (res == null) return _LatencyCell(onTap: reping);
     if (res.latencyMs != null) {
-      return PingBadge(latencyMs: res.latencyMs, onTap: reping);
+      return _LatencyCell(latencyMs: res.latencyMs, onTap: reping);
     }
-    return PingBadge(
-        timedOut: res.timedOut, error: !res.timedOut, onTap: reping);
+    return _LatencyCell(
+        failure: res.timedOut ? 'таймаут' : 'ошибка', onTap: reping);
   }
 
   @override
@@ -150,38 +154,40 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
     final theme = ShadTheme.of(context);
 
     return Padding(
-      padding: const EdgeInsets.all(12),
+      padding: kScreenPadding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // --- Фиксированная верхняя секция ---
           Row(
             children: [
+              const Spacer(),
+              IconAction(
+                icon: LucideIcons.activity,
+                tooltip: 'Пинг всех',
+                onPressed: c.pingAll,
+              ),
+              const SizedBox(width: 8),
+              IconAction(
+                icon: LucideIcons.refreshCw,
+                tooltip: 'Обновить подписки',
+                onPressed: c.isRefreshingAll ? null : c.refreshAllProfiles,
+              ),
+              const SizedBox(width: 8),
               ShadButton(
                 onPressed: () => showAddProfileDialog(context, c),
                 leading: const Icon(LucideIcons.plus, size: 16),
-                child: const Text('Добавить'),
-              ),
-              const Spacer(),
-              ShadButton.outline(
-                onPressed: c.isRefreshingAll ? null : c.refreshAllProfiles,
-                leading: const Icon(LucideIcons.refreshCw, size: 16),
-                child: const Text('Обновить подписки'),
-              ),
-              const SizedBox(width: 8),
-              ShadButton.outline(
-                onPressed: c.pingAll,
-                leading: const Icon(LucideIcons.radar, size: 16),
-                child: const Text('Пинг всех'),
+                child: const Text('Добавить подписку'),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 16),
           HeroPanel(controller: c),
-          const SizedBox(height: 10),
+          const SizedBox(height: 18),
           Row(
             children: [
-              Text('Профили', style: theme.textTheme.large),
+              Text('Серверы',
+                  style: theme.textTheme.large.copyWith(fontSize: 16)),
               const Spacer(),
               // Перебор занимает секунды и молча меняет выбранную ноду —
               // без индикатора он неотличим от неработающей кнопки.
@@ -189,12 +195,12 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                 Text('Подбираем ноду…', style: theme.textTheme.muted),
                 const SizedBox(width: 8),
               ],
-              // Включённый автовыбор — залитая кнопка, выключенный — обычная
-              // обводка: состояние фичи видно, не открывая диалог.
+              // Включённый автовыбор подсвечен кобальтом: состояние фичи
+              // видно, не открывая диалог.
               _AutoSelectButton(controller: c),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 10),
           // --- Прокручиваемая секция профилей ---
           Expanded(
             child: c.profiles.isEmpty
@@ -210,27 +216,11 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                         children: [
                           for (final p in c.profiles)
                             Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                      color: theme.colorScheme.border),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 2),
-                                child: ShadAccordion<String>.multiple(
-                                  children: [
-                                    ShadAccordionItem<String>(
-                                      value: p.id,
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 10),
-                                      separator: const SizedBox.shrink(),
-                                      title: _profileHeader(c, theme, p),
-                                      child: _profileBody(context, c, theme, p),
-                                    ),
-                                  ],
-                                ),
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: _ProfileCard(
+                                header: _profileHeader(c, theme, p),
+                                body: _profileBody(context, c, theme, p),
+                                id: p.id,
                               ),
                             ),
                         ],
@@ -246,7 +236,7 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
   Widget _profileHeader(AppController c, ShadThemeData theme, Profile p) {
     final isActive = p.id == c.activeProfileId;
     final announce = p.subscriptionMeta?.announce;
-    // Мета одной строкой: кол-во нод · трафик · срок (как в макете).
+    // Мета одной строкой: кол-во нод · трафик · срок.
     final meta = <String>['${p.nodes.length} нод'];
     final traffic = _trafficLine(p.subscriptionInfo);
     if (traffic != null) meta.add(traffic);
@@ -261,25 +251,26 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                 children: [
                   Flexible(
                     child: Text(p.name,
-                        style: theme.textTheme.large,
+                        style: const TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w600),
                         overflow: TextOverflow.ellipsis),
                   ),
                   if (isActive) ...[
                     const SizedBox(width: 8),
-                    const ShadBadge(child: Text('активен')),
+                    const _ActiveBadge(),
                   ],
                 ],
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 3),
               Text(
                 meta.join(' · '),
-                style: theme.textTheme.muted,
+                style: theme.textTheme.muted.copyWith(fontSize: 13),
                 overflow: TextOverflow.ellipsis,
               ),
               if (announce != null && announce.isNotEmpty) ...[
                 const SizedBox(height: 2),
                 Text(announce,
-                    style: theme.textTheme.muted,
+                    style: theme.textTheme.muted.copyWith(fontSize: 13),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis),
               ],
@@ -299,31 +290,35 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
       BuildContext context, AppController c, ShadThemeData theme, Profile p) {
     final nodes = p.nodes;
     final profileId = p.id;
+    if (nodes.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Text('В подписке нет серверов', style: theme.textTheme.muted),
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        const _NodeTableHeader(),
         for (var i = 0; i < nodes.length; i++)
-          Padding(
-            padding: EdgeInsets.only(bottom: i == nodes.length - 1 ? 0 : 8),
-            child: _NodeRow(
-              node: nodes[i],
-              selected: profileId == c.activeProfileId &&
-                  p.selectedNodeIndex == i,
-              onTap: () => c.selectNode(profileId, i),
-              onPing: () => c.pingNode(nodes[i]),
-              pingBadge: _pingBadge(c, nodes[i]),
-              choice: p.engineChoiceFor(nodes[i]),
-              engine: _engineFor(c, p, nodes[i]),
-              fellBack: _fellBack(c, p, nodes[i]),
-              onEngineChoice: (choice) =>
-                  c.setNodeEngineChoice(profileId, nodes[i], choice),
-              onEdit: () => showEditNodeDialog(
-                context,
-                c,
-                profileId,
-                i,
-                nodes[i],
-              ),
+          _NodeRow(
+            node: nodes[i],
+            selected:
+                profileId == c.activeProfileId && p.selectedNodeIndex == i,
+            onTap: () => c.selectNode(profileId, i),
+            onPing: () => c.pingNode(nodes[i]),
+            latency: _latencyCell(c, nodes[i]),
+            choice: p.engineChoiceFor(nodes[i]),
+            engine: _engineFor(c, p, nodes[i]),
+            fellBack: _fellBack(c, p, nodes[i]),
+            onEngineChoice: (choice) =>
+                c.setNodeEngineChoice(profileId, nodes[i], choice),
+            onEdit: () => showEditNodeDialog(
+              context,
+              c,
+              profileId,
+              i,
+              nodes[i],
             ),
           ),
       ],
@@ -352,15 +347,111 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
       c.activeEngine == NodeEngine.singbox;
 }
 
-/// Строка ноды: тёмный кружок-галочка у активной, имя жирным, под ним
-/// протокол·хост:порт, справа — пинг и кнопка перепинговки.
-class _NodeRow extends StatelessWidget {
+/// Карточка профиля: шапка (раскрывает список) и таблица нод.
+class _ProfileCard extends StatelessWidget {
+  const _ProfileCard({
+    required this.id,
+    required this.header,
+    required this.body,
+  });
+
+  final String id;
+  final Widget header;
+  final Widget body;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = VergePalette.of(context);
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: palette.panel,
+        border: Border.all(color: palette.panelBorder),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: ShadAccordion<String>.multiple(
+        children: [
+          ShadAccordionItem<String>(
+            value: id,
+            padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+            underlineTitleOnHover: false,
+            separator: const SizedBox.shrink(),
+            title: header,
+            child: body,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActiveBadge extends StatelessWidget {
+  const _ActiveBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = VergePalette.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+      decoration: BoxDecoration(
+        color: palette.accent,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: const Text(
+        'активен',
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: Color(0xFFFFFFFF),
+        ),
+      ),
+    );
+  }
+}
+
+// Колонки таблицы нод — общие для шапки и строк, чтобы стояли ровно.
+const _kRadioWidth = 30.0;
+const _kEngineWidth = 44.0;
+const _kLatencyWidth = 136.0;
+const _kMenuWidth = 32.0;
+
+class _NodeTableHeader extends StatelessWidget {
+  const _NodeTableHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    final style = ShadTheme.of(context).textTheme.muted.copyWith(fontSize: 12);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 8, 12, 8),
+      decoration: BoxDecoration(
+        border: Border(
+            top: BorderSide(color: VergePalette.of(context).divider)),
+      ),
+      child: Row(
+        children: [
+          const SizedBox(width: _kRadioWidth),
+          Expanded(flex: 16, child: Text('Сервер', style: style)),
+          Expanded(flex: 11, child: Text('Протокол', style: style)),
+          SizedBox(width: _kEngineWidth, child: Text('Движок', style: style)),
+          const SizedBox(width: 12),
+          SizedBox(
+              width: _kLatencyWidth, child: Text('Задержка', style: style)),
+          const SizedBox(width: _kMenuWidth),
+        ],
+      ),
+    );
+  }
+}
+
+/// Строка ноды: радио выбора, код страны и имя (под ним адрес), протокол,
+/// движок, задержка полоской и числом, меню.
+class _NodeRow extends StatefulWidget {
   const _NodeRow({
     required this.node,
     required this.selected,
     required this.onTap,
     required this.onPing,
-    required this.pingBadge,
+    required this.latency,
     required this.choice,
     required this.engine,
     required this.fellBack,
@@ -372,7 +463,7 @@ class _NodeRow extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
   final VoidCallback onPing;
-  final Widget pingBadge;
+  final Widget latency;
 
   /// Что выбрал пользователь; auto — движок определяет автоматика.
   final EngineChoice choice;
@@ -384,67 +475,219 @@ class _NodeRow extends StatelessWidget {
   final VoidCallback onEdit;
 
   @override
+  State<_NodeRow> createState() => _NodeRowState();
+}
+
+class _NodeRowState extends State<_NodeRow> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
-    return GestureDetector(
-      onTap: onTap,
-      child: ShadCard(
-        backgroundColor: theme.colorScheme.muted,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Row(
-          children: [
-            // Кружок-индикатор выбора: залитый тёмным с белой галочкой у
-            // активной ноды, пустой контур — у остальных.
-            Container(
-              width: 26,
-              height: 26,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: selected ? theme.colorScheme.primary : null,
-                border: selected
-                    ? null
-                    : Border.all(color: theme.colorScheme.border, width: 1.5),
-              ),
-              alignment: Alignment.center,
-              child: selected
-                  ? Icon(LucideIcons.check,
-                      size: 15, color: theme.colorScheme.primaryForeground)
-                  : null,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(node.name,
-                      style: const TextStyle(fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 1),
-                  Text(
-                    nodeSubtitle(node),
-                    style: theme.textTheme.muted,
-                    overflow: TextOverflow.ellipsis,
+    final palette = VergePalette.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final node = widget.node;
+    final selected = widget.selected;
+    final name = splitCountryFlag(node.name);
+    final radioOn = dark ? palette.accentText : palette.accent;
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          padding: const EdgeInsets.fromLTRB(16, 8, 12, 8),
+          decoration: BoxDecoration(
+            color: selected
+                ? palette.accentSoft
+                : _hovered
+                    ? palette.surfaceHeader
+                    : palette.panel,
+            border: Border(top: BorderSide(color: palette.divider)),
+          ),
+          child: Row(
+            children: [
+              SizedBox(
+                width: _kRadioWidth,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    width: 18,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: selected ? radioOn : palette.radioOff,
+                        width: selected ? 5 : 1.5,
+                      ),
+                    ),
                   ),
-                ],
+                ),
+              ),
+              Expanded(
+                flex: 16,
+                child: Row(
+                  children: [
+                    if (name.code != null) ...[
+                      CountryChip(name.code!),
+                      const SizedBox(width: 8),
+                    ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 14, fontWeight: FontWeight.w500),
+                          ),
+                          Text(
+                            '${node.host}:${node.port}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.muted.copyWith(fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                flex: 11,
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Text(
+                    nodeProtocolLabel(node),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.muted.copyWith(fontSize: 13),
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: _kEngineWidth,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: EngineBadge(
+                    engine: widget.engine,
+                    manual: widget.choice != EngineChoice.auto,
+                    fellBack: widget.fellBack,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              SizedBox(width: _kLatencyWidth, child: widget.latency),
+              SizedBox(
+                width: _kMenuWidth,
+                child: _NodeMenu(
+                  choice: widget.choice,
+                  autoEngine:
+                      preferXray(node) ? NodeEngine.xray : NodeEngine.singbox,
+                  onEngineChoice: widget.onEngineChoice,
+                  onPing: widget.onPing,
+                  onEdit: widget.onEdit,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Задержка ноды: полоска длиной по шкале до 500 мс и число цветом порога.
+/// Без замера — приглушённое «—», по которому можно кликнуть.
+class _LatencyCell extends StatelessWidget {
+  const _LatencyCell({this.latencyMs, this.failure, this.onTap})
+      : loading = false;
+  const _LatencyCell.loading()
+      : latencyMs = null,
+        failure = null,
+        onTap = null,
+        loading = true;
+
+  final int? latencyMs;
+  final String? failure;
+  final VoidCallback? onTap;
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = VergePalette.of(context);
+    final theme = ShadTheme.of(context);
+    final ms = latencyMs;
+    final Widget content;
+    if (loading) {
+      content = const SizedBox(
+        width: 14,
+        height: 14,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      );
+    } else {
+      final fraction = ms != null
+          ? (ms / 500).clamp(0.06, 1.0)
+          : failure != null
+              ? 1.0
+              : 0.0;
+      final barColor = ms != null
+          ? palette.latencyBar(ms)
+          : failure != null
+              ? palette.panelBorder
+              : palette.chip;
+      final label = ms != null ? '$ms мс' : (failure ?? '—');
+      final labelColor = ms != null
+          ? palette.latencyText(ms)
+          : failure != null
+              ? palette.dangerText
+              : theme.colorScheme.mutedForeground;
+      content = Row(
+        children: [
+          Container(
+            width: 56,
+            height: 6,
+            decoration: BoxDecoration(
+              color: palette.chip,
+              borderRadius: BorderRadius.circular(3),
+            ),
+            alignment: Alignment.centerLeft,
+            child: FractionallySizedBox(
+              widthFactor: fraction.toDouble(),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: barColor,
+                  borderRadius: BorderRadius.circular(3),
+                ),
               ),
             ),
-            pingBadge,
-            const SizedBox(width: 6),
-            EngineBadge(
-              engine: engine,
-              manual: choice != EngineChoice.auto,
-              fellBack: fellBack,
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: monoStyle(fontSize: 12, color: labelColor),
             ),
-            const SizedBox(width: 2),
-            _NodeMenu(
-              choice: choice,
-              autoEngine:
-                  preferXray(node) ? NodeEngine.xray : NodeEngine.singbox,
-              onEngineChoice: onEngineChoice,
-              onPing: onPing,
-              onEdit: onEdit,
-            ),
-          ],
-        ),
+          ),
+        ],
+      );
+    }
+    return MouseRegion(
+      cursor:
+          onTap == null ? SystemMouseCursors.basic : SystemMouseCursors.click,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Align(alignment: Alignment.centerLeft, child: content),
       ),
     );
   }

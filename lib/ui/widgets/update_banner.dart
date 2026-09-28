@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../app/app_controller.dart';
+import '../../theme/verge_palette.dart';
 
 /// Ненавязчивая полоска о новой версии. Модального диалога намеренно нет:
 /// обновление не должно перегораживать запуск приложения.
@@ -13,23 +14,27 @@ class UpdateBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final info = controller.updateToOffer;
     if (info == null) return const SizedBox.shrink();
-    final theme = ShadTheme.of(context);
+    final palette = VergePalette.of(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: theme.colorScheme.accent,
-        border: Border(bottom: BorderSide(color: theme.colorScheme.border)),
+        color: palette.accentSoft,
+        border: Border(bottom: BorderSide(color: palette.accentSoftBorder)),
       ),
       child: Row(
         children: [
-          const Icon(LucideIcons.arrowUpCircle, size: 16),
+          Icon(LucideIcons.circleArrowUp, size: 16, color: palette.accentText),
           const SizedBox(width: 8),
           Expanded(
             child: Text('Доступна версия ${info.version}',
-                overflow: TextOverflow.ellipsis),
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    fontWeight: FontWeight.w600, color: palette.accentText)),
           ),
           ShadButton(
             size: ShadButtonSize.sm,
+            backgroundColor: palette.accent,
+            foregroundColor: const Color(0xFFFFFFFF),
             onPressed: () => controller.downloadAndInstallUpdate(),
             child: const Text('Обновить'),
           ),
@@ -39,7 +44,7 @@ class UpdateBanner extends StatelessWidget {
             onPressed: controller.dismissUpdateBanner,
             child: const Text('Позже'),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 4),
           ShadButton.ghost(
             size: ShadButtonSize.sm,
             onPressed: () => controller.skipUpdateVersion(),

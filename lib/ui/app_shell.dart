@@ -5,6 +5,7 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 import '../app/app_controller.dart';
 import '../models/connection_info.dart';
 import '../services/deep_link.dart';
+import '../theme/verge_palette.dart';
 import 'widgets/sidebar.dart';
 import 'widgets/update_banner.dart';
 import 'profiles_screen.dart';
@@ -96,7 +97,9 @@ class _AppShellState extends State<AppShell> {
           RoutingScreen(controller: widget.controller),
           AboutScreen(controller: widget.controller),
         ];
+        final palette = VergePalette.of(context);
         return Scaffold(
+          backgroundColor: palette.chrome,
           body: Column(
             children: [
               UpdateBanner(controller: widget.controller),
@@ -120,7 +123,24 @@ class _AppShellState extends State<AppShell> {
                         ),
                       ),
                     ),
-                    Expanded(child: screens[_index]),
+                    // Контент — «вставленная» панель поверх фона окна,
+                    // как в нативных macOS-приложениях.
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(0, 10, 10, 10),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: palette.panel,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: palette.panelBorder),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(15),
+                            child: screens[_index],
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),

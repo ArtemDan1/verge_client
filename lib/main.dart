@@ -70,8 +70,10 @@ class SingboxApp extends StatelessWidget {
         // ShadTextTheme не доходят. Без этой строки флаги стран в именах нод
         // на Windows так и остаются буквами.
         materialThemeBuilder: (context, theme) => theme.copyWith(
-          textTheme:
-              theme.textTheme.apply(fontFamilyFallback: kEmojiFontFallback),
+          textTheme: theme.textTheme.apply(
+            fontFamily: kUiFontFamily,
+            fontFamilyFallback: kEmojiFontFallback,
+          ),
         ),
       ),
     );

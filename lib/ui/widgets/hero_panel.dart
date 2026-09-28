@@ -4,12 +4,16 @@ import 'package:flutter/widgets.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../app/app_controller.dart';
 import '../../models/app_settings.dart';
+import '../../models/connection_info.dart';
+import '../../services/byte_format.dart';
+import '../../services/node_display.dart';
+import '../../theme/verge_palette.dart';
 import '../../tunnel/tunnel_controller.dart';
+import 'paper.dart';
 import 'ping_badge.dart';
 
-/// Единая высота табов режима и селекта роутинга — чтобы стояли ровно.
-const double _kControlHeight = 40;
-
+/// Карточка подключения: тумблер, статус и сервер, режим и роутинг, под ней —
+/// плитки времени, задержки и скорости.
 class HeroPanel extends StatefulWidget {
   const HeroPanel({super.key, required this.controller});
   final AppController controller;
@@ -17,11 +21,8 @@ class HeroPanel extends StatefulWidget {
   State<HeroPanel> createState() => _HeroPanelState();
 }
 
-class _HeroPanelState extends State<HeroPanel>
-    with SingleTickerProviderStateMixin {
+class _HeroPanelState extends State<HeroPanel> {
   bool _switchingTun = false;
-  bool _pressed = false;
-  late final AnimationController _pulse;
   // Тикающий раз в секунду таймер перерисовки аптайма. Сам момент
   // подключения хранится в AppController и переживает смену экранов.
   Timer? _uptimeTimer;
@@ -29,11 +30,6 @@ class _HeroPanelState extends State<HeroPanel>
   @override
   void initState() {
     super.initState();
-    // Непрерывная пульсация ореола вокруг кнопки, когда VPN активен.
-    _pulse = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1800),
-    )..repeat();
     widget.controller.addListener(_onStatusChanged);
     _onStatusChanged();
   }
@@ -52,7 +48,6 @@ class _HeroPanelState extends State<HeroPanel>
   void dispose() {
     widget.controller.removeListener(_onStatusChanged);
     _uptimeTimer?.cancel();
-    _pulse.dispose();
     super.dispose();
   }
 
@@ -113,214 +108,309 @@ class _HeroPanelState extends State<HeroPanel>
   Widget build(BuildContext context) {
     final c = widget.controller;
     final theme = ShadTheme.of(context);
+    final palette = VergePalette.of(context);
     final running = c.status == TunnelStatus.connected;
     final connecting = c.status == TunnelStatus.connecting;
-    // В активном состоянии — зелёный (вписан в нейтральную палитру),
-    // иначе — основной цвет темы.
-    const activeGreen = Color(0xFF16A34A);
-    final bg = running ? activeGreen : theme.colorScheme.primary;
-    final fg = running
-        ? const Color(0xFFFFFFFF)
-        : theme.colorScheme.primaryForeground;
+
+    final (cardBg, cardBorder, titleColor, title) = running
+        ? (palette.successSoft, palette.successBorder, palette.successText,
+            'Подключено')
+        : connecting
+            ? (palette.warningSoft, palette.warningBorder, palette.warningText,
+                'Подключаемся…')
+            : (palette.surfaceHeader, palette.panelBorder,
+                theme.colorScheme.foreground, 'Не подключено');
+
+    final node = c.selectedNode;
+    final nodeName = node == null ? null : splitCountryFlag(node.name);
+
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        _PowerButton(
-          running: running,
-          connecting: connecting,
-          pressed: _pressed,
-          pulse: _pulse,
-          bg: bg,
-          fg: fg,
-          activeGreen: activeGreen,
-          onTap: _togglePower,
-          onHighlight: (v) => setState(() => _pressed = v),
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: cardBorder),
+          ),
+          child: Row(
+            children: [
+              ConnectToggle(
+                running: running,
+                connecting: connecting,
+                onTap: _togglePower,
+              ),
+              const SizedBox(width: 22),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.4,
+                        color: titleColor,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        if (nodeName?.code != null) ...[
+                          CountryChip(nodeName!.code!),
+                          const SizedBox(width: 8),
+                        ],
+                        Flexible(
+                          child: Text(
+                            nodeName == null
+                                ? 'Выберите сервер ниже'
+                                : [
+                                    nodeName.name,
+                                    if (c.activeProfile != null)
+                                      c.activeProfile!.name,
+                                  ].join('  ·  '),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.muted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              SizedBox(
+                width: 236,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Segmented<TunnelMode>(
+                      value: c.settings.tunnelMode,
+                      onChanged: _switchingTun ? null : _selectMode,
+                      options: const [
+                        SegmentedOption(
+                          value: TunnelMode.systemProxy,
+                          label: 'Системный прокси',
+                        ),
+                        SegmentedOption(value: TunnelMode.tun, label: 'TUN'),
+                      ],
+                    ),
+                    if (c.routingProfiles.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      _RoutingSelect(controller: c),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 10),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            ShadBadge(
-              backgroundColor: running ? activeGreen : null,
-              child: Text(running
-                  ? _formatUptime(DateTime.now()
-                      .difference(c.connectedAt ?? DateTime.now()))
-                  : connecting
-                      ? 'Подключение…'
-                      : 'VPN отключён'),
-            ),
-            if (running && c.settings.gstaticPingEnabled) ...[
-              const SizedBox(width: 8),
-              // Число в чипе — всегда пинг до ноды: в TUN он меряется мимо
-              // туннеля (см. AppController.refreshHeroPing), поэтому честен в
-              // обоих режимах. gstatic остаётся признаком «есть ли интернет».
-              PingBadge(
-                onTap: c.refreshHeroPing,
-                loading: c.selectedNode != null &&
-                    c.isPinging(c.selectedNode!) &&
-                    c.pingFor(c.selectedNode!) == null,
-                latencyMs: c.selectedNode == null
-                    ? null
-                    : c.pingFor(c.selectedNode!)?.latencyMs,
-                timedOut: c.selectedNode != null &&
-                    (c.pingFor(c.selectedNode!)?.timedOut ?? false),
-                error: c.selectedNode != null &&
-                    c.pingFor(c.selectedNode!)?.error != null,
-                noInternet: c.gstaticPingFailed,
-              ),
-            ],
-          ],
-        ),
-        const SizedBox(height: 12),
-        // Режим и роутинг на одном уровне — экономит вертикальное место.
-        // Обе контролки жёстко приведены к одной высоте: у ShadTabs и ShadSelect
-        // разные внутренние отступы, из-за чего без явной высоты селект выше.
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Expanded(
-              child: SizedBox(
-              height: _kControlHeight,
-              child: ShadTabs<TunnelMode>(
-                value: c.settings.tunnelMode,
-                // Контента у табов нет — зазор под него только переполнял бы
-                // фиксированную высоту строки.
-                gap: 0,
-                onChanged: _switchingTun ? (_) {} : _selectMode,
-                tabs: [
-                  ShadTab(
-                    value: TunnelMode.systemProxy,
-                    leading: const Icon(LucideIcons.globe, size: 16),
-                    child: const Text('Proxy'),
-                  ),
-                  ShadTab(
-                    value: TunnelMode.tun,
-                    leading: const Icon(LucideIcons.network, size: 16),
-                    child: const Text('TUN'),
-                  ),
-                ],
-              ),
-              ),
-            ),
-            if (c.routingProfiles.isNotEmpty) ...[
-              const SizedBox(width: 8),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 220),
-                child: SizedBox(
-                  height: _kControlHeight,
-                  child: ShadSelect<String>(
-                  minWidth: 180,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  placeholder: const Text('Роутинг'),
-                  initialValue: c.activeRoutingProfileId,
-                  options: [
-                    for (final p in c.routingProfiles)
-                      ShadOption(value: p.id, child: Text(p.name)),
-                  ],
-                  selectedOptionBuilder: (ctx, value) {
-                    for (final p in c.routingProfiles) {
-                      if (p.id == value) return Text(p.name);
-                    }
-                    return const Text('');
-                  },
-                  onChanged: (id) {
-                    if (id != null) c.selectRoutingProfile(id);
-                  },
+        ValueListenableBuilder<TrafficStats>(
+          valueListenable: c.traffic,
+          builder: (context, traffic, _) => Row(
+            children: [
+              Expanded(
+                child: StatTile(
+                  label: 'Время',
+                  child: Text(running
+                      ? _formatUptime(DateTime.now()
+                          .difference(c.connectedAt ?? DateTime.now()))
+                      : '—'),
                 ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: StatTile(
+                  label: 'Задержка',
+                  child: running && c.settings.gstaticPingEnabled
+                      ? _heroPing(c)
+                      : const Text('—'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: StatTile(
+                  label: 'Загрузка',
+                  child: Text(
+                      running ? formatSpeed(traffic.downSpeed) : '—'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: StatTile(
+                  label: 'Отдача',
+                  child:
+                      Text(running ? formatSpeed(traffic.upSpeed) : '—'),
                 ),
               ),
             ],
-          ],
+          ),
         ),
       ],
     );
   }
+
+  /// Число в чипе — всегда пинг до ноды: в TUN он меряется мимо туннеля
+  /// (см. AppController.refreshHeroPing), поэтому честен в обоих режимах.
+  /// gstatic остаётся признаком «есть ли интернет». Тап — перезамер.
+  Widget _heroPing(AppController c) {
+    final node = c.selectedNode;
+    final res = node == null ? null : c.pingFor(node);
+    return PingBadge(
+      onTap: c.refreshHeroPing,
+      loading: node != null && c.isPinging(node) && res == null,
+      latencyMs: res?.latencyMs,
+      timedOut: res?.timedOut ?? false,
+      error: res?.error != null,
+      noInternet: c.gstaticPingFailed,
+    );
+  }
 }
 
-/// Круглая кнопка питания с анимацией: пульсирующий ореол в активном
-/// состоянии, вращающееся кольцо при подключении и мягкое сжатие при нажатии.
-class _PowerButton extends StatelessWidget {
-  const _PowerButton({
+class _RoutingSelect extends StatelessWidget {
+  const _RoutingSelect({required this.controller});
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = controller;
+    final theme = ShadTheme.of(context);
+    String nameOf(String id) {
+      for (final p in c.routingProfiles) {
+        if (p.id == id) return p.name;
+      }
+      return '';
+    }
+
+    return SizedBox(
+      height: 38,
+      child: ShadSelect<String>(
+        minWidth: 236,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        placeholder: const Text('Правила роутинга'),
+        initialValue: c.activeRoutingProfileId,
+        options: [
+          for (final p in c.routingProfiles)
+            ShadOption(value: p.id, child: Text(p.name)),
+        ],
+        selectedOptionBuilder: (ctx, value) => Row(
+          children: [
+            Icon(LucideIcons.route,
+                size: 14, color: theme.colorScheme.mutedForeground),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(nameOf(value),
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
+            ),
+          ],
+        ),
+        onChanged: (id) {
+          if (id != null) c.selectRoutingProfile(id);
+        },
+      ),
+    );
+  }
+}
+
+/// Большой тумблер подключения. Три состояния: выключен (ручка слева),
+/// подключение (посередине, янтарный), подключён (справа, зелёный).
+class ConnectToggle extends StatefulWidget {
+  const ConnectToggle({
+    super.key,
     required this.running,
     required this.connecting,
-    required this.pressed,
-    required this.pulse,
-    required this.bg,
-    required this.fg,
-    required this.activeGreen,
     required this.onTap,
-    required this.onHighlight,
   });
 
   final bool running;
   final bool connecting;
-  final bool pressed;
-  final AnimationController pulse;
-  final Color bg;
-  final Color fg;
-  final Color activeGreen;
   final VoidCallback onTap;
-  final ValueChanged<bool> onHighlight;
+
+  @override
+  State<ConnectToggle> createState() => _ConnectToggleState();
+}
+
+class _ConnectToggleState extends State<ConnectToggle> {
+  bool _pressed = false;
 
   @override
   Widget build(BuildContext context) {
-    const size = 92.0;
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: onTap,
-        onTapDown: (_) => onHighlight(true),
-        onTapUp: (_) => onHighlight(false),
-        onTapCancel: () => onHighlight(false),
-        child: SizedBox(
-          width: 132,
-          height: 132,
-          child: AnimatedBuilder(
-            animation: pulse,
-            builder: (context, child) {
-              return Stack(
-                alignment: Alignment.center,
-                children: [
-                  // Пульсирующие ореолы только когда активно.
-                  if (running) ...[
-                    _halo(size, activeGreen, pulse.value),
-                    _halo(size, activeGreen, (pulse.value + 0.5) % 1.0),
-                  ],
-                  // Вращающееся кольцо при подключении.
-                  if (connecting)
-                    Transform.rotate(
-                      angle: pulse.value * 6.28318,
-                      child: CustomPaint(
-                        size: const Size(size + 12, size + 12),
-                        painter: _ArcPainter(bg),
-                      ),
-                    ),
-                  child!,
-                ],
-              );
-            },
-            child: AnimatedScale(
-              scale: pressed ? 0.92 : 1.0,
-              duration: const Duration(milliseconds: 120),
+    final palette = VergePalette.of(context);
+    final dark = ShadTheme.of(context).brightness == Brightness.dark;
+    final running = widget.running;
+    final connecting = widget.connecting;
+    final track = running
+        ? palette.success
+        : connecting
+            ? palette.warningTrack
+            : palette.idleTrack;
+    final knobFg = running
+        ? palette.successText
+        : connecting
+            ? palette.warningText
+            : palette.navForeground;
+    final align = running
+        ? Alignment.centerRight
+        : connecting
+            ? Alignment.center
+            : Alignment.centerLeft;
+    // В тёмной теме выключенная ручка приглушена, иначе она светит ярче
+    // всего экрана.
+    final knob = !running && !connecting && dark
+        ? const Color(0xFFC9C5BB)
+        : const Color(0xFFFFFFFF);
+
+    return Semantics(
+      toggled: running,
+      button: true,
+      label: running || connecting ? 'Отключиться' : 'Подключиться',
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: widget.onTap,
+          onTapDown: (_) => setState(() => _pressed = true),
+          onTapUp: (_) => setState(() => _pressed = false),
+          onTapCancel: () => setState(() => _pressed = false),
+          child: AnimatedScale(
+            scale: _pressed ? 0.96 : 1,
+            duration: const Duration(milliseconds: 100),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
               curve: Curves.easeOut,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 350),
-                curve: Curves.easeOut,
-                width: size,
-                height: size,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: bg,
-                  boxShadow: [
-                    BoxShadow(
-                      color: bg.withValues(alpha: running ? 0.45 : 0.25),
-                      blurRadius: running ? 28 : 14,
-                      spreadRadius: running ? 2 : 0,
-                    ),
-                  ],
+              width: 96,
+              height: 54,
+              padding: const EdgeInsets.all(5),
+              decoration: BoxDecoration(
+                color: track,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: AnimatedAlign(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOutBack,
+                alignment: align,
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: knob,
+                    shape: BoxShape.circle,
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x33000000),
+                        blurRadius: 6,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(LucideIcons.power, size: 18, color: knobFg),
                 ),
-                child: Icon(LucideIcons.power, size: 30, color: fg),
               ),
             ),
           ),
@@ -328,41 +418,4 @@ class _PowerButton extends StatelessWidget {
       ),
     );
   }
-
-  Widget _halo(double base, Color color, double t) {
-    // t 0→1: кольцо расширяется и растворяется.
-    final scale = 1.0 + t * 0.42;
-    return Opacity(
-      opacity: (1.0 - t) * 0.5,
-      child: Container(
-        width: base * scale,
-        height: base * scale,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: color, width: 2),
-        ),
-      ),
-    );
-  }
-}
-
-/// Дуга-«спиннер» для состояния подключения.
-class _ArcPainter extends CustomPainter {
-  const _ArcPainter(this.color);
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3
-      ..strokeCap = StrokeCap.round;
-    final rect = Offset.zero & size;
-    // Дуга ~270°.
-    canvas.drawArc(rect.deflate(2), 0, 4.71238, false, paint);
-  }
-
-  @override
-  bool shouldRepaint(_ArcPainter old) => old.color != color;
 }
