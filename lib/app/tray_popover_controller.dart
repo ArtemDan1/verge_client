@@ -63,8 +63,15 @@ class TrayPopoverController extends ChangeNotifier {
     await _window.hidePopover(openMain: openMain);
   }
 
-  /// Показать главное окно — из меню трея или мини-окна.
+  /// Показать главное окно из мини-окна.
   Future<void> openMain() => close(openMain: true);
+
+  /// Выход из приложения — задаёт TrayService (там же штатное отключение).
+  Future<void> Function()? onQuit;
+
+  /// Кнопка «Выйти» в мини-окне. Меню трея больше нет, а на Windows крестик
+  /// лишь прячет окно — это единственный путь закрыть приложение.
+  Future<void> quit() async => onQuit?.call();
 
   void _onNativeDismissed() {
     _dismissedAt = _now();

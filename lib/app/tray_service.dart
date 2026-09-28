@@ -7,8 +7,8 @@ import 'tray_menu.dart';
 import 'tray_popover_controller.dart';
 
 /// Значок в строке меню / области уведомлений. Статус подключения — формой
-/// плитки. Левый клик — мини-окно трея (тумблер, сервер, режим), правый —
-/// короткое меню: Открыть Verge · Подключиться/Отключиться · Выйти.
+/// плитки. Любой клик — мини-окно трея (тумблер, сервер, режим, «Открыть
+/// Verge», «Выйти»); текстового меню у значка нет.
 class TrayService with TrayListener {
   TrayService(this._controller, this._popover);
   final AppController _controller;
@@ -17,6 +17,7 @@ class TrayService with TrayListener {
 
   Future<void> init() async {
     trayManager.addListener(this);
+    _popover.onQuit = _quit;
     await trayManager.setToolTip('Verge');
     await _render();
     _controller.addListener(_onControllerChanged);
@@ -36,27 +37,9 @@ class TrayService with TrayListener {
       trayIconAssetKeyFor(status),
       isTemplate: Platform.isMacOS,
     );
-    await trayManager.setContextMenu(buildTrayMenu(
-      status: status,
-      onToggleConnection: _toggleConnection,
-      onShowWindow: _showWindow,
-      onQuit: _quit,
-    ));
   }
 
-  void _toggleConnection() {
-    final busy = _controller.status == TunnelStatus.connected ||
-        _controller.status == TunnelStatus.connecting;
-    if (busy) {
-      _controller.disconnect();
-    } else {
-      _controller.connect();
-    }
-  }
-
-  Future<void> _showWindow() => _popover.openMain();
-
-  /// Выход из трея — единственный способ закрыть приложение на Windows
+  /// Выход из мини-окна трея — единственный способ закрыть приложение на Windows
   /// (крестик там прячет окно). Раньше это был голый `exit(0)`, и нативная
   /// часть не успевала прибраться: системный прокси оставался прописанным в
   /// реестре и указывал на убитый вместе с процессом sing-box — интернет
@@ -78,11 +61,7 @@ class TrayService with TrayListener {
   }
 
   @override
-  void onTrayIconRightMouseDown() {
-    // Меню и мини-окно вместе не показываем.
-    if (_popover.isOpen) _popover.close();
-    trayManager.popUpContextMenu();
-  }
+  void onTrayIconRightMouseDown() => onTrayIconMouseDown();
 
   void dispose() {
     trayManager.removeListener(this);

@@ -88,6 +88,16 @@ void main() {
     c.dispose();
   });
 
+  testWidgets('кнопка выхода зовёт выход из приложения', (tester) async {
+    final (c, popover) = await pump(tester);
+    var quits = 0;
+    popover.onQuit = () async => quits++;
+    await tester.tap(find.byIcon(LucideIcons.logOut));
+    await tester.pump();
+    expect(quits, 1);
+    c.dispose();
+  });
+
   test('высота окна растёт с числом серверов до предела', () {
     // Без профиля — компактное окно с подсказкой.
     final empty = AppController(

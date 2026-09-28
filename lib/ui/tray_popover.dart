@@ -188,6 +188,8 @@ class _TrayPopoverState extends State<TrayPopover> {
               children: [
                 Text(
                   title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -201,6 +203,8 @@ class _TrayPopoverState extends State<TrayPopover> {
                     builder: (context, t, _) => Text(
                       '${_uptime(DateTime.now().difference(c.connectedAt ?? DateTime.now()))}'
                       '  ·  ↓ ${formatSpeed(t.downSpeed)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: monoStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w400,
@@ -210,12 +214,29 @@ class _TrayPopoverState extends State<TrayPopover> {
                   )
                 else
                   Text(
-                    connecting
-                        ? 'Проверяем сервер'
-                        : 'Нажмите тумблер, чтобы подключиться',
+                    connecting ? 'Проверяем сервер' : 'Нажмите, чтобы подключиться',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.muted.copyWith(fontSize: 12),
                   ),
               ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Меню у значка трея нет — выход живёт здесь. На Windows крестик
+          // только прячет окно, так что это единственный способ закрыть Verge.
+          ShadTooltip(
+            builder: (_) => const Text('Выйти из Verge'),
+            child: ShadButton.ghost(
+              width: 32,
+              height: 32,
+              padding: EdgeInsets.zero,
+              onPressed: widget.popover.quit,
+              child: Icon(
+                LucideIcons.logOut,
+                size: 16,
+                color: theme.colorScheme.mutedForeground,
+              ),
             ),
           ),
         ],
