@@ -4,45 +4,61 @@ import '../../app/app_controller.dart';
 import '../../models/app_settings.dart';
 import '../../theme/verge_palette.dart';
 
-/// Заголовок + рамка секции настроек. Общий для всех секций, чтобы экран
-/// читался как список карточек, а не как одна длинная колонка.
-///
-class SettingsSection extends StatelessWidget {
-  const SettingsSection({
+/// Внутри вкладки настроек заголовок секции совпадает с подписью вкладки,
+/// поэтому экран вкладок прячет его через эту область.
+class SettingsTabScope extends InheritedWidget {
+  const SettingsTabScope({super.key, required super.child});
+
+  static bool hidesTitles(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<SettingsTabScope>() != null;
+
+  @override
+  bool updateShouldNotify(SettingsTabScope oldWidget) => false;
+}
+
+/// Группа настроек: подпись над карточкой, внутри — строки.
+class SettingsGroup extends StatelessWidget {
+  const SettingsGroup({
     super.key,
-    required this.title,
     required this.children,
+    this.title,
     this.description,
+    this.padded = true,
   });
 
-  final String title;
+  final String? title;
   final String? description;
   final List<Widget> children;
 
+  /// false — строки сами задают отступы и разделители ([SettingsRow]).
+  final bool padded;
+
   @override
   Widget build(BuildContext context) {
-    final theme = ShadTheme.of(context);
+    final text = ShadTheme.of(context).textTheme;
     final palette = VergePalette.of(context);
-    final text = theme.textTheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            title,
-            style: text.muted.copyWith(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
+          if (title != null) ...[
+            Text(
+              title!,
+              style: text.muted.copyWith(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
-          if (description != null) ...[
-            const SizedBox(height: 2),
-            Text(description!, style: text.muted.copyWith(fontSize: 12)),
+            const SizedBox(height: 8),
           ],
-          const SizedBox(height: 8),
+          if (description != null) ...[
+            Text(description!, style: text.muted.copyWith(fontSize: 13)),
+            const SizedBox(height: 8),
+          ],
           Container(
-            padding: const EdgeInsets.all(16),
+            clipBehavior: Clip.antiAlias,
+            padding: padded ? const EdgeInsets.all(16) : EdgeInsets.zero,
             decoration: BoxDecoration(
               color: palette.panel,
               border: Border.all(color: palette.panelBorder),
@@ -59,7 +75,80 @@ class SettingsSection extends StatelessWidget {
   }
 }
 
-/// Тема, локальный порт прокси, автозапуск.
+/// Строка настройки: подпись и пояснение слева, контрол справа.
+class SettingsRow extends StatelessWidget {
+  const SettingsRow({
+    super.key,
+    required this.label,
+    required this.trailing,
+    this.description,
+    this.first = false,
+  });
+
+  final String label;
+  final String? description;
+  final Widget trailing;
+  final bool first;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = ShadTheme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        border: first
+            ? null
+            : Border(
+                top: BorderSide(color: VergePalette.of(context).divider)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w500)),
+                if (description != null) ...[
+                  const SizedBox(height: 2),
+                  Text(description!,
+                      style: theme.textTheme.muted.copyWith(fontSize: 13)),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          trailing,
+        ],
+      ),
+    );
+  }
+}
+
+/// Секция одной вкладки настроек (TUN, DNS, TLS…). Заголовок показывается
+/// только вне вкладок.
+class SettingsSection extends StatelessWidget {
+  const SettingsSection({
+    super.key,
+    required this.title,
+    required this.children,
+    this.description,
+  });
+
+  final String title;
+  final String? description;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => SettingsGroup(
+        title: SettingsTabScope.hidesTitles(context) ? null : title,
+        description: description,
+        children: children,
+      );
+}
+
+/// Вкладка «Общие»: тема, запуск, локальный порт.
 class GeneralSection extends StatelessWidget {
   const GeneralSection({super.key, required this.controller});
 
@@ -75,60 +164,71 @@ class GeneralSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = controller;
     final s = c.settings;
-    final theme = ShadTheme.of(context);
-    return SettingsSection(
-      title: 'Общие',
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('Тема', style: theme.textTheme.small),
-        const SizedBox(height: 10),
-        Row(
+        SettingsGroup(
+          title: 'Тема',
           children: [
-            for (final m in const [
-              AppThemeMode.light,
-              AppThemeMode.dark,
-              AppThemeMode.system,
-            ]) ...[
-              if (m != AppThemeMode.light) const SizedBox(width: 10),
-              Expanded(
-                child: _ThemeCard(
-                  mode: m,
-                  label: _themeLabel(m),
-                  selected: s.themeMode == m,
-                  onTap: () => c.updateSettings(s.copyWith(themeMode: m)),
-                ),
-              ),
-            ],
+            Row(
+              children: [
+                for (final m in const [
+                  AppThemeMode.light,
+                  AppThemeMode.dark,
+                  AppThemeMode.system,
+                ]) ...[
+                  if (m != AppThemeMode.light) const SizedBox(width: 10),
+                  Expanded(
+                    child: _ThemeCard(
+                      mode: m,
+                      label: _themeLabel(m),
+                      selected: s.themeMode == m,
+                      onTap: () =>
+                          c.updateSettings(s.copyWith(themeMode: m)),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ],
         ),
-        const SizedBox(height: 24),
-        Text('Локальный порт прокси', style: theme.textTheme.small),
-        const SizedBox(height: 8),
-        ShadInput(
-          initialValue: '${s.localPort}',
-          keyboardType: TextInputType.number,
-          onSubmitted: (v) {
-            final port = int.tryParse(v.trim());
-            if (port != null && port > 0 && port < 65536) {
-              c.updateSettings(s.copyWith(localPort: port));
-            }
-          },
-        ),
-        const SizedBox(height: 24),
-        Row(
+        SettingsGroup(
+          title: 'Запуск',
+          padded: false,
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Автозапуск', style: theme.textTheme.small),
-                  Text('Подключать последнюю ноду при старте',
-                      style: theme.textTheme.muted),
-                ],
+            SettingsRow(
+              first: true,
+              label: 'Автозапуск',
+              description: 'Подключать последнюю ноду при старте',
+              trailing: ShadSwitch(
+                value: s.autostart,
+                onChanged: (v) => c.updateSettings(s.copyWith(autostart: v)),
               ),
             ),
-            ShadSwitch(
-              value: s.autostart,
-              onChanged: (v) => c.updateSettings(s.copyWith(autostart: v)),
+          ],
+        ),
+        SettingsGroup(
+          title: 'Прокси',
+          padded: false,
+          children: [
+            SettingsRow(
+              first: true,
+              label: 'Локальный порт прокси',
+              description: 'HTTP + SOCKS на 127.0.0.1',
+              trailing: SizedBox(
+                width: 110,
+                child: ShadInput(
+                  initialValue: '${s.localPort}',
+                  keyboardType: TextInputType.number,
+                  textAlign: TextAlign.right,
+                  onSubmitted: (v) {
+                    final port = int.tryParse(v.trim());
+                    if (port != null && port > 0 && port < 65536) {
+                      c.updateSettings(s.copyWith(localPort: port));
+                    }
+                  },
+                ),
+              ),
             ),
           ],
         ),

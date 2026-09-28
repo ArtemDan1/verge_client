@@ -41,11 +41,17 @@ class _TunSectionState extends State<TunSection> {
     final theme = ShadTheme.of(context);
     return SettingsSection(
       title: 'TUN',
+      description: 'Параметры туннеля подобраны под большинство сетей — '
+          'трогать их стоит, только если TUN работает с проблемами.',
       children: [
         Row(
           children: [
             ShadButton.ghost(
               onPressed: () => setState(() => _expanded = !_expanded),
+              leading: Icon(
+                _expanded ? LucideIcons.chevronDown : LucideIcons.chevronRight,
+                size: 16,
+              ),
               child: const Text('Расширенные'),
             ),
             const Spacer(),

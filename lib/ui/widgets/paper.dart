@@ -209,20 +209,20 @@ class _SegmentButton<T> extends StatelessWidget {
           onTap: onTap,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
+            // Прозрачный вариант того же цвета, а не прозрачный чёрный:
+            // иначе анимация переключения проходит через серую вспышку.
             decoration: BoxDecoration(
-              color: selected
-                  ? (dark ? palette.navActiveRing : palette.panel)
-                  : const Color(0x00000000),
+              color: (dark ? palette.navActiveRing : palette.panel)
+                  .withValues(alpha: selected ? 1 : 0),
               borderRadius: BorderRadius.circular(8),
-              boxShadow: selected && !dark
-                  ? const [
-                      BoxShadow(
-                        color: Color(0x14000000),
-                        blurRadius: 2,
-                        offset: Offset(0, 1),
-                      ),
-                    ]
-                  : null,
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF000000)
+                      .withValues(alpha: selected && !dark ? 0.08 : 0),
+                  blurRadius: 2,
+                  offset: const Offset(0, 1),
+                ),
+              ],
             ),
             alignment: Alignment.center,
             child: Row(

@@ -115,11 +115,12 @@ class _NavItemState extends State<_NavItem> {
     final palette = VergePalette.of(context);
     final selected = widget.selected;
     final fg = selected ? theme.colorScheme.foreground : palette.navForeground;
+    // Все состояния — оттенки одного цвета: AnimatedContainer интерполирует
+    // между ними, и переход через прозрачный ЧЁРНЫЙ давал тёмную вспышку
+    // на середине анимации при наведении.
     final bg = selected
         ? palette.navActive
-        : _hovered
-            ? palette.navActive.withValues(alpha: 0.5)
-            : const Color(0x00000000);
+        : palette.navActive.withValues(alpha: _hovered ? 0.6 : 0);
     return Semantics(
       button: true,
       selected: selected,
@@ -138,20 +139,21 @@ class _NavItemState extends State<_NavItem> {
               color: bg,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: selected
-                    ? palette.navActiveRing
-                    : const Color(0x00000000),
+                color: palette.navActiveRing
+                    .withValues(alpha: selected ? 1 : 0),
               ),
-              boxShadow: selected &&
-                      theme.brightness == Brightness.light
-                  ? const [
-                      BoxShadow(
-                        color: Color(0x141C1B18),
-                        blurRadius: 2,
-                        offset: Offset(0, 1),
-                      ),
-                    ]
-                  : null,
+              // Тень всегда в списке, меняется только прозрачность — иначе
+              // лерп null↔тень тоже даёт скачок.
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF1C1B18).withValues(
+                      alpha: selected && theme.brightness == Brightness.light
+                          ? 0.08
+                          : 0),
+                  blurRadius: 2,
+                  offset: const Offset(0, 1),
+                ),
+              ],
             ),
             child: Row(
               children: [

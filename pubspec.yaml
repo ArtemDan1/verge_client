@@ -62,7 +62,9 @@ flutter_launcher_icons:
   remove_alpha_ios: true
   macos:
     generate: true
-    image_path: "assets/branding/verge-app-icon-1024.png"
+    # Для macOS своя картинка: плитка с полями по сетке Apple, иначе в доке
+    # иконка крупнее соседних.
+    image_path: "assets/branding/verge-app-icon-macos-1024.png"
   windows:
     generate: true
     image_path: "assets/branding/verge-app-icon-1024.png"

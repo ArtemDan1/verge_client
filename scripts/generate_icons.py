@@ -4,6 +4,9 @@
   - assets/branding/verge-app-icon-{light,dark}.svg — исходники иконки;
   - assets/branding/verge-app-icon-1024.png — основная (светлая) для
     flutter_launcher_icons, verge-app-icon-{light,dark}-1024.png — варианты;
+  - assets/branding/verge-app-icon-macos-1024.png — вариант для macOS: плитка
+    824×824 с полями и тенью по сетке Apple, иначе в доке иконка крупнее
+    соседних;
   - assets/tray/tray_{disconnected,connecting,connected}.png — macOS,
     монохромный template-образ 44×44 (22 pt @2x): цвет подставляет система;
   - assets/tray/tray_*.ico — Windows, цветные, 16/20/24/32/48 px.
@@ -17,7 +20,7 @@ import io
 from pathlib import Path
 
 import cairosvg
-from PIL import Image, ImageChops, ImageOps
+from PIL import Image, ImageChops, ImageFilter, ImageOps
 
 ROOT = Path(__file__).resolve().parent.parent
 BRANDING = ROOT / "assets" / "branding"
@@ -118,12 +121,32 @@ def knock_out(img: Image.Image, size: int) -> Image.Image:
     return Image.merge("RGBA", (r, g, b, cut))
 
 
+def macos_icon(svg: str) -> Image.Image:
+    """Иконка по сетке macOS: тело 824×824 со сдвигом 100 px и мягкой тенью.
+
+    Док рисует PNG как есть, поэтому поля и тень — часть картинки; без них
+    иконка на 20 % крупнее системных и сторонних.
+    """
+    body = render(svg, 824)
+    canvas = Image.new("RGBA", (1024, 1024), (0, 0, 0, 0))
+    shadow_alpha = Image.new("L", (1024, 1024), 0)
+    shadow_alpha.paste(body.split()[3], (100, 112))
+    shadow_alpha = shadow_alpha.filter(ImageFilter.GaussianBlur(14))
+    shadow_alpha = shadow_alpha.point(lambda a: int(a * 0.28))
+    shadow = Image.new("RGBA", (1024, 1024), (0, 0, 0, 255))
+    shadow.putalpha(shadow_alpha)
+    canvas.alpha_composite(shadow)
+    canvas.alpha_composite(body, (100, 100))
+    return canvas
+
+
 def main() -> None:
     (BRANDING / "verge-app-icon-light.svg").write_text(APP_LIGHT)
     (BRANDING / "verge-app-icon-dark.svg").write_text(APP_DARK)
     render(APP_LIGHT, 1024).save(BRANDING / "verge-app-icon-1024.png")
     render(APP_LIGHT, 1024).save(BRANDING / "verge-app-icon-light-1024.png")
     render(APP_DARK, 1024).save(BRANDING / "verge-app-icon-dark-1024.png")
+    macos_icon(APP_LIGHT).save(BRANDING / "verge-app-icon-macos-1024.png")
 
     for state, svg in MAC.items():
         img = render(svg, 44)
