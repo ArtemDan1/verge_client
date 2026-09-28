@@ -8,7 +8,6 @@ import '../../services/node_display.dart';
 import '../../theme/verge_palette.dart';
 import '../../tunnel/tunnel_controller.dart';
 import 'paper.dart';
-import 'ping_badge.dart';
 
 /// Карточка подключения: тумблер, статус и сервер, режим и роутинг, под ней —
 /// плитки времени и задержки.
@@ -231,7 +230,7 @@ class _HeroPanelState extends State<HeroPanel> {
               child: StatTile(
                 label: 'Задержка',
                 child: running && c.settings.gstaticPingEnabled
-                    ? _heroPing(c)
+                    ? _heroPing(context, c)
                     : const Text('—'),
               ),
             ),
@@ -241,19 +240,36 @@ class _HeroPanelState extends State<HeroPanel> {
     );
   }
 
-  /// Число в чипе — всегда пинг до ноды: в TUN он меряется мимо туннеля
-  /// (см. AppController.refreshHeroPing), поэтому честен в обоих режимах.
-  /// gstatic остаётся признаком «есть ли интернет». Тап — перезамер.
-  Widget _heroPing(AppController c) {
+  /// Пинг до ноды — простым моно-текстом, как «Время» рядом: в TUN он
+  /// меряется мимо туннеля (см. AppController.refreshHeroPing), поэтому
+  /// честен в обоих режимах. gstatic остаётся признаком «есть ли интернет».
+  /// Тап — перезамер.
+  Widget _heroPing(BuildContext context, AppController c) {
+    final palette = VergePalette.of(context);
     final node = c.selectedNode;
     final res = node == null ? null : c.pingFor(node);
-    return PingBadge(
-      onTap: c.refreshHeroPing,
-      loading: node != null && c.isPinging(node) && res == null,
-      latencyMs: res?.latencyMs,
-      timedOut: res?.timedOut ?? false,
-      error: res?.error != null,
-      noInternet: c.gstaticPingFailed,
+    final Widget value;
+    if (node != null && c.isPinging(node) && res == null) {
+      value = Spinner(
+          size: 14, color: ShadTheme.of(context).colorScheme.mutedForeground);
+    } else if (c.gstaticPingFailed) {
+      value = Text('нет интернета', style: TextStyle(color: palette.dangerText));
+    } else if (res != null && (res.timedOut || res.error != null)) {
+      value = Text(res.timedOut ? 'таймаут' : 'ошибка',
+          style: TextStyle(color: palette.dangerText));
+    } else if (res?.latencyMs != null) {
+      final ms = res!.latencyMs!;
+      value = Text('$ms мс', style: TextStyle(color: palette.latencyText(ms)));
+    } else {
+      value = const Text('—');
+    }
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: c.refreshHeroPing,
+        child: value,
+      ),
     );
   }
 }
