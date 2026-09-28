@@ -4,8 +4,6 @@ import 'package:flutter/widgets.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../app/app_controller.dart';
 import '../../models/app_settings.dart';
-import '../../models/connection_info.dart';
-import '../../services/byte_format.dart';
 import '../../services/node_display.dart';
 import '../../theme/verge_palette.dart';
 import '../../tunnel/tunnel_controller.dart';
@@ -13,7 +11,7 @@ import 'paper.dart';
 import 'ping_badge.dart';
 
 /// Карточка подключения: тумблер, статус и сервер, режим и роутинг, под ней —
-/// плитки времени, задержки и скорости.
+/// плитки времени и задержки.
 class HeroPanel extends StatefulWidget {
   const HeroPanel({super.key, required this.controller});
   final AppController controller;
@@ -216,46 +214,28 @@ class _HeroPanelState extends State<HeroPanel> {
           ),
         ),
         const SizedBox(height: 10),
-        ValueListenableBuilder<TrafficStats>(
-          valueListenable: c.traffic,
-          builder: (context, traffic, _) => Row(
-            children: [
-              Expanded(
-                child: StatTile(
-                  label: 'Время',
-                  child: Text(running
-                      ? _formatUptime(DateTime.now()
-                          .difference(c.connectedAt ?? DateTime.now()))
-                      : '—'),
-                ),
+        // Скорость загрузки и отдачи — в сайдбаре, здесь не дублируем.
+        Row(
+          children: [
+            Expanded(
+              child: StatTile(
+                label: 'Время',
+                child: Text(running
+                    ? _formatUptime(DateTime.now()
+                        .difference(c.connectedAt ?? DateTime.now()))
+                    : '—'),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: StatTile(
-                  label: 'Задержка',
-                  child: running && c.settings.gstaticPingEnabled
-                      ? _heroPing(c)
-                      : const Text('—'),
-                ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: StatTile(
+                label: 'Задержка',
+                child: running && c.settings.gstaticPingEnabled
+                    ? _heroPing(c)
+                    : const Text('—'),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: StatTile(
-                  label: 'Загрузка',
-                  child: Text(
-                      running ? formatSpeed(traffic.downSpeed) : '—'),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: StatTile(
-                  label: 'Отдача',
-                  child:
-                      Text(running ? formatSpeed(traffic.upSpeed) : '—'),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ],
     );

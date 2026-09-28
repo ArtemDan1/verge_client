@@ -66,11 +66,59 @@ class SettingsGroup extends StatelessWidget {
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: children,
+              children: padded
+                  ? children
+                  : [
+                      // Строки разделяем линиями сами — строкам не нужно
+                      // знать, первые они или нет (часть из них условная).
+                      for (var i = 0; i < children.length; i++) ...[
+                        if (i > 0)
+                          Container(height: 1, color: palette.divider),
+                        children[i],
+                      ],
+                    ],
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Подпись и пояснение настройки — общие для строк и полей.
+class _SettingLabel extends StatelessWidget {
+  const _SettingLabel({required this.label, this.description});
+
+  final String label;
+  final String? description;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = ShadTheme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            height: 1.3,
+            color: theme.colorScheme.foreground,
+          ),
+        ),
+        if (description != null) ...[
+          const SizedBox(height: 3),
+          Text(
+            description!,
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.4,
+              color: theme.colorScheme.mutedForeground,
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
@@ -82,48 +130,143 @@ class SettingsRow extends StatelessWidget {
     required this.label,
     required this.trailing,
     this.description,
-    this.first = false,
+    this.onTap,
   });
 
   final String label;
   final String? description;
   final Widget trailing;
-  final bool first;
+
+  /// Клик по всей строке (например, раскрыть спойлер).
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final theme = ShadTheme.of(context);
-    return Container(
+    final row = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        border: first
-            ? null
-            : Border(
-                top: BorderSide(color: VergePalette.of(context).divider)),
-      ),
       child: Row(
         children: [
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label,
-                    style: const TextStyle(
-                        fontSize: 14, fontWeight: FontWeight.w500)),
-                if (description != null) ...[
-                  const SizedBox(height: 2),
-                  Text(description!,
-                      style: theme.textTheme.muted.copyWith(fontSize: 13)),
-                ],
-              ],
-            ),
+            child: _SettingLabel(label: label, description: description),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 24),
           trailing,
         ],
       ),
     );
+    if (onTap == null) return row;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: row,
+      ),
+    );
   }
+}
+
+/// Поле во всю ширину под подписью — для длинных значений (адреса, DNS).
+class SettingsField extends StatelessWidget {
+  const SettingsField({
+    super.key,
+    required this.label,
+    required this.child,
+    this.description,
+  });
+
+  final String label;
+  final String? description;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _SettingLabel(label: label, description: description),
+            const SizedBox(height: 10),
+            child,
+          ],
+        ),
+      );
+}
+
+/// Предупреждение внутри группы настроек.
+class SettingsNotice extends StatelessWidget {
+  const SettingsNotice(this.text, {super.key});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = VergePalette.of(context);
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        decoration: BoxDecoration(
+          color: palette.dangerSoft,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Icon(LucideIcons.triangleAlert,
+                  size: 15, color: palette.dangerText),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(text,
+                  style: TextStyle(
+                      fontSize: 13, height: 1.4, color: palette.dangerText)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Узкое поле ввода для строки настройки (числа, короткие значения).
+class SettingsInput extends StatelessWidget {
+  const SettingsInput({
+    super.key,
+    this.controller,
+    this.initialValue,
+    this.focusNode,
+    this.placeholder,
+    this.onSubmitted,
+    this.number = false,
+    this.width = 120,
+    this.inputKey,
+  });
+
+  final TextEditingController? controller;
+  final String? initialValue;
+  final FocusNode? focusNode;
+  final String? placeholder;
+  final ValueChanged<String>? onSubmitted;
+  final bool number;
+  final double width;
+  final Key? inputKey;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: width,
+        child: ShadInput(
+          key: inputKey,
+          controller: controller,
+          initialValue: controller == null ? initialValue : null,
+          focusNode: focusNode,
+          placeholder: placeholder == null ? null : Text(placeholder!),
+          keyboardType: number ? TextInputType.number : null,
+          textAlign: TextAlign.right,
+          onSubmitted: onSubmitted,
+        ),
+      );
 }
 
 /// Секция одной вкладки настроек (TUN, DNS, TLS…). Заголовок показывается
@@ -144,6 +287,7 @@ class SettingsSection extends StatelessWidget {
   Widget build(BuildContext context) => SettingsGroup(
         title: SettingsTabScope.hidesTitles(context) ? null : title,
         description: description,
+        padded: false,
         children: children,
       );
 }
@@ -197,7 +341,6 @@ class GeneralSection extends StatelessWidget {
           padded: false,
           children: [
             SettingsRow(
-              first: true,
               label: 'Автозапуск',
               description: 'Подключать последнюю ноду при старте',
               trailing: ShadSwitch(
@@ -212,22 +355,17 @@ class GeneralSection extends StatelessWidget {
           padded: false,
           children: [
             SettingsRow(
-              first: true,
               label: 'Локальный порт прокси',
               description: 'HTTP + SOCKS на 127.0.0.1',
-              trailing: SizedBox(
-                width: 110,
-                child: ShadInput(
-                  initialValue: '${s.localPort}',
-                  keyboardType: TextInputType.number,
-                  textAlign: TextAlign.right,
-                  onSubmitted: (v) {
-                    final port = int.tryParse(v.trim());
-                    if (port != null && port > 0 && port < 65536) {
-                      c.updateSettings(s.copyWith(localPort: port));
-                    }
-                  },
-                ),
+              trailing: SettingsInput(
+                initialValue: '${s.localPort}',
+                number: true,
+                onSubmitted: (v) {
+                  final port = int.tryParse(v.trim());
+                  if (port != null && port > 0 && port < 65536) {
+                    c.updateSettings(s.copyWith(localPort: port));
+                  }
+                },
               ),
             ),
           ],

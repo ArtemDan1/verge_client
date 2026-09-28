@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter/material.dart' show CircularProgressIndicator;
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
@@ -115,24 +117,22 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
     return '$s ${units[i]}';
   }
 
-  String? _trafficLine(SubscriptionInfo? info) {
-    if (info == null) return null;
+  /// Мета строкой: срок действия и трафик, если лимита нет (с лимитом
+  /// трафик показывает полоска [_UsageBar]).
+  List<String> _subscriptionMeta(SubscriptionInfo? info) {
+    if (info == null) return const [];
+    final parts = <String>[];
     final used = info.used;
     final total = info.total;
-    final parts = <String>[];
-    if (used != null && total != null && total > 0) {
-      parts.add('Использовано ${_fmtBytes(used)} из ${_fmtBytes(total)}');
-      final rem = info.remaining;
-      if (rem != null) parts.add('осталось ${_fmtBytes(rem)}');
-    } else if (used != null) {
-      parts.add('Использовано ${_fmtBytes(used)}');
+    if (used != null && (total == null || total <= 0)) {
+      parts.add('использовано ${_fmtBytes(used)} · без лимита');
     }
     final exp = info.expire;
     if (exp != null) {
       parts.add(
           'до ${exp.day.toString().padLeft(2, '0')}.${exp.month.toString().padLeft(2, '0')}.${exp.year}');
     }
-    return parts.isEmpty ? null : parts.join(' · ');
+    return parts;
   }
 
   /// Ячейка задержки ноды: полоска + число, клик — перезамер.
@@ -240,10 +240,14 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
   Widget _profileHeader(AppController c, ShadThemeData theme, Profile p) {
     final isActive = p.id == c.activeProfileId;
     final announce = p.subscriptionMeta?.announce;
-    // Мета одной строкой: кол-во нод · трафик · срок.
-    final meta = <String>[_nodesLabel(p.nodes.length)];
-    final traffic = _trafficLine(p.subscriptionInfo);
-    if (traffic != null) meta.add(traffic);
+    // Мета одной строкой: кол-во нод · срок; лимит трафика — полоской ниже.
+    final info = p.subscriptionInfo;
+    final meta = <String>[
+      _nodesLabel(p.nodes.length),
+      ..._subscriptionMeta(info),
+    ];
+    final used = info?.used;
+    final total = info?.total;
 
     return Row(
       children: [
@@ -271,6 +275,14 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                 style: theme.textTheme.muted.copyWith(fontSize: 13),
                 overflow: TextOverflow.ellipsis,
               ),
+              if (used != null && total != null && total > 0) ...[
+                const SizedBox(height: 10),
+                _UsageBar(
+                  used: used,
+                  total: total,
+                  format: _fmtBytes,
+                ),
+              ],
               if (announce != null && announce.isNotEmpty) ...[
                 const SizedBox(height: 2),
                 Text(announce,
@@ -1092,4 +1104,83 @@ String _nodesLabel(int n) {
           ? 'сервера'
           : 'серверов';
   return '$n $word';
+}
+
+/// Расход трафика подписки: полоска и «40.8 из 500 ГБ · осталось 459 ГБ».
+/// Цвет — по заполненности: кобальт, ближе к лимиту янтарный, у края красный.
+class _UsageBar extends StatelessWidget {
+  const _UsageBar({
+    required this.used,
+    required this.total,
+    required this.format,
+  });
+
+  final int used;
+  final int total;
+  final String Function(int bytes) format;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = ShadTheme.of(context);
+    final palette = VergePalette.of(context);
+    final fraction = (used / total).clamp(0.0, 1.0);
+    final fill = fraction < 0.75
+        ? palette.accent
+        : fraction < 0.9
+            ? palette.warning
+            : palette.danger;
+    final left = total - used;
+    return Row(
+      children: [
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 260, minWidth: 120),
+          child: Container(
+            height: 6,
+            decoration: BoxDecoration(
+              color: palette.chip,
+              borderRadius: BorderRadius.circular(3),
+            ),
+            alignment: Alignment.centerLeft,
+            child: FractionallySizedBox(
+              // Хоть какой-то след даже при почти нулевом расходе.
+              widthFactor: fraction == 0 ? 0 : math.max(fraction, 0.02),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: fill,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Text.rich(
+            TextSpan(children: [
+              TextSpan(
+                text: '${format(used)} из ${format(total)}',
+                style: TextStyle(
+                  fontWeight: FontWeight.w500,
+                  color: theme.colorScheme.foreground,
+                ),
+              ),
+              TextSpan(
+                text: left > 0
+                    ? '  ·  осталось ${format(left)}'
+                    : '  ·  лимит исчерпан',
+                style: TextStyle(
+                  color: left > 0
+                      ? theme.colorScheme.mutedForeground
+                      : palette.dangerText,
+                ),
+              ),
+            ]),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 12),
+          ),
+        ),
+      ],
+    );
+  }
 }

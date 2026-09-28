@@ -91,28 +91,20 @@ class _RoutingScreenState extends State<RoutingScreen> {
               ),
               const SizedBox(height: 18),
               LayoutBuilder(
-                builder: (context, box) {
-                  // Три карточки в ряд на обычной ширине окна, две — на узкой.
-                  final cols = box.maxWidth > 640 ? 3 : 2;
-                  const gap = 12.0;
-                  final w = (box.maxWidth - gap * (cols - 1)) / cols;
-                  return Wrap(
-                    spacing: gap,
-                    runSpacing: gap,
-                    children: [
-                      for (final p in controller.routingProfiles)
-                        SizedBox(
-                          width: w,
-                          child: _ProfileCard(
-                            profile: p,
-                            viewed: p.id == viewed?.id,
-                            active: p.id == controller.activeRoutingProfileId,
-                            onTap: () => setState(() => _viewId = p.id),
-                          ),
-                        ),
-                    ],
-                  );
-                },
+                // Три карточки в ряд на обычной ширине окна, две — на узкой.
+                builder: (context, box) => _EqualRows(
+                  columns: box.maxWidth > 640 ? 3 : 2,
+                  gap: 12,
+                  children: [
+                    for (final p in controller.routingProfiles)
+                      _ProfileCard(
+                        profile: p,
+                        viewed: p.id == viewed?.id,
+                        active: p.id == controller.activeRoutingProfileId,
+                        onTap: () => setState(() => _viewId = p.id),
+                      ),
+                  ],
+                ),
               ),
               if (viewed != null) ...[
                 const SizedBox(height: 26),
@@ -234,7 +226,7 @@ class _ProfileCard extends StatelessWidget {
                     Flexible(
                       child: Text(
                         p.name,
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 15,
@@ -426,39 +418,12 @@ class _Editor extends StatelessWidget {
                 onPressed: onRemove,
               ),
             const Spacer(),
-            if (!active) ...[
+            if (!active)
               ShadButton.outline(
                 size: ShadButtonSize.sm,
                 onPressed: () => controller.selectRoutingProfile(p.id),
                 child: const Text('Использовать'),
               ),
-              const SizedBox(width: 12),
-            ],
-            Text(
-              'Остальное',
-              style: theme.textTheme.muted.copyWith(fontSize: 12),
-            ),
-            const SizedBox(width: 8),
-            SizedBox(
-              width: 200,
-              child: Segmented<RoutingFinal>(
-                value: p.finalAction,
-                height: 32,
-                onChanged: editable
-                    ? (v) => _save(p.copyWith(finalAction: v))
-                    : null,
-                options: const [
-                  SegmentedOption(
-                    value: RoutingFinal.proxy,
-                    label: 'через VPN',
-                  ),
-                  SegmentedOption(
-                    value: RoutingFinal.direct,
-                    label: 'напрямую',
-                  ),
-                ],
-              ),
-            ),
           ],
         ),
         if (!editable) ...[
@@ -470,16 +435,42 @@ class _Editor extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 12),
-        LayoutBuilder(
-          builder: (context, box) {
-            const gap = 10.0;
-            final w = (box.maxWidth - gap) / 2;
-            return Wrap(
-              spacing: gap,
-              runSpacing: gap,
-              children: [for (final g in groups) SizedBox(width: w, child: g)],
-            );
-          },
+        _EqualRows(columns: 2, gap: 10, children: groups),
+        const SizedBox(height: 10),
+        // Итоговое действие — отдельной строкой под группами: в шапке рядом
+        // с именем и кнопками ему не хватало места.
+        Container(
+          padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+          decoration: BoxDecoration(
+            color: palette.surfaceHeader,
+            border: Border.all(color: palette.divider),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Всё, что не попало в правила',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+              ),
+              SizedBox(
+                width: 220,
+                child: Segmented<RoutingFinal>(
+                  value: p.finalAction,
+                  height: 32,
+                  onChanged:
+                      editable ? (v) => _save(p.copyWith(finalAction: v)) : null,
+                  options: const [
+                    SegmentedOption(
+                        value: RoutingFinal.proxy, label: 'через VPN'),
+                    SegmentedOption(
+                        value: RoutingFinal.direct, label: 'напрямую'),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -828,6 +819,52 @@ class _RuleMixBar extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+/// Сетка, в которой карточки одной строки равны по высоте самой высокой:
+/// Wrap выравнивал их только по верху, и соседние блоки «прыгали».
+class _EqualRows extends StatelessWidget {
+  const _EqualRows({
+    required this.columns,
+    required this.gap,
+    required this.children,
+  });
+
+  final int columns;
+  final double gap;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = <Widget>[];
+    for (var start = 0; start < children.length; start += columns) {
+      final cells = children.sublist(
+          start, (start + columns).clamp(0, children.length));
+      rows.add(IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < columns; i++) ...[
+              if (i > 0) SizedBox(width: gap),
+              // Пустые ячейки последней строки держат ширину колонок.
+              Expanded(
+                child: i < cells.length ? cells[i] : const SizedBox.shrink(),
+              ),
+            ],
+          ],
+        ),
+      ));
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < rows.length; i++) ...[
+          if (i > 0) SizedBox(height: gap),
+          rows[i],
+        ],
+      ],
     );
   }
 }
