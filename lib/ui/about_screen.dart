@@ -162,7 +162,12 @@ class _UpdateBlockState extends State<_UpdateBlock> {
     final info = c.availableUpdate;
 
     if (info == null) {
-      return Row(
+      // Wrap, а не Row: в узкой колонке подпись уходила за край экрана —
+      // теперь она просто переносится под кнопку.
+      return Wrap(
+        spacing: 12,
+        runSpacing: 10,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           ShadButton.outline(
             onPressed: c.isCheckingUpdate
@@ -177,9 +182,16 @@ class _UpdateBlockState extends State<_UpdateBlock> {
             child: Text(
                 c.isCheckingUpdate ? 'Проверка…' : 'Проверить обновления'),
           ),
-          const SizedBox(width: 12),
           if (_checked && !c.isCheckingUpdate)
-            Text('У вас последняя версия', style: theme.textTheme.muted),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(LucideIcons.circleCheck,
+                    size: 16, color: VergePalette.of(context).successText),
+                const SizedBox(width: 6),
+                Text('У вас последняя версия', style: theme.textTheme.muted),
+              ],
+            ),
         ],
       );
     }
