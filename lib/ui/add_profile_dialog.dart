@@ -3,6 +3,7 @@ import 'package:flutter/services.dart' show Clipboard;
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../app/app_controller.dart';
 import '../services/subscription_service.dart';
+import '../theme/verge_palette.dart';
 
 /// Имя профиля из ссылки: фрагмент после `#`, иначе хост, иначе «Профиль».
 String deriveProfileName(String link) {
@@ -21,13 +22,12 @@ String deriveProfileName(String link) {
   return 'Профиль';
 }
 
-/// Нижний лист добавления подписки: из буфера обмена или вводом ссылки.
-/// Имя профиля берётся из ссылки. Возвращает true при успехе.
+/// Диалог добавления подписки: из буфера обмена одной кнопкой или вводом
+/// ссылки. Имя профиля берётся из ссылки. Возвращает true при успехе.
 Future<bool> showAddProfileDialog(BuildContext context, AppController c) async {
-  final result = await showShadSheet<bool>(
+  final result = await showShadDialog<bool>(
     context: context,
-    side: ShadSheetSide.bottom,
-    builder: (sheetContext) => _AddProfileSheet(controller: c),
+    builder: (dialogContext) => _AddProfileSheet(controller: c),
   );
   return result ?? false;
 }
@@ -41,7 +41,6 @@ class _AddProfileSheet extends StatefulWidget {
 }
 
 class _AddProfileSheetState extends State<_AddProfileSheet> {
-  bool _manual = false;
   bool _busy = false;
   String? _error;
   final _linkCtrl = TextEditingController();
@@ -91,75 +90,84 @@ class _AddProfileSheetState extends State<_AddProfileSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
-    return ShadSheet(
-      title: Text(_manual ? 'Вставьте ссылку' : 'Добавить профиль'),
-      constraints: const BoxConstraints(maxWidth: 560),
-      actions: _manual
-          ? [
-              ShadButton.outline(
-                onPressed: _busy ? null : () => setState(() => _manual = false),
-                child: const Text('Назад'),
-              ),
-              ShadButton(
-                onPressed: _busy ? null : () => _add(_linkCtrl.text),
-                child: const Text('Добавить'),
-              ),
-            ]
-          : const [],
+    final palette = VergePalette.of(context);
+    return ShadDialog(
+      title: const Text('Добавить подписку'),
+      description: const Text(
+          'URL подписки, share-ссылка (vless://, ss://…) или JSON-конфиг'),
+      constraints: const BoxConstraints(maxWidth: 440),
+      actions: [
+        ShadButton.outline(
+          onPressed: _busy ? null : () => Navigator.of(context).pop(false),
+          child: const Text('Отмена'),
+        ),
+        ShadButton(
+          onPressed: _busy ? null : () => _add(_linkCtrl.text),
+          child: const Text('Добавить'),
+        ),
+      ],
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 16),
+        padding: const EdgeInsets.symmetric(vertical: 8),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (_manual)
-              ShadInput(
-                controller: _linkCtrl,
-                placeholder: const Text(
-                    'https://… или vless://… (имя возьмётся из ссылки)'),
-                onSubmitted: _busy ? null : (v) => _add(v),
-              )
-            else
-              Row(
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: palette.accentSoft,
+                border: Border.all(color: palette.accentSoftBorder),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
                 children: [
+                  Icon(LucideIcons.clipboardPaste,
+                      size: 20, color: palette.accentText),
+                  const SizedBox(width: 12),
                   Expanded(
-                    child: ShadButton.outline(
-                      height: 88,
-                      onPressed: _busy ? null : _fromClipboard,
-                      child: const Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(LucideIcons.clipboard, size: 24),
-                          SizedBox(height: 8),
-                          Text('Добавить из буфера'),
-                        ],
-                      ),
+                    child: Text(
+                      'Скопировали ссылку? Добавим прямо из буфера обмена',
+                      style: TextStyle(
+                          fontSize: 13, color: theme.colorScheme.foreground),
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Expanded(
-                    child: ShadButton.outline(
-                      height: 88,
-                      onPressed:
-                          _busy ? null : () => setState(() => _manual = true),
-                      child: const Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(LucideIcons.keyboard, size: 24),
-                          SizedBox(height: 8),
-                          Text('Ввести ссылку'),
-                        ],
-                      ),
-                    ),
+                  ShadButton(
+                    size: ShadButtonSize.sm,
+                    backgroundColor: palette.accent,
+                    foregroundColor: const Color(0xFFFFFFFF),
+                    onPressed: _busy ? null : _fromClipboard,
+                    child: const Text('Вставить'),
                   ),
                 ],
               ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                    child: Container(height: 1, color: palette.panelBorder)),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Text('или',
+                      style: theme.textTheme.muted.copyWith(fontSize: 12)),
+                ),
+                Expanded(
+                    child: Container(height: 1, color: palette.panelBorder)),
+              ],
+            ),
+            const SizedBox(height: 14),
+            ShadInput(
+              controller: _linkCtrl,
+              autofocus: true,
+              placeholder: const Text('https://… или vless://…'),
+              onSubmitted: _busy ? null : (v) => _add(v),
+            ),
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.only(top: 12),
                 child: Text(_error!,
-                    style:
-                        TextStyle(color: theme.colorScheme.destructive)),
+                    style: TextStyle(color: palette.dangerText)),
               ),
           ],
         ),

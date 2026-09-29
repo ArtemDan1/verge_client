@@ -1,21 +1,23 @@
 import 'dart:io';
 import 'package:tray_manager/tray_manager.dart';
+import '../tunnel/tunnel_controller.dart';
+import '../ui/tray_popover.dart';
 import 'app_controller.dart';
 import 'tray_menu.dart';
-import 'window_control_channel.dart';
-import '../tunnel/tunnel_controller.dart';
+import 'tray_popover_controller.dart';
 
-/// Иконка и меню в строке меню macOS: статус подключения — цветом точки,
-/// клик — то же самое меню (Подключиться/Отключиться, Открыть, Закрыть).
+/// Значок в строке меню / области уведомлений. Статус подключения — формой
+/// плитки. Любой клик — мини-окно трея (тумблер, сервер, режим, «Открыть
+/// Verge», «Выйти»); текстового меню у значка нет.
 class TrayService with TrayListener {
-  TrayService(this._controller, [WindowControlChannel? windowControl])
-      : _windowControl = windowControl ?? WindowControlChannel();
+  TrayService(this._controller, this._popover);
   final AppController _controller;
-  final WindowControlChannel _windowControl;
+  final TrayPopoverController _popover;
   TunnelStatus? _lastRenderedStatus;
 
   Future<void> init() async {
     trayManager.addListener(this);
+    _popover.onQuit = _quit;
     await trayManager.setToolTip('Verge');
     await _render();
     _controller.addListener(_onControllerChanged);
@@ -29,28 +31,15 @@ class TrayService with TrayListener {
   Future<void> _render() async {
     final status = _controller.status;
     _lastRenderedStatus = status;
-    await trayManager.setIcon(trayIconAssetKeyFor(status));
-    await trayManager.setContextMenu(buildTrayMenu(
-      status: status,
-      onToggleConnection: _toggleConnection,
-      onShowWindow: _showWindow,
-      onQuit: _quit,
-    ));
+    // На macOS иконки — монохромные template-образы: система сама
+    // перекрашивает их под светлую/тёмную строку меню. На Windows — цветные.
+    await trayManager.setIcon(
+      trayIconAssetKeyFor(status),
+      isTemplate: Platform.isMacOS,
+    );
   }
 
-  void _toggleConnection() {
-    final busy = _controller.status == TunnelStatus.connected ||
-        _controller.status == TunnelStatus.connecting;
-    if (busy) {
-      _controller.disconnect();
-    } else {
-      _controller.connect();
-    }
-  }
-
-  Future<void> _showWindow() => _windowControl.show();
-
-  /// Выход из трея — единственный способ закрыть приложение на Windows
+  /// Выход из мини-окна трея — единственный способ закрыть приложение на Windows
   /// (крестик там прячет окно). Раньше это был голый `exit(0)`, и нативная
   /// часть не успевала прибраться: системный прокси оставался прописанным в
   /// реестре и указывал на убитый вместе с процессом sing-box — интернет
@@ -68,8 +57,11 @@ class TrayService with TrayListener {
 
   @override
   void onTrayIconMouseDown() {
-    trayManager.popUpContextMenu();
+    _popover.toggle(TrayPopover.heightFor(_controller));
   }
+
+  @override
+  void onTrayIconRightMouseDown() => onTrayIconMouseDown();
 
   void dispose() {
     trayManager.removeListener(this);

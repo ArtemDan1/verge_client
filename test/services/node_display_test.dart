@@ -33,4 +33,24 @@ void main() {
     );
     expect(nodeSubtitle(n), 'trojan · tls · example.com:443');
   });
+
+  group('splitCountryFlag', () {
+    test('флаг в начале → код страны и имя без флага', () {
+      final r = splitCountryFlag('🇳🇱 Amsterdam-02');
+      expect(r.code, 'NL');
+      expect(r.name, 'Amsterdam-02');
+    });
+
+    test('без флага — имя как есть', () {
+      final r = splitCountryFlag('VPN | Франция');
+      expect(r.code, isNull);
+      expect(r.name, 'VPN | Франция');
+    });
+
+    test('только флаг — имя не пустеет', () {
+      final r = splitCountryFlag('🇩🇪');
+      expect(r.code, 'DE');
+      expect(r.name, '🇩🇪');
+    });
+  });
 }

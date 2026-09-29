@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../models/connection_info.dart';
+import '../../theme/verge_palette.dart';
 import 'traffic_widget.dart';
 import 'verge_logo.dart';
 
@@ -15,8 +16,8 @@ class SidebarItem {
 /// поэтому здесь только верхняя группа.
 const sidebarItems = <SidebarItem>[
   SidebarItem('Главная', LucideIcons.house),
-  SidebarItem('Настройки', LucideIcons.settings),
-  SidebarItem('Логи', LucideIcons.scrollText),
+  SidebarItem('Настройки', LucideIcons.slidersVertical),
+  SidebarItem('Логи', LucideIcons.fileText),
   SidebarItem('Соединения', LucideIcons.arrowLeftRight),
   SidebarItem('Роутинг', LucideIcons.route),
 ];
@@ -27,6 +28,8 @@ final aboutIndex = sidebarItems.length;
 final connectionsIndex =
     sidebarItems.indexWhere((e) => e.label == 'Соединения');
 
+/// Сайдбар в тон фону окна: сам он «бумага», а контент лежит на отдельной
+/// панели справа (см. AppShell).
 class Sidebar extends StatelessWidget {
   const Sidebar({
     super.key,
@@ -46,74 +49,160 @@ class Sidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
     return Container(
-      width: 224,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        border: Border(right: BorderSide(color: theme.colorScheme.border)),
-      ),
+      width: 232,
+      color: VergePalette.of(context).chrome,
+      padding: const EdgeInsets.fromLTRB(14, 18, 14, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(4, 4, 4, 16),
+            padding: const EdgeInsets.fromLTRB(8, 2, 8, 20),
             child: VergeLogo(titleColor: theme.colorScheme.foreground),
           ),
           for (var i = 0; i < sidebarItems.length; i++)
             Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: _navButton(theme, i, sidebarItems[i],
-                  badge: i == connectionsIndex ? connectionCount : null),
+              padding: const EdgeInsets.only(bottom: 2),
+              child: _NavItem(
+                item: sidebarItems[i],
+                selected: i == index,
+                onTap: () => onSelect(i),
+                trailing: i == connectionsIndex && connectionCount > 0
+                    // Счётчик скрыт при нуле — при выключенном VPN он шум.
+                    ? Text('$connectionCount',
+                        style: theme.textTheme.muted.copyWith(fontSize: 12))
+                    : null,
+              ),
             ),
           const Spacer(),
           TrafficWidget(stats: traffic),
-          _navButton(theme, aboutIndex, aboutItem, dot: hasUpdate),
+          const SizedBox(height: 6),
+          _NavItem(
+            item: aboutItem,
+            selected: index == aboutIndex,
+            onTap: () => onSelect(aboutIndex),
+            // Метка, а не число: обновление всегда одно, важен сам факт.
+            trailing: hasUpdate ? const _NewBadge(key: Key('update-dot')) : null,
+          ),
         ],
       ),
     );
   }
+}
 
-  Widget _navButton(ShadThemeData theme, int i, SidebarItem item,
-      {int? badge, bool dot = false}) {
-    return ShadButton.ghost(
-      onPressed: () => onSelect(i),
-      backgroundColor: i == index ? theme.colorScheme.accent : null,
-      mainAxisAlignment: MainAxisAlignment.start,
-      // Иконка внутри child, а не в leading: разные глифы Lucide имеют разную
-      // ширину, из-за чего подписи «прыгали» по горизонтали. Фиксированный бокс
-      // выравнивает старт текста для всех пунктов.
-      child: Row(
-        // min: ShadButton отдаёт child неограниченную ширину, Expanded здесь падает.
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: 20,
-            child: Icon(item.icon, size: 16),
-          ),
-          const SizedBox(width: 8),
-          // Flexible+ellipsis: длинные подписи (напр. «О приложении») не вызывают
-          // overflow при узком сайдбаре.
-          Flexible(
-            child: Text(item.label, overflow: TextOverflow.ellipsis, maxLines: 1),
-          ),
-          // Badge скрыт при нуле — при выключенном VPN он был бы шумом.
-          if (badge != null && badge > 0) ...[
-            const SizedBox(width: 6),
-            ShadBadge(child: Text('$badge')),
-          ],
-          // Точка, а не число: количество обновлений всегда одно, важен факт.
-          if (dot) ...[
-            const SizedBox(width: 6),
-            Container(
-              key: const Key('update-dot'),
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary,
-                shape: BoxShape.circle,
+class _NavItem extends StatefulWidget {
+  const _NavItem({
+    required this.item,
+    required this.selected,
+    required this.onTap,
+    this.trailing,
+  });
+
+  final SidebarItem item;
+  final bool selected;
+  final VoidCallback onTap;
+  final Widget? trailing;
+
+  @override
+  State<_NavItem> createState() => _NavItemState();
+}
+
+class _NavItemState extends State<_NavItem> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = ShadTheme.of(context);
+    final palette = VergePalette.of(context);
+    final selected = widget.selected;
+    final fg = selected ? theme.colorScheme.foreground : palette.navForeground;
+    // Все состояния — оттенки одного цвета: AnimatedContainer интерполирует
+    // между ними, и переход через прозрачный ЧЁРНЫЙ давал тёмную вспышку
+    // на середине анимации при наведении.
+    final bg = selected
+        ? palette.navActive
+        : palette.navActive.withValues(alpha: _hovered ? 0.6 : 0);
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: widget.onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            height: 38,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: palette.navActiveRing
+                    .withValues(alpha: selected ? 1 : 0),
               ),
+              // Тень всегда в списке, меняется только прозрачность — иначе
+              // лерп null↔тень тоже даёт скачок.
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF1C1B18).withValues(
+                      alpha: selected && theme.brightness == Brightness.light
+                          ? 0.08
+                          : 0),
+                  blurRadius: 2,
+                  offset: const Offset(0, 1),
+                ),
+              ],
             ),
-          ],
-        ],
+            child: Row(
+              children: [
+                Icon(widget.item.icon, size: 17, color: fg),
+                const SizedBox(width: 12),
+                // Flexible+ellipsis: длинные подписи не вызывают overflow.
+                Expanded(
+                  child: Text(
+                    widget.item.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: fg,
+                    ),
+                  ),
+                ),
+                if (widget.trailing != null) ...[
+                  const SizedBox(width: 6),
+                  widget.trailing!,
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NewBadge extends StatelessWidget {
+  const _NewBadge({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+      decoration: BoxDecoration(
+        color: VergePalette.of(context).accent,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: const Text(
+        'новое',
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: Color(0xFFFFFFFF),
+        ),
       ),
     );
   }

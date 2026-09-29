@@ -62,10 +62,17 @@ flutter_launcher_icons:
   remove_alpha_ios: true
   macos:
     generate: true
-    image_path: "assets/branding/verge-app-icon-1024.png"
+    # Для macOS своя картинка: плитка с полями по сетке Apple, иначе в доке
+    # иконка крупнее соседних.
+    image_path: "assets/branding/verge-app-icon-macos-1024.png"
   windows:
     generate: true
-    image_path: "assets/branding/verge-app-icon-1024.png"
+    # Та же плитка, что на macOS: ярлык на рабочем столе выглядит одинаково.
+    # flutter_launcher_icons кладёт в .ico только один размер (icon_size) —
+    # мелкие Windows ужимает сама и мылит. В репозитории лежит .ico со всеми
+    # размерами 16–256, собранный из этой картинки через Pillow; после
+    # перегенерации пересоберите его так же.
+    image_path: "assets/branding/verge-app-icon-macos-1024.png"
     icon_size: 256
   ios: true
 
@@ -96,6 +103,23 @@ flutter:
     - family: NotoColorEmoji
       fonts:
         - asset: assets/fonts/NotoColorEmoji.ttf
+    # Шрифты дизайна «Бумага» (OFL, лицензии рядом в assets/fonts).
+    - family: Onest
+      fonts:
+        - asset: assets/fonts/Onest-Regular.ttf
+        - asset: assets/fonts/Onest-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Onest-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Onest-Bold.ttf
+          weight: 700
+    - family: JetBrains Mono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono-Regular.ttf
+        - asset: assets/fonts/JetBrainsMono-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/JetBrainsMono-SemiBold.ttf
+          weight: 600
 
   # To add assets to your application, add an assets section, like this:
   # assets:

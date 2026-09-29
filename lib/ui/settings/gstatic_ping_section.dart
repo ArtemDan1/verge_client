@@ -82,54 +82,44 @@ class _GstaticPingSectionState extends State<GstaticPingSection> {
   Widget build(BuildContext context) {
     final c = widget.controller;
     final s = c.settings;
-    final theme = ShadTheme.of(context);
     return SettingsSection(
       title: 'Пинг активного соединения',
-      description: 'Бейдж задержки рядом с таймером подключения',
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text('Показывать пинг', style: theme.textTheme.large),
-            ),
-            ShadSwitch(
-              value: s.gstaticPingEnabled,
-              onChanged: (v) =>
-                  c.updateSettings(s.copyWith(gstaticPingEnabled: v)),
-            ),
-          ],
+        SettingsRow(
+          label: 'Показывать пинг',
+          description: 'Задержка до сервера на главной, рядом с таймером '
+              'подключения',
+          trailing: ShadSwitch(
+            value: s.gstaticPingEnabled,
+            onChanged: (v) =>
+                c.updateSettings(s.copyWith(gstaticPingEnabled: v)),
+          ),
         ),
         if (s.gstaticPingEnabled) ...[
-          const SizedBox(height: 20),
-          Text('Интервал обновления, с', style: theme.textTheme.large),
-          const SizedBox(height: 8),
-          ShadInput(
-            key: const Key('gstaticPingInterval'),
-            controller: _interval,
-            focusNode: _intervalFocus,
-            keyboardType: TextInputType.number,
-            onSubmitted: _commitInterval,
+          SettingsRow(
+            label: 'Интервал обновления, с',
+            description: 'От ${AppSettings.minGstaticPingIntervalSeconds} до '
+                '${AppSettings.maxGstaticPingIntervalSeconds} с, по умолчанию '
+                '${AppSettings.defaultGstaticPingIntervalSeconds}',
+            trailing: SettingsInput(
+              inputKey: const Key('gstaticPingInterval'),
+              controller: _interval,
+              focusNode: _intervalFocus,
+              number: true,
+              onSubmitted: _commitInterval,
+            ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            'От ${AppSettings.minGstaticPingIntervalSeconds} до '
-            '${AppSettings.maxGstaticPingIntervalSeconds} с, '
-            'по умолчанию ${AppSettings.defaultGstaticPingIntervalSeconds}',
-            style: theme.textTheme.muted,
-          ),
-          const SizedBox(height: 20),
-          Text('Адрес проверки', style: theme.textTheme.large),
-          const SizedBox(height: 8),
-          ShadInput(
-            key: const Key('gstaticPingUrl'),
-            controller: _url,
-            onSubmitted: _commitUrl,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'В TUN-режиме до этого адреса проверяется наличие интернета мимо '
-            'туннеля; в Proxy — задержка через локальный прокси',
-            style: theme.textTheme.muted,
+          SettingsField(
+            label: 'Адрес проверки',
+            description: 'В TUN-режиме до этого адреса проверяется наличие '
+                'интернета мимо туннеля; в Proxy — задержка через локальный '
+                'прокси',
+            child: ShadInput(
+              key: const Key('gstaticPingUrl'),
+              controller: _url,
+              focusNode: _urlFocus,
+              onSubmitted: _commitUrl,
+            ),
           ),
         ],
       ],
