@@ -1106,8 +1106,9 @@ void main() {
       final svc = FakeUpdateService();
       final repo = InMemoryStateRepository(PersistedState(
         settings: const AppSettings().copyWith(
+          // Период — 12 часов: через 10 часов проверять ещё рано.
           lastUpdateCheckAt:
-              DateTime.now().subtract(const Duration(minutes: 10)),
+              DateTime.now().subtract(const Duration(hours: 10)),
         ),
       ));
       final app = build(repo: repo, updateService: svc);
@@ -1120,7 +1121,7 @@ void main() {
       final svc = FakeUpdateService();
       final repo = InMemoryStateRepository(PersistedState(
         settings: const AppSettings().copyWith(
-          lastUpdateCheckAt: DateTime.now().subtract(const Duration(hours: 2)),
+          lastUpdateCheckAt: DateTime.now().subtract(const Duration(hours: 13)),
         ),
       ));
       final app = build(repo: repo, updateService: svc);
@@ -1145,6 +1146,41 @@ void main() {
       // период, и следующий запуск снова «не проверял бы».
       expect(app.settings.lastUpdateCheckAt, isNull);
       await sub.cancel();
+    });
+
+    test('минутный тик не долбит GitHub после неудачной проверки', () async {
+      final svc = FakeUpdateService(checkError: Exception('net'));
+      void Function(Timer)? tick;
+      final app = build(
+        repo: InMemoryStateRepository(),
+        updateService: svc,
+        timerFactory: (d, cb) {
+          tick = cb;
+          return Timer(const Duration(days: 1), () {});
+        },
+      );
+      await app.init();
+      await Future<void>.delayed(Duration.zero);
+      expect(svc.checkCalls, 1);
+
+      // Тик через минуту: отметки нет (проверка упала), но пауза перед
+      // повтором ещё не прошла.
+      tick!(FakeTimer());
+      await Future<void>.delayed(Duration.zero);
+      expect(svc.checkCalls, 1);
+    });
+
+    test('ошибка загрузки обновления видна в updateError', () async {
+      final svc = _FailingDownloadUpdateService();
+      final app = build(repo: InMemoryStateRepository(), updateService: svc);
+      await app.init();
+      await Future<void>.delayed(Duration.zero);
+      expect(app.availableUpdate, isNotNull);
+
+      await app.downloadAndInstallUpdate();
+      expect(app.updateError, contains('disk full'));
+      expect(app.updateDownloadProgress, isNull);
+      expect(app.isInstallingUpdate, isFalse);
     });
 
     test(
@@ -1850,4 +1886,20 @@ void main() {
       app.dispose();
     });
   });
+}
+
+class _FailingDownloadUpdateService extends FakeUpdateService {
+  _FailingDownloadUpdateService()
+      : super(
+            info: const UpdateInfo(
+                version: 'v9.9.9',
+                pkgUrl: 'https://e/x.pkg',
+                releaseUrl: 'https://e'));
+
+  @override
+  Future<String> downloadPkg(String url,
+      {void Function(double)? onProgress, Directory? targetDir}) async {
+    onProgress?.call(0.3);
+    throw Exception('disk full');
+  }
 }

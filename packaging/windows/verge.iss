@@ -31,6 +31,10 @@ WizardStyle=modern
 ; запуском инсталлятора (installUpdate в tunnel_channel.cpp), но подстрахуемся.
 CloseApplications=yes
 RestartApplications=no
+; После установки просим Проводник перечитать значки: путь к exe при
+; обновлении тот же, и без этого ярлык показывает старую иконку из кэша.
+; Заодно подхватывается свежезарегистрированная схема verge://.
+ChangesAssociations=yes
 
 [Languages]
 Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"

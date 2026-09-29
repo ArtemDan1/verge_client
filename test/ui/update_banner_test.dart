@@ -97,7 +97,8 @@ void main() {
       ),
     ));
     await tester.tap(find.text('Позже'));
-    await tester.pump();
+    // Карточка уезжает с анимацией — ждём её конца.
+    await tester.pumpAndSettle();
     expect(find.textContaining('Доступна версия'), findsNothing);
     c.dispose();
   });

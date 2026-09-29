@@ -83,6 +83,14 @@ class AppController extends ChangeNotifier {
   bool isCheckingUpdate = false;
   double? updateDownloadProgress;
 
+  /// Скачивание закончено, запущен установщик — ждём, пока он заберёт
+  /// управление (приложение при этом закроется).
+  bool isInstallingUpdate = false;
+
+  /// Последняя ошибка загрузки обновления — показывается в панели обновления
+  /// с кнопкой «Повторить». Сбрасывается новой попыткой.
+  String? updateError;
+
   late final NodeTester _nodeTester;
 
   /// true, пока идёт перебор нод. Нужен и UI (прогресс), и health-check:
@@ -108,10 +116,17 @@ class AppController extends ChangeNotifier {
   /// а не потерять его навсегда одним случайным кликом.
   bool _updateBannerDismissed = false;
 
-  /// Как часто ходим в GitHub Releases в фоне. Час, а не сутки: приложение
-  /// запускают руками и ждут, что при запуске проверка есть. Троттлинг тут
-  /// только чтобы серия перезапусков подряд не долбила API.
-  static const _updateCheckPeriod = Duration(hours: 1);
+  /// Как часто ходим в GitHub Releases в фоне — два раза в сутки. Проверка
+  /// идёт при запуске и затем с минутного тика автообновления подписок;
+  /// отметка успешной проверки хранится в настройках, так что перезапуски
+  /// подряд лишних запросов не делают.
+  static const _updateCheckPeriod = Duration(hours: 12);
+
+  /// После неудачной проверки (нет сети) повторяем не раньше чем через это
+  /// время: отметку при ошибке не пишем, и без паузы тик раз в минуту
+  /// долбил бы GitHub.
+  static const _updateRetryPause = Duration(minutes: 30);
+  DateTime? _lastUpdateAttemptAt;
 
   /// Папка с распакованными .srs; если задана — rule-set подключаются локально.
   final String? geoAssetDir;
@@ -405,6 +420,7 @@ class AppController extends ChangeNotifier {
 
   void _onRefreshTick() {
     final now = DateTime.now();
+    checkForUpdateSilently().ignore();
     for (final p in List.of(_state.profiles)) {
       final interval = p.effectiveRefreshIntervalMinutes;
       if (interval == null) continue;
@@ -962,11 +978,12 @@ class AppController extends ChangeNotifier {
   /// Фоновая проверка при старте. В отличие от [checkForUpdate], молчит при
   /// ошибке: отсутствие интернета не должно выглядеть как поломка.
   Future<void> checkForUpdateSilently() async {
+    final now = DateTime.now();
     final last = _state.settings.lastUpdateCheckAt;
-    if (last != null &&
-        DateTime.now().difference(last) < _updateCheckPeriod) {
-      return;
-    }
+    if (last != null && now.difference(last) < _updateCheckPeriod) return;
+    final attempt = _lastUpdateAttemptAt;
+    if (attempt != null && now.difference(attempt) < _updateRetryPause) return;
+    _lastUpdateAttemptAt = now;
     try {
       final info = await _update.checkForUpdate(await _platform.appVersion());
       availableUpdate = info;
@@ -986,11 +1003,18 @@ class AppController extends ChangeNotifier {
   Future<void> downloadAndInstallUpdate() async {
     final info = availableUpdate;
     if (info == null) return;
+    if (updateDownloadProgress != null || isInstallingUpdate) return;
+    updateError = null;
+    updateDownloadProgress = 0;
+    notifyListeners();
     try {
       final path = await _update.downloadPkg(info.pkgUrl, onProgress: (p) {
         updateDownloadProgress = p;
         notifyListeners();
       });
+      updateDownloadProgress = null;
+      isInstallingUpdate = true;
+      notifyListeners();
       // Гасим туннель ДО установщика: postinstall делает bootout демона, и
       // оборванный на полпути туннель оставит переопределённый DNS/системный
       // прокси в системе.
@@ -1000,9 +1024,12 @@ class AppController extends ChangeNotifier {
       }
       await _platform.installUpdate(path);
     } catch (e) {
+      // Без «Exception: » — текст уходит пользователю в карточку обновления.
+      updateError = '$e'.replaceFirst('Exception: ', '');
       _alertCtrl.add('Не удалось загрузить обновление: $e');
     } finally {
       updateDownloadProgress = null;
+      isInstallingUpdate = false;
       notifyListeners();
     }
   }

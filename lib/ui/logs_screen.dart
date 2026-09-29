@@ -1,11 +1,13 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 // SelectionArea живёт в material — берём точечно, остальной UI на shadcn.
-import 'package:flutter/material.dart' show SelectionArea, Colors;
+import 'package:flutter/material.dart' show SelectionArea;
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../app/app_controller.dart';
 import '../models/log_entry.dart';
 import '../theme/app_theme.dart';
+import '../theme/verge_palette.dart';
+import 'widgets/paper.dart';
 
 class LogsScreen extends StatefulWidget {
   const LogsScreen({super.key, required this.controller});
@@ -36,8 +38,8 @@ class _LogsScreenState extends State<LogsScreen> {
   }
 
   void _toggle<T>(Set<T> set, T value) => setState(() {
-        if (!set.remove(value)) set.add(value);
-      });
+    if (!set.remove(value)) set.add(value);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -46,36 +48,38 @@ class _LogsScreenState extends State<LogsScreen> {
     final all = c.logs;
     final logs = all.where(_passes).toList();
 
+    final palette = VergePalette.of(context);
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: kScreenPadding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Text('Логи', style: theme.textTheme.large),
-              const SizedBox(width: 8),
-              Text('${logs.length} из ${all.length}',
-                  style: theme.textTheme.muted),
-              const Spacer(),
+          ScreenHeader(
+            title: 'Логи',
+            subtitle: Text('${logs.length} из ${all.length}'),
+            actions: [
               ShadButton.outline(
-                onPressed: () => Clipboard.setData(ClipboardData(
-                    text: logs.map((e) => e.toPlainString()).join('\n'))),
+                onPressed: () => Clipboard.setData(
+                  ClipboardData(
+                    text: logs.map((e) => e.toPlainString()).join('\n'),
+                  ),
+                ),
                 leading: const Icon(LucideIcons.clipboard, size: 16),
                 child: const Text('Копировать'),
               ),
-              const SizedBox(width: 8),
               ShadButton.outline(
                 onPressed: c.clearLogs,
+                foregroundColor: palette.dangerText,
                 leading: const Icon(LucideIcons.trash2, size: 16),
                 child: const Text('Очистить'),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           ShadInput(
             placeholder: const Text('Поиск по логам'),
             leading: const Icon(LucideIcons.search, size: 16),
+            decoration: ShadDecoration(color: palette.surface),
             onChanged: (v) => setState(() => _query = v),
           ),
           const SizedBox(height: 10),
@@ -117,24 +121,29 @@ class _LogsScreenState extends State<LogsScreen> {
           ),
           const SizedBox(height: 12),
           Expanded(
-            child: ShadCard(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Container(
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                color: palette.panel,
+                border: Border.all(color: palette.panelBorder),
+                borderRadius: BorderRadius.circular(12),
+              ),
               child: logs.isEmpty
                   ? Center(
                       child: Text(
-                          all.isEmpty
-                              ? 'Логов пока нет'
-                              : 'Ничего не найдено по фильтру',
-                          style: theme.textTheme.muted))
+                        all.isEmpty
+                            ? 'Логов пока нет'
+                            : 'Ничего не найдено по фильтру',
+                        style: theme.textTheme.muted,
+                      ),
+                    )
                   : SelectionArea(
                       child: ListView.builder(
                         reverse: true,
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        padding: const EdgeInsets.symmetric(vertical: 4),
                         itemCount: logs.length,
-                        itemBuilder: (ctx, i) => _LogRow(
-                          entry: logs[logs.length - 1 - i],
-                          striped: i.isOdd,
-                        ),
+                        itemBuilder: (ctx, i) =>
+                            _LogRow(entry: logs[logs.length - 1 - i]),
                       ),
                     ),
             ),
@@ -180,12 +189,13 @@ class _FilterChipState extends State<_FilterChip> {
   @override
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
+    final palette = VergePalette.of(context);
     final active = widget.active;
+    // Активный чип — мягкая заливка своим цветом, как бейджи в строках;
+    // выключенный — нейтральная обводка.
     final bg = active
-        ? (_hovered
-            ? Color.alphaBlend(Colors.white24, widget.color)
-            : widget.color)
-        : (_hovered ? theme.colorScheme.muted : null);
+        ? widget.color.withValues(alpha: _hovered ? 0.22 : 0.14)
+        : (_hovered ? palette.surface : null);
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
@@ -200,7 +210,10 @@ class _FilterChipState extends State<_FilterChip> {
             color: bg,
             borderRadius: BorderRadius.circular(999),
             border: Border.all(
-                color: active ? widget.color : theme.colorScheme.border),
+              color: active
+                  ? widget.color.withValues(alpha: 0.45)
+                  : theme.colorScheme.border,
+            ),
           ),
           child: Text(
             widget.label,
@@ -208,9 +221,7 @@ class _FilterChipState extends State<_FilterChip> {
               fontSize: 11,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.3,
-              color: active
-                  ? const Color(0xFFFFFFFF)
-                  : theme.colorScheme.mutedForeground,
+              color: active ? widget.color : theme.colorScheme.mutedForeground,
             ),
           ),
         ),
@@ -222,10 +233,9 @@ class _FilterChipState extends State<_FilterChip> {
 /// Одна строка: время · цветной бейдж уровня · источник · подсистема ·
 /// сообщение.
 class _LogRow extends StatelessWidget {
-  const _LogRow({required this.entry, required this.striped});
+  const _LogRow({required this.entry});
 
   final LogEntry entry;
-  final bool striped;
 
   @override
   Widget build(BuildContext context) {
@@ -239,21 +249,15 @@ class _LogRow extends StatelessWidget {
       height: 1.45,
     );
 
+    final palette = VergePalette.of(context);
     return Container(
       decoration: BoxDecoration(
-        color: striped ? theme.colorScheme.muted.withValues(alpha: 0.35) : null,
-        // Тонкая цветная полоса слева — уровень читается боковым зрением,
-        // не вчитываясь в текст бейджа.
-        border: Border(
-          left: BorderSide(
-            color: entry.level == LogLevel.error || entry.level == LogLevel.warn
-                ? color
-                : const Color(0x00000000),
-            width: 2,
-          ),
-        ),
+        color: entry.level == LogLevel.error
+            ? palette.dangerSoft.withValues(alpha: 0.5)
+            : null,
+        border: Border(bottom: BorderSide(color: palette.divider)),
       ),
-      padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+      padding: const EdgeInsets.fromLTRB(14, 5, 14, 5),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -272,18 +276,22 @@ class _LogRow extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: Text.rich(
-              TextSpan(children: [
-                if (entry.source != null)
+              TextSpan(
+                children: [
+                  if (entry.source != null)
+                    TextSpan(
+                      text: '${entry.source}  ',
+                      style: mono.copyWith(
+                        color: muted,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   TextSpan(
-                    text: '${entry.source}  ',
-                    style: mono.copyWith(
-                        color: muted, fontWeight: FontWeight.w600),
+                    text: entry.message,
+                    style: mono.copyWith(color: theme.colorScheme.foreground),
                   ),
-                TextSpan(
-                  text: entry.message,
-                  style: mono.copyWith(color: theme.colorScheme.foreground),
-                ),
-              ]),
+                ],
+              ),
             ),
           ),
         ],
@@ -318,15 +326,23 @@ class _LogRow extends StatelessWidget {
   }
 }
 
-Color _levelColor(LogLevel level, ShadThemeData theme) => switch (level) {
-      LogLevel.error => const Color(0xFFDC2626),
-      LogLevel.warn => const Color(0xFFD97706),
-      LogLevel.info => const Color(0xFF16A34A),
-      _ => theme.colorScheme.mutedForeground,
-    };
+Color _levelColor(LogLevel level, ShadThemeData theme) {
+  final dark = theme.brightness == Brightness.dark;
+  final palette = dark ? VergePalette.dark : VergePalette.light;
+  return switch (level) {
+    LogLevel.error => palette.dangerText,
+    LogLevel.warn => palette.warningText,
+    LogLevel.info => palette.successText,
+    _ => theme.colorScheme.mutedForeground,
+  };
+}
 
-Color _originColor(LogOrigin origin, ShadThemeData theme) => switch (origin) {
-      LogOrigin.app => const Color(0xFF6366F1),
-      LogOrigin.singbox => const Color(0xFF0EA5E9),
-      LogOrigin.xray => const Color(0xFFA855F7),
-    };
+Color _originColor(LogOrigin origin, ShadThemeData theme) {
+  final dark = theme.brightness == Brightness.dark;
+  return switch (origin) {
+    LogOrigin.app => dark ? const Color(0xFFB9A4F5) : const Color(0xFF6D4ED0),
+    LogOrigin.singbox =>
+      dark ? const Color(0xFF8FA8FF) : const Color(0xFF2447D6),
+    LogOrigin.xray => dark ? const Color(0xFF6ECFD0) : const Color(0xFF0F7A7C),
+  };
+}

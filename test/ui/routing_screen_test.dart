@@ -48,7 +48,8 @@ void main() {
     await tester.pumpWidget(ShadApp(home: RoutingScreen(controller: c)));
     await tester.pumpAndSettle();
 
-    expect(find.text('Всё через прокси'), findsOneWidget);
+    // Имя — в карточке и в шапке правил открытого (активного) профиля.
+    expect(find.text('Всё через прокси'), findsNWidgets(2));
     expect(find.byIcon(LucideIcons.lock), findsWidgets);
 
     await tester.tap(find.byIcon(LucideIcons.plus));
@@ -68,6 +69,14 @@ void main() {
     await tester.tap(find.byIcon(LucideIcons.copy).first);
     await tester.pumpAndSettle();
     expect(c.routingProfiles.where((p) => !p.isBuiltIn), isNotEmpty);
+    // Копия сразу открыта в редакторе, но активной не становится: её
+    // включают явно, кнопкой «Использовать».
+    final active = c.activeRoutingProfileId;
+    expect(find.text('Использовать'), findsOneWidget);
+    await tester.tap(find.text('Использовать'));
+    await tester.pumpAndSettle();
+    expect(c.activeRoutingProfileId, isNot(active));
+    expect(find.text('Использовать'), findsNothing);
     c.dispose();
   });
 }

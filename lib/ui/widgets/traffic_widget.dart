@@ -3,6 +3,8 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../models/connection_info.dart';
 import '../../services/byte_format.dart';
+import '../../theme/app_theme.dart';
+import '../../theme/verge_palette.dart';
 
 /// Живой счётчик внизу сайдбара: мгновенная скорость и суммарно за сессию.
 /// Некликабельный — отдельного экрана статистики нет.
@@ -12,42 +14,70 @@ class TrafficWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = ShadTheme.of(context);
-    final muted = theme.textTheme.muted;
-    final small = theme.textTheme.small;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.muted,
-        border: Border.all(color: theme.colorScheme.border),
-        borderRadius: theme.radius,
-      ),
+    final palette = VergePalette.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Каждая метрика в равной по ширине половине строки — иначе стрелка ↓
-          // сдвигается при смене разрядности значения слева.
-          _row(context, '↑ ${formatSpeed(stats.upSpeed)}',
-              '↓ ${formatSpeed(stats.downSpeed)}', small),
-          const SizedBox(height: 2),
-          _row(context, '↑ ${formatBytes(stats.upTotal)}',
-              '↓ ${formatBytes(stats.downTotal)}', muted),
+          _row(
+            context,
+            icon: LucideIcons.arrowDown,
+            tint: palette.successText,
+            tile: palette.success.withValues(alpha: 0.14),
+            speed: formatSpeed(stats.downSpeed),
+            total: formatBytes(stats.downTotal),
+          ),
+          const SizedBox(height: 6),
+          _row(
+            context,
+            icon: LucideIcons.arrowUp,
+            tint: palette.accentText,
+            tile: palette.accent.withValues(alpha: 0.14),
+            speed: formatSpeed(stats.upSpeed),
+            total: formatBytes(stats.upTotal),
+          ),
         ],
       ),
     );
   }
 
-  Widget _row(BuildContext context, String left, String right, TextStyle? style) {
+  Widget _row(
+    BuildContext context, {
+    required IconData icon,
+    required Color tint,
+    required Color tile,
+    required String speed,
+    required String total,
+  }) {
+    final theme = ShadTheme.of(context);
     return Row(
       children: [
-        Expanded(
-          child: Text(left,
-              style: style, maxLines: 1, overflow: TextOverflow.ellipsis),
+        Container(
+          width: 22,
+          height: 22,
+          decoration: BoxDecoration(
+            color: tile,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          alignment: Alignment.center,
+          child: Icon(icon, size: 12, color: tint),
         ),
+        const SizedBox(width: 8),
+        // Скорость и итог в своих колонках — стрелки не прыгают при смене
+        // разрядности значений.
         Expanded(
-          child: Text(right,
-              style: style, maxLines: 1, overflow: TextOverflow.ellipsis),
+          child: Text(
+            speed,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: monoStyle(color: theme.colorScheme.foreground),
+          ),
+        ),
+        Text(
+          total,
+          maxLines: 1,
+          style: theme.textTheme.muted.copyWith(fontSize: 12),
         ),
       ],
     );

@@ -60,6 +60,12 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
   }
 
+  /// Настройки разбиты на вкладки — открываем нужную перед проверками.
+  Future<void> openTab(WidgetTester tester, String tab) async {
+    await tester.tap(find.text(tab));
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('экран настроек показывает тему, порт и автозапуск',
       (tester) async {
     await c.init();
@@ -83,7 +89,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(c.networkSettings.ipv6Enabled, isFalse);
 
-    // Секций стало больше — переключатель может быть за пределами экрана.
+    await openTab(tester, 'Сеть');
     await tester.ensureVisible(find.byKey(const Key('ipv6-switch')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('ipv6-switch')));
@@ -98,6 +104,8 @@ void main() {
     await c.init();
     await tester.pumpWidget(ShadApp(home: SettingsScreen(controller: c)));
     await tester.pumpAndSettle();
+    await openTab(tester, 'DNS');
+    // Одна надпись «DNS» — вкладка; заголовок секции внутри вкладки скрыт.
     expect(find.text('DNS'), findsOneWidget);
     expect(find.text('Перехват DNS в TUN'), findsOneWidget);
     expect(find.text('DNS для прокси'), findsOneWidget);
@@ -110,6 +118,7 @@ void main() {
     await c.init();
     await tester.pumpWidget(ShadApp(home: SettingsScreen(controller: c)));
     await tester.pumpAndSettle();
+    await openTab(tester, 'TUN');
     expect(find.text('MTU'), findsNothing);
 
     await tester.tap(find.text('Расширенные'));
@@ -133,6 +142,7 @@ void main() {
       ),
     ));
     await tester.pumpAndSettle();
+    await openTab(tester, 'TUN');
     await tester.tap(find.text('Расширенные'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Сбросить'));
@@ -148,6 +158,7 @@ void main() {
     await c.init();
     await tester.pumpWidget(ShadApp(home: SettingsScreen(controller: c)));
     await tester.pumpAndSettle();
+    await openTab(tester, 'TLS');
     expect(find.text('Пропустить проверку сертификата'), findsOneWidget);
     c.dispose();
   });
@@ -165,6 +176,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(c.networkSettings.tlsFragmentEnabled, isFalse);
 
+    await openTab(tester, 'TLS');
     await tester.tap(find.byKey(const Key('tls-fragment-switch')));
     await tester.pumpAndSettle();
 
