@@ -151,12 +151,32 @@ void FlutterWindow::ShowPopover(double width, double height) {
   if (!in_popover_) {
     saved_placement_.length = sizeof(WINDOWPLACEMENT);
     ::GetWindowPlacement(hwnd, &saved_placement_);
-    saved_style_ = ::GetWindowLongPtr(hwnd, GWL_STYLE);
-    saved_ex_style_ = ::GetWindowLongPtr(hwnd, GWL_EXSTYLE);
-    was_visible_ = ::IsWindowVisible(hwnd) && !::IsIconic(hwnd);
+    const bool iconic = ::IsIconic(hwnd) != FALSE;
+    const bool visible = ::IsWindowVisible(hwnd) != FALSE;
+    was_visible_ = visible && !iconic;
+    was_minimized_ = visible && iconic;
     // Прячем ДО флага: скрытие активного окна шлёт WM_ACTIVATE(WA_INACTIVE),
     // и с уже выставленным флагом мини-окно тут же закрылось бы.
     ::ShowWindow(hwnd, SW_HIDE);
+    if (iconic) {
+      // Свёрнутое окно остаётся свёрнутым и после SWP_SHOWWINDOW — мини-окно
+      // так и не появилось бы. Разворачиваем его за пределами экрана (без
+      // мелькания) и снова прячем; настоящее место задаст SetWindowPos ниже,
+      // а прежнее вернёт ExitPopover из saved_placement_.
+      WINDOWPLACEMENT offscreen = saved_placement_;
+      offscreen.flags = 0;
+      offscreen.showCmd = SW_SHOWNOACTIVATE;
+      const LONG w = offscreen.rcNormalPosition.right -
+                     offscreen.rcNormalPosition.left;
+      const LONG h = offscreen.rcNormalPosition.bottom -
+                     offscreen.rcNormalPosition.top;
+      offscreen.rcNormalPosition = {-32000, -32000, -32000 + w, -32000 + h};
+      ::SetWindowPlacement(hwnd, &offscreen);
+      ::ShowWindow(hwnd, SW_HIDE);
+    }
+    // Стили — уже после разворота: у свёрнутого окна в них WS_MINIMIZE.
+    saved_style_ = ::GetWindowLongPtr(hwnd, GWL_STYLE);
+    saved_ex_style_ = ::GetWindowLongPtr(hwnd, GWL_EXSTYLE);
     in_popover_ = true;
     // Без рамки и заголовка; TOOLWINDOW — без кнопки на панели задач.
     ::SetWindowLongPtr(hwnd, GWL_STYLE,
@@ -220,7 +240,10 @@ void FlutterWindow::ExitPopover(bool show_main, bool notify) {
   ::SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
                  SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED | SWP_NOACTIVATE);
   WINDOWPLACEMENT placement = saved_placement_;
-  placement.showCmd = SW_HIDE;
+  // Главное окно было свёрнуто — возвращаем его на панель задач свёрнутым,
+  // иначе вместе с мини-окном пропала бы и кнопка приложения.
+  placement.showCmd =
+      was_minimized_ && !show_main ? SW_SHOWMINNOACTIVE : SW_HIDE;
   ::SetWindowPlacement(hwnd, &placement);
 
   if (notify && window_channel_) {

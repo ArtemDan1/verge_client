@@ -53,6 +53,7 @@ class FlutterWindow : public Win32Window {
   // Состояние главного окна на время мини-окна.
   bool in_popover_ = false;
   bool was_visible_ = false;
+  bool was_minimized_ = false;
   LONG_PTR saved_style_ = 0;
   LONG_PTR saved_ex_style_ = 0;
   WINDOWPLACEMENT saved_placement_{};

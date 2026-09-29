@@ -67,7 +67,12 @@ flutter_launcher_icons:
     image_path: "assets/branding/verge-app-icon-macos-1024.png"
   windows:
     generate: true
-    image_path: "assets/branding/verge-app-icon-1024.png"
+    # Та же плитка, что на macOS: ярлык на рабочем столе выглядит одинаково.
+    # flutter_launcher_icons кладёт в .ico только один размер (icon_size) —
+    # мелкие Windows ужимает сама и мылит. В репозитории лежит .ico со всеми
+    # размерами 16–256, собранный из этой картинки через Pillow; после
+    # перегенерации пересоберите его так же.
+    image_path: "assets/branding/verge-app-icon-macos-1024.png"
     icon_size: 256
   ios: true
 
