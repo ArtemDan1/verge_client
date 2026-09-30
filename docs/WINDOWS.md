@@ -84,6 +84,14 @@ pwsh scripts/make_installer.ps1
 Нужен установленный Inno Setup 6 (`iscc` в `PATH`). Готовый инсталлятор
 появится в `dist\Verge-<версия>-setup.exe`.
 
+Microsoft Visual C++ Redistributable 2015–2022 (x64) в инсталлятор не
+вшивается: при установке он проверяет реестр
+(`HKLM\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64`) и, если
+рантайма нет или он старше 14.40, скачивает `vc_redist.x64.exe` с
+`https://aka.ms/vs/17/release/vc_redist.x64.exe` и ставит его тихо. Без сети
+установка продолжится, но на чистой системе Verge тогда не запустится — рантайм
+нужно поставить вручную по той же ссылке.
+
 ## TUN-режим
 
 Привилегированная часть — служба `VergeTunnel` (LocalSystem), ставится
