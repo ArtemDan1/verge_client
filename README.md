@@ -8,6 +8,13 @@
 
 Работает на базе **sing-box** и **Xray**.
 
+<br>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/home-dark.png">
+  <img src="docs/screenshots/home-light.png" alt="Главный экран Verge" width="880">
+</picture>
+
 </div>
 
 ---
@@ -40,6 +47,32 @@ Verge доступен для:
 - **Deep links** — добавление подписки по ссылке вида `verge://import/...`.
 - **Обновления приложения** — проверка GitHub Releases и установка новой версии (PKG на macOS, установщик `.exe` на Windows) прямо из Verge.
 - **Системный трей и темы** — быстрый доступ к состоянию клиента, светлая и тёмная темы.
+
+## Скриншоты
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/connections.png" alt="Соединения"></td>
+    <td width="50%"><img src="docs/screenshots/routing.png" alt="Роутинг"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Соединения</b> — активные подключения по приложениям: куда ушёл трафик и по какому правилу</td>
+    <td align="center"><b>Роутинг</b> — готовые профили и свои правила direct / proxy / block</td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/logs.png" alt="Логи"></td>
+    <td width="50%"><img src="docs/screenshots/settings.png" alt="Настройки"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Логи</b> — sing-box, Xray и приложение с фильтром по уровню</td>
+    <td align="center"><b>Настройки</b> — тема, TUN, DNS, TLS, сеть и пинг</td>
+  </tr>
+</table>
+
+<p align="center">
+  <img src="docs/screenshots/tray.png" alt="Мини-окно в трее" width="340"><br>
+  <b>Мини-окно в трее</b> — статус, скорость и быстрая смена сервера без открытия главного окна
+</p>
 
 ## Как это работает
 
@@ -92,6 +125,12 @@ flutter pub get
 flutter run -d macos     # или: flutter run -d windows
 flutter test
 flutter analyze
+```
+
+Скриншоты для README генерируются из настоящих экранов приложения с демо-данными:
+
+```bash
+VERGE_SCREENSHOTS=1 flutter test --update-goldens test/readme_screenshots
 ```
 
 Для сборки под Windows нужны Visual Studio 2022 с workload «Desktop development with C++» и вендоренные бинарники sing-box, Xray и Wintun — см. [docs/WINDOWS.md](docs/WINDOWS.md).
