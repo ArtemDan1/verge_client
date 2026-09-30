@@ -40,6 +40,118 @@ ChangesAssociations=yes
 Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
 
 [Code]
+// Microsoft Visual C++ Redistributable 2015–2022 (x64). Без него приложение и
+// служба не стартуют на чистой Windows: нет vcruntime140.dll / msvcp140.dll.
+// Ставим только если рантайма нет или он старый; сам редистрибутив в
+// инсталлятор не кладём (+25 МБ), а скачиваем с постоянного адреса Microsoft.
+const
+  VCRedistUrl = 'https://aka.ms/vs/17/release/vc_redist.x64.exe';
+  VCRedistFile = 'vc_redist.x64.exe';
+  // Сборка идёт MSVC из VS 2022 17.10+, а такие бинарники падают на рантайме
+  // старше 14.40 (изменился std::mutex) — старый рантайм тоже обновляем.
+  VCRedistMinMinor = 40;
+
+var
+  DownloadPage: TDownloadWizardPage;
+  VCRedistRestart: Boolean;
+  // Загрузку уже пробовали со страницей прогресса — второй раз не качаем.
+  VCRedistDownloadTried: Boolean;
+
+function VCRedistInView(RootKey: Integer): Boolean;
+var
+  Key: String;
+  Installed, Major, Minor: Cardinal;
+begin
+  Key := 'SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64';
+  Result := RegQueryDWordValue(RootKey, Key, 'Installed', Installed) and
+            (Installed = 1) and
+            RegQueryDWordValue(RootKey, Key, 'Major', Major) and
+            RegQueryDWordValue(RootKey, Key, 'Minor', Minor) and
+            ((Major > 14) or ((Major = 14) and (Minor >= VCRedistMinMinor)));
+end;
+
+// Редистрибутив — 32-битный bootstrapper и пишет ключ в WOW6432Node, но
+// смотрим оба представления реестра, чтобы не зависеть от этого.
+function VCRedistInstalled: Boolean;
+begin
+  Result := VCRedistInView(HKLM32) or VCRedistInView(HKLM64);
+end;
+
+procedure InitializeWizard;
+begin
+  DownloadPage := CreateDownloadPage(
+    'Загрузка компонентов',
+    'Скачивается Microsoft Visual C++ Redistributable, он нужен для работы Verge.',
+    nil);
+end;
+
+// В интерактивной установке качаем на шаге «Готово к установке» со страницей
+// прогресса. Если сети нет — даём повторить или продолжить без рантайма.
+function NextButtonClick(CurPageID: Integer): Boolean;
+begin
+  Result := True;
+  if (CurPageID <> wpReady) or VCRedistInstalled then Exit;
+  VCRedistDownloadTried := True;
+  DownloadPage.Clear;
+  DownloadPage.Add(VCRedistUrl, VCRedistFile, '');
+  DownloadPage.Show;
+  try
+    try
+      DownloadPage.Download;
+    except
+      Log('VC++ Redistributable: загрузка не удалась: ' + GetExceptionMessage);
+      if not DownloadPage.AbortedByUser then
+        Result := SuppressibleMsgBox(
+          'Не удалось скачать Microsoft Visual C++ Redistributable:' + #13#10 +
+          GetExceptionMessage + #13#10#13#10 +
+          'Продолжить установку без него? Если на компьютере его нет, Verge ' +
+          'не запустится — тогда установите его вручную:' + #13#10 +
+          VCRedistUrl + #13#10#13#10 +
+          'Нажмите «Нет», чтобы попробовать ещё раз.',
+          mbError, MB_YESNO, IDYES) = IDYES
+      else
+        Result := False;
+    end;
+  finally
+    DownloadPage.Hide;
+  end;
+end;
+
+procedure InstallVCRedist;
+var
+  Path: String;
+  ResultCode: Integer;
+begin
+  if VCRedistInstalled then Exit;
+  Path := ExpandConstant('{tmp}\' + VCRedistFile);
+  // Запасной путь, если страница загрузки не отработала (например, её
+  // пропустили) — качаем здесь же без UI.
+  if not FileExists(Path) then
+  begin
+    if VCRedistDownloadTried then Exit;
+    try
+      DownloadTemporaryFile(VCRedistUrl, VCRedistFile, '', nil);
+    except
+      Log('VC++ Redistributable: загрузка не удалась: ' + GetExceptionMessage);
+      Exit;
+    end;
+  end;
+  WizardForm.StatusLabel.Caption :=
+    'Установка Microsoft Visual C++ Redistributable...';
+  if not Exec(Path, '/install /quiet /norestart', '', SW_HIDE,
+              ewWaitUntilTerminated, ResultCode) then
+  begin
+    Log('VC++ Redistributable: не удалось запустить: ' +
+        SysErrorMessage(ResultCode));
+    Exit;
+  end;
+  // 1638 — уже стоит более новая версия, 3010 — нужна перезагрузка.
+  if ResultCode = 3010 then
+    VCRedistRestart := True
+  else if (ResultCode <> 0) and (ResultCode <> 1638) then
+    Log('VC++ Redistributable: код завершения ' + IntToStr(ResultCode));
+end;
+
 // Служба держит свой exe открытым: без остановки установка новой версии
 // поверх старой падает на «файл занят другим процессом».
 function PrepareToInstall(var NeedsRestart: Boolean): String;
@@ -51,6 +163,18 @@ begin
        SW_HIDE, ewWaitUntilTerminated, ResultCode);
   // Дать службе догаснуть: sc.exe возвращается сразу, не дожидаясь остановки.
   Sleep(2000);
+end;
+
+// Рантайм ставим до копирования файлов: к [Run] со стартом службы и запуском
+// приложения он уже должен быть на месте.
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssInstall then InstallVCRedist;
+end;
+
+function NeedRestart: Boolean;
+begin
+  Result := VCRedistRestart;
 end;
 
 [Files]
