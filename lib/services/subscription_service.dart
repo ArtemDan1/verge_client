@@ -51,12 +51,53 @@ class SubscriptionService {
       }
       final headers = <String, String>{'User-Agent': _userAgent};
       if (hwid != null && hwid.isNotEmpty) headers['x-hwid'] = hwid;
-      final resp = await client.get(Uri.parse(url), headers: headers);
+      final resp = await _getFollowingRedirects(client, Uri.parse(url), headers);
       if (resp.statusCode != 200) {
         throw SubscriptionException('HTTP ${resp.statusCode}');
       }
       return FetchResult(resp.body, resp.headers);
     };
+  }
+
+  static const _maxRedirects = 10;
+
+  // Редиректы обрабатываем вручную: часть панелей (анти-бот прослойки) ставит
+  // cookie и редиректит на тот же URL. Встроенный клиент cookie не хранит и
+  // падает с «Redirect loop detected», поэтому копим cookie между запросами.
+  static Future<http.Response> _getFollowingRedirects(
+      http.Client client, Uri uri, Map<String, String> headers) async {
+    final cookies = <String, String>{};
+    for (var i = 0; i <= _maxRedirects; i++) {
+      final req = http.Request('GET', uri)
+        ..followRedirects = false
+        ..headers.addAll(headers);
+      if (cookies.isNotEmpty) {
+        req.headers['Cookie'] =
+            cookies.entries.map((e) => '${e.key}=${e.value}').join('; ');
+      }
+      final resp = await http.Response.fromStream(await client.send(req));
+      final location = resp.headers['location'];
+      if (!_redirectCodes.contains(resp.statusCode) || location == null) {
+        return resp;
+      }
+      _collectCookies(resp.headers['set-cookie'], cookies);
+      uri = uri.resolve(location);
+    }
+    throw SubscriptionException('слишком много редиректов');
+  }
+
+  static const _redirectCodes = {301, 302, 303, 307, 308};
+
+  // package:http склеивает несколько Set-Cookie через запятую; запятая
+  // встречается и внутри Expires, поэтому режем только перед `имя=`.
+  static void _collectCookies(String? header, Map<String, String> into) {
+    if (header == null) return;
+    for (final part in header.split(RegExp(r',(?=\s*[^;,=\s]+=)'))) {
+      final pair = part.split(';').first.trim();
+      final eq = pair.indexOf('=');
+      if (eq <= 0) continue;
+      into[pair.substring(0, eq).trim()] = pair.substring(eq + 1).trim();
+    }
   }
 
   // Outbound-типы, которые не являются нодами-серверами.
