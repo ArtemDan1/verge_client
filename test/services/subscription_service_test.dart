@@ -176,4 +176,36 @@ void main() {
     );
     expect((await svc.loadWithInfo('https://example.com/sub')).meta, isNull);
   });
+
+  test('редирект на тот же URL с Set-Cookie: повторяет запрос с cookie', () async {
+    final body = base64.encode(utf8.encode('vless://u@h:443#A'));
+    final requests = <http.BaseRequest>[];
+    final svc = SubscriptionService(
+      client: MockClient((req) async {
+        requests.add(req);
+        if (req.headers['Cookie'] == null) {
+          return http.Response('', 302, headers: {
+            'location': '/sub',
+            'set-cookie': 'guard=abc; Path=/; Expires=Wed, 21 Oct 2026 07:28:00 GMT',
+          });
+        }
+        return http.Response(body, 200);
+      }),
+    );
+    final nodes = await svc.load('https://example.com/sub');
+    expect(nodes, hasLength(1));
+    expect(requests, hasLength(2));
+    expect(requests[1].url.toString(), 'https://example.com/sub');
+    expect(requests[1].headers['Cookie'], 'guard=abc');
+    expect(requests[1].headers['User-Agent'], 'v2rayNG/1.8.0');
+  });
+
+  test('бесконечный редирект → SubscriptionException', () async {
+    final svc = SubscriptionService(
+      client: MockClient((req) async =>
+          http.Response('', 302, headers: {'location': req.url.toString()})),
+    );
+    await expectLater(
+        svc.load('https://example.com/sub'), throwsA(isA<SubscriptionException>()));
+  });
 }
