@@ -126,6 +126,13 @@ class MainActivity : FlutterActivity() {
                     if (VpnState.status != VpnState.Status.DISCONNECTED) {
                         events.success(statusEvent(VpnState.status, VpnState.lastError))
                     }
+                    // Ядро упало в прошлый раз — показываем причину в «Логах».
+                    BoxEngine.takeCrashReport()?.let { lines ->
+                        events.success(
+                            mapOf("type" to "log", "line" to "ERROR приложение упало в прошлый раз:"),
+                        )
+                        for (line in lines) events.success(mapOf("type" to "log", "line" to line))
+                    }
                 }
 
                 override fun onCancel(arguments: Any?) {

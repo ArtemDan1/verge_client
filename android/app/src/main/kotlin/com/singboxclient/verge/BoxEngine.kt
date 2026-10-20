@@ -1,6 +1,7 @@
 package com.singboxclient.verge
 
 import android.content.Context
+import android.os.Build
 import io.nekohasekai.libbox.CommandServer
 import io.nekohasekai.libbox.CommandServerHandler
 import io.nekohasekai.libbox.Libbox
@@ -89,6 +90,8 @@ class BoxEngine(
         fun ensureSetup(context: Context) {
             if (setupDone) return
             val app = context.applicationContext
+            CrashLog.install(app)
+            collectCrashReports(app)
             NetworkMonitor.init(app)
             val options = SetupOptions()
             options.basePath = app.filesDir.path
@@ -98,11 +101,48 @@ class BoxEngine(
             options.tempPath = app.cacheDir.path
             options.logMaxLines = 3000
             options.crashReportSource = "Verge"
+            // Обход бага Go (golang/go#68760): вызов Go из потока, созданного
+            // не Go (монитор сети, поток движка), на Android 7.x и 9+ роняет
+            // процесс. Условие — как в официальном клиенте sing-box.
+            options.fixAndroidStack = Build.VERSION.SDK_INT in 24..25 ||
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
             Libbox.setup(options)
             setupDone = true
         }
 
         fun version(): String = Libbox.version()
+
+        /** Отчёты о падениях прошлого запуска; отдаются один раз. */
+        @Volatile
+        private var pendingCrash: List<String>? = null
+
+        /**
+         * Строки отчёта о падении с прошлого запуска: паника Go (sing-box)
+         * и/или исключение Kotlin. null — падений не было.
+         */
+        fun takeCrashReport(): List<String>? {
+            val lines = pendingCrash
+            pendingCrash = null
+            return lines
+        }
+
+        /**
+         * Забирает отчёты до Libbox.setup: тот при старте переносит отчёт Go
+         * в архив и очищает файл.
+         */
+        private fun collectCrashReports(app: Context) {
+            val lines = mutableListOf<String>()
+            for (file in listOf(
+                File(File(app.filesDir, "box"), "CrashReport-Verge.log"),
+                CrashLog.file(app),
+            )) {
+                val text = runCatching { file.readText() }.getOrNull()
+                if (text.isNullOrBlank()) continue
+                lines += text.lines().filter { it.isNotBlank() }.takeLast(80)
+                if (file == CrashLog.file(app)) runCatching { file.delete() }
+            }
+            if (lines.isNotEmpty()) pendingCrash = lines
+        }
 
         /**
          * Направляет лог sing-box в файл: так его читает [LogTail]. Цвета
