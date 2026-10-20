@@ -189,46 +189,100 @@ class _HeroPanelState extends State<HeroPanel> {
       ?modeSwitch,
       if (c.routingProfiles.isNotEmpty) ...[
         if (modeSwitch != null) const SizedBox(height: 8),
-        _RoutingSelect(controller: c),
+        _RoutingSelect(controller: c, height: compact ? 44 : 38),
       ],
     ];
 
     // Телефон: тумблер и статус в строку, режим и роутинг — под ними во всю
     // ширину.
-    final Widget card = compact
-        ? Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  toggle,
-                  const SizedBox(width: 16),
-                  Expanded(child: status),
-                ],
+    // Скорость загрузки и отдачи — в сайдбаре, здесь не дублируем.
+    final stats = Row(
+      children: [
+        Expanded(
+          child: StatTile(
+            label: 'Время',
+            child: Text(running
+                ? _formatUptime(
+                    DateTime.now().difference(c.connectedAt ?? DateTime.now()))
+                : '—'),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: StatTile(
+            label: 'Задержка',
+            child: running && c.settings.gstaticPingEnabled
+                ? _heroPing(context, c)
+                : const Text('—'),
+          ),
+        ),
+      ],
+    );
+
+    // Телефон: крупный тумблер по центру — под большой палец, под ним статус
+    // и роутинг, внизу карточки время и задержка. Сервер виден в списке ниже.
+    if (compact) {
+      return AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        padding: const EdgeInsets.fromLTRB(16, 28, 16, 16),
+        decoration: BoxDecoration(
+          color: cardBg,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: cardBorder),
+        ),
+        child: Column(
+          children: [
+            ConnectToggle(
+              running: running,
+              connecting: connecting,
+              onTap: _togglePower,
+              scale: 1.5,
+            ),
+            const SizedBox(height: 18),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.5,
+                color: titleColor,
               ),
-              if (controls.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                ...controls,
-              ],
-            ],
-          )
-        : Row(
-            children: [
-              toggle,
-              const SizedBox(width: 22),
-              Expanded(child: status),
-              if (controls.isNotEmpty) ...[
-                const SizedBox(width: 16),
-                SizedBox(
-                  width: 236,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: controls,
-                  ),
+            ),
+            if (controls.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: 240,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: controls,
                 ),
-              ],
+              ),
             ],
-          );
+            const SizedBox(height: 20),
+            stats,
+          ],
+        ),
+      );
+    }
+
+    final Widget card = Row(
+      children: [
+        toggle,
+        const SizedBox(width: 22),
+        Expanded(child: status),
+        if (controls.isNotEmpty) ...[
+          const SizedBox(width: 16),
+          SizedBox(
+            width: 236,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: controls,
+            ),
+          ),
+        ],
+      ],
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -236,9 +290,7 @@ class _HeroPanelState extends State<HeroPanel> {
       children: [
         AnimatedContainer(
           duration: const Duration(milliseconds: 250),
-          padding: compact
-              ? const EdgeInsets.all(16)
-              : const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
           decoration: BoxDecoration(
             color: cardBg,
             borderRadius: BorderRadius.circular(16),
@@ -247,29 +299,7 @@ class _HeroPanelState extends State<HeroPanel> {
           child: card,
         ),
         const SizedBox(height: 10),
-        // Скорость загрузки и отдачи — в сайдбаре, здесь не дублируем.
-        Row(
-          children: [
-            Expanded(
-              child: StatTile(
-                label: 'Время',
-                child: Text(running
-                    ? _formatUptime(DateTime.now()
-                        .difference(c.connectedAt ?? DateTime.now()))
-                    : '—'),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: StatTile(
-                label: 'Задержка',
-                child: running && c.settings.gstaticPingEnabled
-                    ? _heroPing(context, c)
-                    : const Text('—'),
-              ),
-            ),
-          ],
-        ),
+        stats,
       ],
     );
   }
@@ -309,8 +339,11 @@ class _HeroPanelState extends State<HeroPanel> {
 }
 
 class _RoutingSelect extends StatelessWidget {
-  const _RoutingSelect({required this.controller});
+  const _RoutingSelect({required this.controller, this.height = 38});
   final AppController controller;
+
+  /// На телефоне выше — под палец.
+  final double height;
 
   @override
   Widget build(BuildContext context) {
@@ -324,7 +357,7 @@ class _RoutingSelect extends StatelessWidget {
     }
 
     return SizedBox(
-      height: 38,
+      height: height,
       child: ShadSelect<String>(
         minWidth: 236,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
