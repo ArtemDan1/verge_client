@@ -67,7 +67,11 @@ class VergeVpnService : VpnService() {
     private val worker = Executors.newSingleThreadExecutor()
     private var tunFd: ParcelFileDescriptor? = null
 
-    private val platform = object : BoxPlatform(this) {
+    // Лениво: в конструкторе сервиса контекста ещё нет (attachBaseContext
+    // вызывается позже), и getApplicationContext() падает с NPE.
+    private val platform by lazy { createPlatform() }
+
+    private fun createPlatform() = object : BoxPlatform(this) {
         override fun autoDetectInterfaceControl(fd: Int) {
             protect(fd)
         }
