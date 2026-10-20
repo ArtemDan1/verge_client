@@ -57,6 +57,12 @@ android {
             } else {
                 signingConfigs.getByName("debug")
             }
+            // Минификацию R8 включает Flutter; без своих правил R8 вырезает
+            // классы libbox и ML Kit, которые ищутся по имени.
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 
