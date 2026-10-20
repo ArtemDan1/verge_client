@@ -81,6 +81,9 @@ dependencies {
     // scripts/android/build_libbox.sh (локально и в CI).
     implementation(files("libs/libbox.aar"))
     implementation("androidx.core:core-ktx:1.13.1")
+    // Сканер QR из сервисов Google: свой экран и камера, без разрешения на
+    // камеру и почти без веса в APK.
+    implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
 }
 
 flutter {

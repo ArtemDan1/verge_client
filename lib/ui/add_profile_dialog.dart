@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter/services.dart' show Clipboard;
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../app/app_controller.dart';
+import '../platform/qr_scanner.dart';
 import '../services/subscription_service.dart';
 import '../theme/verge_palette.dart';
 
@@ -87,6 +88,18 @@ class _AddProfileSheetState extends State<_AddProfileSheet> {
     await _add(text);
   }
 
+  Future<void> _fromQr() async {
+    setState(() => _error = null);
+    try {
+      final link = await const QrScanner().scan();
+      if (link == null || !mounted) return;
+      _linkCtrl.text = link;
+      await _add(link);
+    } on QrScanException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
@@ -142,6 +155,16 @@ class _AddProfileSheetState extends State<_AddProfileSheet> {
                 ],
               ),
             ),
+            // На телефоне подписку чаще дают QR-кодом с экрана компьютера
+            // или из бота.
+            if (QrScanner.isSupported) ...[
+              const SizedBox(height: 10),
+              ShadButton.outline(
+                onPressed: _busy ? null : _fromQr,
+                leading: const Icon(LucideIcons.scanQrCode, size: 16),
+                child: const Text('Сканировать QR-код'),
+              ),
+            ],
             const SizedBox(height: 14),
             Row(
               children: [

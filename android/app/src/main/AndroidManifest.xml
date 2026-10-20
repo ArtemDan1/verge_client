@@ -83,6 +83,12 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- Модуль сканера QR докачивается сервисами Google при установке,
+             а не при первом нажатии «Сканировать». -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="barcode_ui" />
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

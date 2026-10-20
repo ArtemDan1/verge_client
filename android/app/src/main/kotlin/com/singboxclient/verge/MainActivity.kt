@@ -10,6 +10,9 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import androidx.core.content.FileProvider
+import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
+import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.BinaryMessenger
@@ -81,7 +84,29 @@ class MainActivity : FlutterActivity() {
                 }
             }
         }
+        MethodChannel(messenger, "verge/qr").setMethodCallHandler { call, result ->
+            if (call.method == "scan") scanQr(result) else result.notImplemented()
+        }
         VpnState.addListener(vpnListener)
+    }
+
+    /** Системный сканер QR (Google Code Scanner): отдаёт текст кода. */
+    private fun scanQr(result: MethodChannel.Result) {
+        val options = GmsBarcodeScannerOptions.Builder()
+            .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
+            .build()
+        GmsBarcodeScanning.getClient(this, options).startScan()
+            .addOnSuccessListener { barcode -> result.success(barcode.rawValue) }
+            .addOnCanceledListener { result.success(null) }
+            .addOnFailureListener { e ->
+                result.error(
+                    "SCAN",
+                    "Сканер QR недоступен: нужны сервисы Google Play. " +
+                        "Отсканируйте код камерой телефона, скопируйте ссылку " +
+                        "и нажмите «Вставить». (${e.message})",
+                    null,
+                )
+            }
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
