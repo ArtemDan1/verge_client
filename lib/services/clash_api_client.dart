@@ -33,6 +33,27 @@ class ClashApiCredentials {
   }
 }
 
+/// Адрес и секрет Clash API из уже собранного конфига sing-box — для туннеля,
+/// который поднимали не в этой сессии UI. null, если API в конфиге нет.
+ClashApiCredentials? clashApiOf(Map<String, dynamic> config) {
+  final exp = config['experimental'];
+  if (exp is! Map) return null;
+  final api = exp['clash_api'];
+  if (api is! Map) return null;
+  final controller = api['external_controller'];
+  final secret = api['secret'];
+  if (controller is! String || secret is! String) return null;
+  final colon = controller.lastIndexOf(':');
+  if (colon < 0) return null;
+  final port = int.tryParse(controller.substring(colon + 1));
+  if (port == null) return null;
+  return ClashApiCredentials(
+    host: controller.substring(0, colon),
+    port: port,
+    secret: secret,
+  );
+}
+
 /// Тонкая обёртка над WebSocket, чтобы клиент можно было тестировать без сети.
 abstract class ClashSocket {
   Stream<String> get messages;

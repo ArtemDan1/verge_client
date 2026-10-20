@@ -28,6 +28,7 @@ import '../platform/platform_info.dart';
 import '../platform/helper_service.dart';
 import '../services/update_service.dart';
 import '../tunnel/tunnel_controller.dart';
+import '../tunnel/android_vpn_tunnel.dart';
 import '../services/ping_service.dart';
 import '../models/connection_info.dart';
 import '../services/clash_api_client.dart';
@@ -51,6 +52,11 @@ class AppController extends ChangeNotifier {
       _bypassProbe;
   final HelperService _helper;
   final UpdateService _update;
+
+  /// Платформа умеет только TUN (Android: VpnService). Режим из настроек
+  /// тогда игнорируется, а приложение исключено из собственного VPN — его
+  /// трафик идёт мимо туннеля (см. [_geoProxyPort]).
+  final bool tunOnly;
 
   /// Клиент Clash API живёт на уровне контроллера, а не экрана: badge в
   /// сайдбаре и счётчики трафика обновляются при любом открытом экране.
@@ -225,6 +231,7 @@ class AppController extends ChangeNotifier {
         gstaticProbe,
     Future<int?> Function(String host, int port, {Duration timeout})?
         bypassProbe,
+    this.tunOnly = false,
   })  : _xrayFactory = xrayFactory ?? XrayProcess.new,
         _pickPort = pickPort ?? pickFreePort,
         _probeSocks = probeSocks ?? _defaultProbeSocks,
@@ -300,8 +307,12 @@ class AppController extends ChangeNotifier {
     }
   }
 
+  /// Действующий режим туннеля: настройка, если платформа даёт выбор.
+  TunnelMode get tunnelMode =>
+      tunOnly ? TunnelMode.tun : _state.settings.tunnelMode;
+
   TunnelController get _activeTunnel =>
-      _state.settings.tunnelMode == TunnelMode.tun ? _tunTunnel : _proxyTunnel;
+      tunnelMode == TunnelMode.tun ? _tunTunnel : _proxyTunnel;
 
   PersistedState _state = const PersistedState();
   TunnelStatus _status = TunnelStatus.disconnected;
@@ -369,10 +380,12 @@ class AppController extends ChangeNotifier {
 
   /// Порт локального прокси для загрузки наборов в обход блокировок.
   /// В TUN-режиме весь трафик и так идёт через туннель (прямая загрузка),
-  /// в systemProxy качаем через mixed-инбаунд sing-box.
+  /// в systemProxy качаем через mixed-инбаунд sing-box. Исключение — [tunOnly]
+  /// (Android): там приложение само исключено из VPN, и для него в конфиге
+  /// поднят тот же mixed-инбаунд.
   int? get _geoProxyPort {
     if (_status != TunnelStatus.connected) return null;
-    if (_state.settings.tunnelMode == TunnelMode.tun) return null;
+    if (tunnelMode == TunnelMode.tun && !tunOnly) return null;
     return _state.settings.localPort;
   }
 
@@ -450,7 +463,8 @@ class AppController extends ChangeNotifier {
       await _repo.save(_state);
     }
     notifyListeners();
-    if (_state.settings.autostart && selectedNode != null) {
+    final attached = await _attachRunningTunnel();
+    if (!attached && _state.settings.autostart && selectedNode != null) {
       await connect();
     }
     _scheduleAutoRefresh();
@@ -826,7 +840,7 @@ class AppController extends ChangeNotifier {
     final url = _state.settings.gstaticPingUrl;
     const timeout = Duration(seconds: 3);
     final int? ms;
-    if (_state.settings.tunnelMode == TunnelMode.tun) {
+    if (tunnelMode == TunnelMode.tun) {
       // В TUN обычный запрос ушёл бы внутрь туннеля и мерил бы его, а не
       // доступность интернета — бьём мимо utun нативным TCP-замером.
       final uri = Uri.parse(url);
@@ -862,7 +876,7 @@ class AppController extends ChangeNotifier {
   /// Мерить ли пинг нод мимо туннеля: в поднятом TUN обычный сокет меряет
   /// туннель, а не сервер.
   bool get _bypassNodePing =>
-      _state.settings.tunnelMode == TunnelMode.tun &&
+      tunnelMode == TunnelMode.tun &&
       _status == TunnelStatus.connected;
 
   /// Фоновая проверка активной ноды: один запрос, не перебор. Полный перебор
@@ -1018,8 +1032,12 @@ class AppController extends ChangeNotifier {
       // Гасим туннель ДО установщика: postinstall делает bootout демона, и
       // оборванный на полпути туннель оставит переопределённый DNS/системный
       // прокси в системе.
-      if (_status == TunnelStatus.connected ||
-          _status == TunnelStatus.connecting) {
+      // На Android установщик системный и может быть отменён пользователем,
+      // а при замене пакета система сама остановит VPN, — гасить заранее
+      // незачем.
+      if (!tunOnly &&
+          (_status == TunnelStatus.connected ||
+              _status == TunnelStatus.connecting)) {
         await disconnect();
       }
       await _platform.installUpdate(path);
@@ -1132,6 +1150,44 @@ class AppController extends ChangeNotifier {
   NodeEngine? get activeEngine => _activeEngine;
   NodeEngine? _activeEngine;
 
+  /// Подхватывает туннель, поднятый до запуска UI (Android: VPN-сервис
+  /// пережил движок Flutter). Возвращает true, если туннель уже работает.
+  Future<bool> _attachRunningTunnel() async {
+    final tunnel = _activeTunnel;
+    if (tunnel is! AttachableTunnel) return false;
+    final Map<String, dynamic>? config;
+    try {
+      config = await (tunnel as AttachableTunnel).attach();
+    } catch (_) {
+      return false;
+    }
+    if (config == null) return false;
+    _status = TunnelStatus.connected;
+    _connectedAt ??= DateTime.now();
+    _activeEngine = _engineOf(config);
+    final api = clashApiOf(config);
+    if (api != null) _clashApi.start(api);
+    _appendLog('VPN уже был подключён — продолжаем работу с ним');
+    notifyListeners();
+    return true;
+  }
+
+  /// Движок по собранному конфигу: в Xray sing-box ходит socks-outbound'ом
+  /// на loopback (см. ConfigBuilder._proxyOutbound).
+  static NodeEngine _engineOf(Map<String, dynamic> config) {
+    final outbounds = config['outbounds'];
+    if (outbounds is List) {
+      for (final o in outbounds) {
+        if (o is Map && o['tag'] == 'proxy') {
+          return o['type'] == 'socks' && o['server'] == '127.0.0.1'
+              ? NodeEngine.xray
+              : NodeEngine.singbox;
+        }
+      }
+    }
+    return NodeEngine.singbox;
+  }
+
   Future<void> connect() async {
     // Автовыбор до старта туннеля: тестовые процессы отдельные, но чем меньше
     // движущихся частей во время подключения, тем лучше.
@@ -1173,9 +1229,10 @@ class AppController extends ChangeNotifier {
       clashApiPort: api.port,
       clashApiSecret: api.secret,
       network: _state.networkSettings,
+      tunLocalProxy: tunOnly,
     );
     final routing = activeRoutingProfile;
-    if (_state.settings.tunnelMode == TunnelMode.tun) {
+    if (tunnelMode == TunnelMode.tun) {
       final ip = await _resolveHost(node.host);
       // Сервис нужен, чтобы на старте TUN переопределить системный DNS (иначе
       // запросы к LAN-роутеру минуют туннель и hijack-dns не срабатывает).

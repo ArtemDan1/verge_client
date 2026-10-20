@@ -128,4 +128,33 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 20));
     expect(sockets.length, opened.length, reason: 'после stop не переподключаемся');
   });
+
+  group('clashApiOf', () {
+    test('достаёт адрес и секрет из собранного конфига', () {
+      final creds = clashApiOf({
+        'experimental': {
+          'cache_file': {'enabled': true},
+          'clash_api': {
+            'external_controller': '127.0.0.1:41234',
+            'secret': 'abc',
+          },
+        },
+      });
+      expect(creds?.host, '127.0.0.1');
+      expect(creds?.port, 41234);
+      expect(creds?.secret, 'abc');
+    });
+
+    test('без clash_api или с битым адресом — null', () {
+      expect(clashApiOf({}), isNull);
+      expect(clashApiOf({'experimental': {'cache_file': {}}}), isNull);
+      expect(
+          clashApiOf({
+            'experimental': {
+              'clash_api': {'external_controller': 'nope', 'secret': 'x'},
+            },
+          }),
+          isNull);
+    });
+  });
 }

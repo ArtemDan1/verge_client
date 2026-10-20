@@ -2,6 +2,8 @@ import 'package:flutter/widgets.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../app/app_controller.dart';
 import '../theme/verge_palette.dart';
+import 'about_screen.dart';
+import 'form_factor.dart';
 import 'settings/dns_section.dart';
 import 'settings/general_section.dart';
 import 'settings/gstatic_ping_section.dart';
@@ -44,12 +46,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final c = widget.controller;
     final palette = VergePalette.of(context);
     return Padding(
-      padding: kScreenPadding.copyWith(bottom: 0),
+      padding: screenPadding(context).copyWith(bottom: 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           ScreenHeader(
             title: 'Настройки',
+            // На телефоне «О приложении» нет в навигации — вход отсюда.
+            trailing: FormFactor.isCompact(context)
+                ? IconAction(
+                    icon: LucideIcons.info,
+                    tooltip: 'О приложении',
+                    onPressed: () => openAboutPage(context, c),
+                  )
+                : null,
             // Настройки применяются при сборке конфига, а живой туннель
             // собран на старых. Перезапускать его молча нельзя —
             // пользователь может быть в середине важного соединения.
@@ -103,7 +113,10 @@ class _TabBar extends StatelessWidget {
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: palette.panelBorder)),
       ),
-      child: Row(
+      // На узком экране вкладки листаются вбок.
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
         children: [
           for (var i = 0; i < settingsTabs.length; i++)
             Semantics(
@@ -144,6 +157,7 @@ class _TabBar extends StatelessWidget {
               ),
             ),
         ],
+        ),
       ),
     );
   }

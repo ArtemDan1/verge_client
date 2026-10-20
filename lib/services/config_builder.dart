@@ -21,12 +21,19 @@ class ConfigBuilder {
   /// повторяет значения, которые раньше были захардкожены здесь же.
   final NetworkSettings network;
 
+  /// Поднимать ли в TUN-конфиге ещё и mixed-инбаунд на [localPort]. Нужен на
+  /// Android: приложение исключено из собственного VPN, и свой трафик,
+  /// которому нужен прокси (обновление гео-наборов), оно пускает через этот
+  /// порт — как в режиме системного прокси на десктопе.
+  final bool tunLocalProxy;
+
   const ConfigBuilder({
     this.localPort = 2080,
     this.geoAssetDir,
     this.clashApiPort,
     this.clashApiSecret,
     this.network = const NetworkSettings(),
+    this.tunLocalProxy = false,
   });
 
   static const _routing = RoutingBuilder();
@@ -149,7 +156,14 @@ class ConfigBuilder {
           'strict_route': network.tunStrictRoute,
           'mtu': network.tunMtu,
           'stack': network.tunStack.name,
-        }
+        },
+        if (tunLocalProxy)
+          {
+            'type': 'mixed',
+            'tag': 'mixed-in',
+            'listen': '127.0.0.1',
+            'listen_port': localPort,
+          },
       ],
       'outbounds': [
         proxyOut,

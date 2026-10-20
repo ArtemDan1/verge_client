@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:async';
 
 import 'package:flutter/foundation.dart' show ValueListenable;
@@ -11,6 +12,7 @@ import '../services/byte_format.dart';
 import '../theme/app_theme.dart';
 import '../theme/verge_palette.dart';
 import '../tunnel/tunnel_controller.dart';
+import 'form_factor.dart';
 import 'widgets/paper.dart';
 
 /// Поиск идёт по домену, IP и имени приложения; пустой набор [kinds] означает
@@ -101,14 +103,21 @@ class _ConnectionsScreenState extends State<ConnectionsScreen> {
     final theme = ShadTheme.of(context);
     final palette = VergePalette.of(context);
     return Padding(
-      padding: kScreenPadding,
+      padding: screenPadding(context),
       child: ValueListenableBuilder<List<ConnectionInfo>>(
         valueListenable: widget.controller.connections,
         builder: (context, all, _) {
           final byQuery =
               filterConnections(all, query: _search.text, kinds: const {});
-          int countOf(OutboundKind k) =>
-              byQuery.where((c) => c.outboundKind == k).length;
+          final compact = FormFactor.isCompact(context);
+          final search = ShadInput(
+            controller: _search,
+            placeholder: const Text('Домен, IP или приложение'),
+            leading: const Icon(LucideIcons.search, size: 16),
+            decoration: ShadDecoration(color: palette.surface),
+            onChanged: (_) => setState(() {}),
+          );
+          final pills = _pills(byQuery);
           final list = filterConnections(
             all,
             query: _search.text,
@@ -184,39 +193,22 @@ class _ConnectionsScreenState extends State<ConnectionsScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: ShadInput(
-                      controller: _search,
-                      placeholder: const Text('Домен, IP или приложение'),
-                      leading: const Icon(LucideIcons.search, size: 16),
-                      decoration: ShadDecoration(color: palette.surface),
-                      onChanged: (_) => setState(() {}),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  _KindPill(
-                    label: 'Все · ${byQuery.length}',
-                    selected: _kinds.isEmpty,
-                    onTap: () => setState(_kinds.clear),
-                  ),
-                  for (final k in OutboundKind.values) ...[
-                    const SizedBox(width: 6),
-                    _KindPill(
-                      label: '${_kindLabels[k]} · ${countOf(k)}',
-                      selected: _kinds.length == 1 && _kinds.contains(k),
-                      onTap: () => setState(() {
-                        // Один вид за раз: «Все» сбрасывает, повторный клик
-                        // по активному — тоже.
-                        final was = _kinds.contains(k) && _kinds.length == 1;
-                        _kinds.clear();
-                        if (!was) _kinds.add(k);
-                      }),
-                    ),
+              if (compact) ...[
+                search,
+                const SizedBox(height: 10),
+                // Фильтры не помещаются в строку — листаются вбок.
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(children: pills),
+                ),
+              ] else
+                Row(
+                  children: [
+                    Expanded(child: search),
+                    const SizedBox(width: 8),
+                    ...pills,
                   ],
-                ],
-              ),
+                ),
               const SizedBox(height: 14),
               Expanded(child: body),
             ],
@@ -224,6 +216,32 @@ class _ConnectionsScreenState extends State<ConnectionsScreen> {
         },
       ),
     );
+  }
+
+  List<Widget> _pills(List<ConnectionInfo> byQuery) {
+    int countOf(OutboundKind k) =>
+        byQuery.where((c) => c.outboundKind == k).length;
+    return [
+      _KindPill(
+        label: 'Все · ${byQuery.length}',
+        selected: _kinds.isEmpty,
+        onTap: () => setState(_kinds.clear),
+      ),
+      for (final k in OutboundKind.values) ...[
+        const SizedBox(width: 6),
+        _KindPill(
+          label: '${_kindLabels[k]} · ${countOf(k)}',
+          selected: _kinds.length == 1 && _kinds.contains(k),
+          onTap: () => setState(() {
+            // Один вид за раз: «Все» сбрасывает, повторный клик
+            // по активному — тоже.
+            final was = _kinds.contains(k) && _kinds.length == 1;
+            _kinds.clear();
+            if (!was) _kinds.add(k);
+          }),
+        ),
+      ],
+    ];
   }
 
   /// Детали соединения — выдвижная панель справа, как в макете. Раньше это
@@ -405,7 +423,36 @@ class _GroupCard extends StatelessWidget {
           Container(
             color: palette.surfaceHeader,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            child: Row(
+            child: FormFactor.isCompact(context)
+                ? Row(
+                    children: [
+                      _AppTile(group.name),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              group.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  fontSize: 14, fontWeight: FontWeight.w600),
+                            ),
+                            Text(
+                              '${_plural(n)} · ↑ ${formatBytes(group.upload)}  '
+                              '↓ ${formatBytes(group.download)}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.muted
+                                  .copyWith(fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  )
+                : Row(
               children: [
                 _AppTile(group.name),
                 const SizedBox(width: 12),
@@ -493,6 +540,54 @@ class _ConnectionRowState extends State<_ConnectionRow> {
         fontSize: 12,
         fontWeight: FontWeight.w400,
         color: theme.colorScheme.mutedForeground);
+    if (FormFactor.isCompact(context)) {
+      // Телефон: адрес на всю ширину, время и трафик — второй строкой.
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onTap,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(14, 9, 14, 9),
+          decoration: BoxDecoration(
+            border: widget.first
+                ? null
+                : Border(top: BorderSide(color: palette.divider)),
+          ),
+          child: Row(
+            children: [
+              if (widget.showApp) ...[
+                _AppTile(conn.appName ?? _kUnknownApp),
+                const SizedBox(width: 12),
+              ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(conn.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 14)),
+                    const SizedBox(height: 2),
+                    Text(
+                      [
+                        if (widget.showApp) conn.appName ?? _kUnknownApp,
+                        formatDuration(conn.durationAt(widget.now)),
+                        '↑ ${formatBytes(conn.upload)}  '
+                            '↓ ${formatBytes(conn.download)}',
+                      ].join(' · '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: muted,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              _RouteChip(conn.outboundKind),
+            ],
+          ),
+        ),
+      );
+    }
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
@@ -647,7 +742,8 @@ class _ConnectionDrawerState extends State<_ConnectionDrawer> {
         color: theme.colorScheme.foreground,
       ),
       child: Container(
-        width: 380,
+        // На телефоне панель занимает весь экран.
+        width: math.min(380, MediaQuery.sizeOf(context).width),
         height: double.infinity,
         decoration: BoxDecoration(
           color: palette.panel,

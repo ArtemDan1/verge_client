@@ -4,6 +4,7 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../theme/app_theme.dart';
 import '../../theme/verge_palette.dart';
+import '../form_factor.dart';
 
 /// Мелкие общие элементы дизайна «Бумага», которых нет в shadcn.
 
@@ -14,15 +15,65 @@ class ScreenHeader extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.actions = const [],
+    this.trailing,
   });
 
   final String title;
   final Widget? subtitle;
   final List<Widget> actions;
 
+  /// Виджет справа от заголовка, который не переносится вместе с [actions]
+  /// на телефоне (например, кнопка «О приложении»).
+  final Widget? trailing;
+
   @override
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
+    final titleBlock = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.4,
+            color: theme.colorScheme.foreground,
+          ),
+        ),
+        if (subtitle != null) ...[
+          const SizedBox(height: 2),
+          DefaultTextStyle.merge(
+            style: theme.textTheme.muted.copyWith(fontSize: 13),
+            child: subtitle!,
+          ),
+        ],
+      ],
+    );
+    // На телефоне действия не помещаются в строку с заголовком — переносим
+    // их под него.
+    if (FormFactor.isCompact(context)) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (trailing == null)
+            titleBlock
+          else
+            Row(children: [Expanded(child: titleBlock), trailing!]),
+          if (actions.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: actions,
+            ),
+          ],
+        ],
+      );
+    }
     return Row(
       children: [
         Expanded(
@@ -53,6 +104,10 @@ class ScreenHeader extends StatelessWidget {
           if (i > 0) const SizedBox(width: 8),
           actions[i],
         ],
+        if (trailing != null) ...[
+          if (actions.isNotEmpty) const SizedBox(width: 8),
+          trailing!,
+        ],
       ],
     );
   }
@@ -60,6 +115,12 @@ class ScreenHeader extends StatelessWidget {
 
 /// Внутренние отступы экрана на панели контента.
 const kScreenPadding = EdgeInsets.fromLTRB(26, 22, 26, 22);
+
+/// Отступы экрана с учётом раскладки: на телефоне каждый пиксель ширины на
+/// счету.
+EdgeInsets screenPadding(BuildContext context) => FormFactor.isCompact(context)
+    ? const EdgeInsets.fromLTRB(16, 14, 16, 14)
+    : kScreenPadding;
 
 /// Чип с кодом страны («NL») вместо флага-emoji.
 class CountryChip extends StatelessWidget {

@@ -7,6 +7,7 @@ import '../../models/app_settings.dart';
 import '../../services/node_display.dart';
 import '../../theme/verge_palette.dart';
 import '../../tunnel/tunnel_controller.dart';
+import '../form_factor.dart';
 import 'paper.dart';
 
 /// Карточка подключения: тумблер, статус и сервер, режим и роутинг, под ней —
@@ -120,6 +121,114 @@ class _HeroPanelState extends State<HeroPanel> {
 
     final node = c.selectedNode;
     final nodeName = node == null ? null : splitCountryFlag(node.name);
+    final compact = FormFactor.isCompact(context);
+
+    final status = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: compact ? 20 : 24,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.4,
+            color: titleColor,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            if (nodeName?.code != null) ...[
+              CountryChip(nodeName!.code!),
+              const SizedBox(width: 8),
+            ],
+            Flexible(
+              child: Text(
+                nodeName == null
+                    ? 'Выберите сервер ниже'
+                    : [
+                        nodeName.name,
+                        if (c.activeProfile != null) c.activeProfile!.name,
+                      ].join('  ·  '),
+                maxLines: compact ? 2 : 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.muted,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+    final toggle = ConnectToggle(
+      running: running,
+      connecting: connecting,
+      onTap: _togglePower,
+    );
+    // Выбор режима — только там, где он есть (на Android — всегда VPN).
+    final modeSwitch = c.tunOnly
+        ? null
+        : Segmented<TunnelMode>(
+            value: c.settings.tunnelMode,
+            onChanged: _switchingTun ? null : _selectMode,
+            options: const [
+              SegmentedOption(
+                value: TunnelMode.systemProxy,
+                label: 'Прокси',
+                icon: LucideIcons.globe,
+              ),
+              SegmentedOption(
+                value: TunnelMode.tun,
+                label: 'TUN',
+                icon: LucideIcons.network,
+              ),
+            ],
+          );
+    final controls = [
+      ?modeSwitch,
+      if (c.routingProfiles.isNotEmpty) ...[
+        if (modeSwitch != null) const SizedBox(height: 8),
+        _RoutingSelect(controller: c),
+      ],
+    ];
+
+    // Телефон: тумблер и статус в строку, режим и роутинг — под ними во всю
+    // ширину.
+    final Widget card = compact
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  toggle,
+                  const SizedBox(width: 16),
+                  Expanded(child: status),
+                ],
+              ),
+              if (controls.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                ...controls,
+              ],
+            ],
+          )
+        : Row(
+            children: [
+              toggle,
+              const SizedBox(width: 22),
+              Expanded(child: status),
+              if (controls.isNotEmpty) ...[
+                const SizedBox(width: 16),
+                SizedBox(
+                  width: 236,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: controls,
+                  ),
+                ),
+              ],
+            ],
+          );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -127,90 +236,15 @@ class _HeroPanelState extends State<HeroPanel> {
       children: [
         AnimatedContainer(
           duration: const Duration(milliseconds: 250),
-          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
+          padding: compact
+              ? const EdgeInsets.all(16)
+              : const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
           decoration: BoxDecoration(
             color: cardBg,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: cardBorder),
           ),
-          child: Row(
-            children: [
-              ConnectToggle(
-                running: running,
-                connecting: connecting,
-                onTap: _togglePower,
-              ),
-              const SizedBox(width: 22),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.4,
-                        color: titleColor,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        if (nodeName?.code != null) ...[
-                          CountryChip(nodeName!.code!),
-                          const SizedBox(width: 8),
-                        ],
-                        Flexible(
-                          child: Text(
-                            nodeName == null
-                                ? 'Выберите сервер ниже'
-                                : [
-                                    nodeName.name,
-                                    if (c.activeProfile != null)
-                                      c.activeProfile!.name,
-                                  ].join('  ·  '),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.muted,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              SizedBox(
-                width: 236,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Segmented<TunnelMode>(
-                      value: c.settings.tunnelMode,
-                      onChanged: _switchingTun ? null : _selectMode,
-                      options: const [
-                        SegmentedOption(
-                          value: TunnelMode.systemProxy,
-                          label: 'Прокси',
-                          icon: LucideIcons.globe,
-                        ),
-                        SegmentedOption(
-                          value: TunnelMode.tun,
-                          label: 'TUN',
-                          icon: LucideIcons.network,
-                        ),
-                      ],
-                    ),
-                    if (c.routingProfiles.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      _RoutingSelect(controller: c),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ),
+          child: card,
         ),
         const SizedBox(height: 10),
         // Скорость загрузки и отдачи — в сайдбаре, здесь не дублируем.

@@ -515,4 +515,27 @@ void main() {
       expect(exp['clash_api'], isNotNull);
     });
   });
+
+  group('tunLocalProxy (Android)', () {
+    const node = NodeConfig(
+      name: 'A', protocol: NodeProtocol.vless, host: 'h', port: 443,
+      params: {'uuid': 'u', 'security': 'reality', 'pbk': 'k', 'sid': ''},
+    );
+
+    test('в TUN-конфиг добавляется mixed-инбаунд на localPort', () {
+      final cfg = const ConfigBuilder(localPort: 3090, tunLocalProxy: true)
+          .build(node, mode: TunnelMode.tun, serverIp: '1.2.3.4');
+      final inbounds = (cfg['inbounds'] as List).cast<Map<String, dynamic>>();
+      expect(inbounds.map((i) => i['tag']), ['tun-in', 'mixed-in']);
+      expect(inbounds.last['listen'], '127.0.0.1');
+      expect(inbounds.last['listen_port'], 3090);
+    });
+
+    test('по умолчанию TUN-конфиг прежний — только tun', () {
+      final cfg = const ConfigBuilder()
+          .build(node, mode: TunnelMode.tun, serverIp: '1.2.3.4');
+      final inbounds = cfg['inbounds'] as List;
+      expect(inbounds, hasLength(1));
+    });
+  });
 }

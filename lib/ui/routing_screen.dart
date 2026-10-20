@@ -5,6 +5,7 @@ import '../models/routing_profile.dart';
 import '../models/routing_rule.dart';
 import '../services/geo_catalog.dart';
 import '../theme/verge_palette.dart';
+import 'form_factor.dart';
 import 'widgets/paper.dart';
 
 /// Роутинг: карточки профилей сверху, под ними — правила выбранного.
@@ -60,7 +61,7 @@ class _RoutingScreenState extends State<RoutingScreen> {
       builder: (context, _) {
         final viewed = _viewed;
         return SingleChildScrollView(
-          padding: kScreenPadding,
+          padding: screenPadding(context),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -317,6 +318,11 @@ class _Editor extends StatelessWidget {
     final exceptions = theme.brightness == Brightness.dark
         ? const Color(0xFFA58BF0)
         : const Color(0xFF7C5CD6);
+    final compact = FormFactor.isCompact(context);
+    const finalLabel = Text(
+      'Всё, что не попало в правила',
+      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+    );
 
     final groups = [
       _RuleGroup(
@@ -431,7 +437,9 @@ class _Editor extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 12),
-        _EqualRows(columns: 2, gap: 10, children: groups),
+        // На телефоне группы друг под другом: в две колонки чипы правил
+        // и переключатель исключений не помещаются.
+        _EqualRows(columns: compact ? 1 : 2, gap: 10, children: groups),
         const SizedBox(height: 10),
         // Итоговое действие — отдельной строкой под группами: в шапке рядом
         // с именем и кнопками ему не хватало места.
@@ -442,16 +450,21 @@ class _Editor extends StatelessWidget {
             border: Border.all(color: palette.divider),
             borderRadius: BorderRadius.circular(14),
           ),
-          child: Row(
+          child: Flex(
+            direction: compact ? Axis.vertical : Axis.horizontal,
+            crossAxisAlignment: compact
+                ? CrossAxisAlignment.stretch
+                : CrossAxisAlignment.center,
             children: [
-              const Expanded(
-                child: Text(
-                  'Всё, что не попало в правила',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                ),
-              ),
+              // В вертикальной раскладке (телефон) Expanded нельзя: высота
+              // внутри прокрутки не ограничена.
+              if (compact) ...[
+                finalLabel,
+                const SizedBox(height: 8),
+              ] else
+                Expanded(child: finalLabel),
               SizedBox(
-                width: 220,
+                width: compact ? null : 220,
                 child: Segmented<RoutingFinal>(
                   value: p.finalAction,
                   height: 32,

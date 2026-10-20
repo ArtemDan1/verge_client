@@ -20,6 +20,8 @@ import 'widgets/hero_panel.dart';
 import 'widgets/paper.dart';
 import 'add_profile_dialog.dart';
 import 'edit_node_dialog.dart';
+import 'form_factor.dart';
+import 'widgets/verge_logo.dart';
 
 /// Диалог переименования профиля. После него имя считается ручным и больше
 /// не перетирается profile-title из подписки.
@@ -152,82 +154,119 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
   Widget build(BuildContext context) {
     final c = widget.controller;
     final theme = ShadTheme.of(context);
+    final compact = FormFactor.isCompact(context);
+
+    final toolbar = Row(
+      children: [
+        // На телефоне сайдбара с логотипом нет — логотип в шапке главной.
+        if (compact)
+          VergeLogo(titleColor: theme.colorScheme.foreground),
+        const Spacer(),
+        IconAction(
+          icon: LucideIcons.activity,
+          tooltip: 'Пинг всех',
+          onPressed: c.pingAll,
+        ),
+        const SizedBox(width: 8),
+        IconAction(
+          icon: LucideIcons.refreshCw,
+          tooltip: 'Обновить подписки',
+          onPressed: c.isRefreshingAll ? null : c.refreshAllProfiles,
+        ),
+        const SizedBox(width: 8),
+        if (compact)
+          IconAction(
+            icon: LucideIcons.plus,
+            tooltip: 'Добавить подписку',
+            onPressed: () => showAddProfileDialog(context, c),
+          )
+        else
+          ShadButton(
+            onPressed: () => showAddProfileDialog(context, c),
+            leading: const Icon(LucideIcons.plus, size: 16),
+            child: const Text('Добавить подписку'),
+          ),
+      ],
+    );
+
+    final serversHeader = Row(
+      children: [
+        Text('Серверы', style: theme.textTheme.large.copyWith(fontSize: 16)),
+        const Spacer(),
+        // Перебор занимает секунды и молча меняет выбранную ноду —
+        // без индикатора он неотличим от неработающей кнопки.
+        if (c.isAutoSelecting) ...[
+          Text('Подбираем ноду…', style: theme.textTheme.muted),
+          const SizedBox(width: 8),
+        ],
+        // Включённый автовыбор подсвечен кобальтом: состояние фичи
+        // видно, не открывая диалог.
+        _AutoSelectButton(controller: c),
+      ],
+    );
+
+    final cards = [
+      for (final p in c.profiles)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: _ProfileCard(
+            key: ValueKey(p.id),
+            // Активный профиль сразу раскрыт: его сервера нужны чаще всего.
+            expanded: p.id == c.activeProfileId,
+            header: _profileHeader(c, theme, p),
+            body: _profileBody(context, c, theme, p),
+            id: p.id,
+          ),
+        ),
+    ];
+    final empty = Text('Нет подписок. Добавьте первую.',
+        style: theme.textTheme.muted);
+
+    // Телефон: панель подключения и список серверов прокручиваются вместе —
+    // иначе под фиксированной шапкой на список почти не остаётся места.
+    if (compact) {
+      return ListView(
+        padding: screenPadding(context),
+        children: [
+          toolbar,
+          const SizedBox(height: 14),
+          HeroPanel(controller: c),
+          const SizedBox(height: 18),
+          serversHeader,
+          const SizedBox(height: 10),
+          if (c.profiles.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 32),
+              child: Center(child: empty),
+            )
+          else
+            ...cards,
+        ],
+      );
+    }
 
     return Padding(
-      padding: kScreenPadding,
+      padding: screenPadding(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // --- Фиксированная верхняя секция ---
-          Row(
-            children: [
-              const Spacer(),
-              IconAction(
-                icon: LucideIcons.activity,
-                tooltip: 'Пинг всех',
-                onPressed: c.pingAll,
-              ),
-              const SizedBox(width: 8),
-              IconAction(
-                icon: LucideIcons.refreshCw,
-                tooltip: 'Обновить подписки',
-                onPressed: c.isRefreshingAll ? null : c.refreshAllProfiles,
-              ),
-              const SizedBox(width: 8),
-              ShadButton(
-                onPressed: () => showAddProfileDialog(context, c),
-                leading: const Icon(LucideIcons.plus, size: 16),
-                child: const Text('Добавить подписку'),
-              ),
-            ],
-          ),
+          toolbar,
           const SizedBox(height: 16),
           HeroPanel(controller: c),
           const SizedBox(height: 18),
-          Row(
-            children: [
-              Text('Серверы',
-                  style: theme.textTheme.large.copyWith(fontSize: 16)),
-              const Spacer(),
-              // Перебор занимает секунды и молча меняет выбранную ноду —
-              // без индикатора он неотличим от неработающей кнопки.
-              if (c.isAutoSelecting) ...[
-                Text('Подбираем ноду…', style: theme.textTheme.muted),
-                const SizedBox(width: 8),
-              ],
-              // Включённый автовыбор подсвечен кобальтом: состояние фичи
-              // видно, не открывая диалог.
-              _AutoSelectButton(controller: c),
-            ],
-          ),
+          serversHeader,
           const SizedBox(height: 10),
           // --- Прокручиваемая секция профилей ---
           Expanded(
             child: c.profiles.isEmpty
-                ? Center(
-                    child: Text('Нет подписок. Добавьте первую.',
-                        style: theme.textTheme.muted),
-                  )
+                ? Center(child: empty)
                 : _ScrollFadeShadow(
                     color: theme.colorScheme.background,
                     child: SingleChildScrollView(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          for (final p in c.profiles)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
-                              child: _ProfileCard(
-                                key: ValueKey(p.id),
-                                // Активный профиль сразу раскрыт: его сервера
-                                // нужны чаще всего.
-                                expanded: p.id == c.activeProfileId,
-                                header: _profileHeader(c, theme, p),
-                                body: _profileBody(context, c, theme, p),
-                                id: p.id,
-                              ),
-                            ),
-                        ],
+                        children: cards,
                       ),
                     ),
                   ),
@@ -440,6 +479,9 @@ class _NodeTableHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // На телефоне строка ноды — карточка в две строки, колонкам заголовок
+    // не нужен.
+    if (FormFactor.isCompact(context)) return const SizedBox.shrink();
     final style = ShadTheme.of(context).textTheme.muted.copyWith(fontSize: 12);
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 8, 12, 8),
@@ -510,45 +552,88 @@ class _NodeRowState extends State<_NodeRow> {
     final selected = widget.selected;
     final name = splitCountryFlag(node.name);
     final radioOn = dark ? palette.accentText : palette.accent;
-
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: widget.onTap,
+    final compact = FormFactor.isCompact(context);
+    final radio = SizedBox(
+      width: _kRadioWidth,
+      child: Align(
+        alignment: Alignment.centerLeft,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          padding: const EdgeInsets.fromLTRB(16, 8, 12, 8),
+          duration: const Duration(milliseconds: 150),
+          width: 18,
+          height: 18,
           decoration: BoxDecoration(
-            color: selected
-                ? palette.accentSoft
-                : _hovered
-                    ? palette.surfaceHeader
-                    : palette.panel,
-            border: Border(top: BorderSide(color: palette.divider)),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: selected ? radioOn : palette.radioOff,
+              width: selected ? 5 : 1.5,
+            ),
           ),
-          child: Row(
+        ),
+      ),
+    );
+    final menu = SizedBox(
+      width: _kMenuWidth,
+      child: _NodeMenu(
+        choice: widget.choice,
+        autoEngine: preferXray(node) ? NodeEngine.xray : NodeEngine.singbox,
+        onEngineChoice: widget.onEngineChoice,
+        onPing: widget.onPing,
+        onEdit: widget.onEdit,
+      ),
+    );
+    final engineBadge = EngineBadge(
+      engine: widget.engine,
+      manual: widget.choice != EngineChoice.auto,
+      fellBack: widget.fellBack,
+    );
+
+    // Телефон: имя на всю ширину, протокол и движок — второй строкой вместо
+    // адреса, задержка — только числом.
+    final Widget row = compact
+        ? Row(
             children: [
-              SizedBox(
-                width: _kRadioWidth,
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
-                    width: 18,
-                    height: 18,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: selected ? radioOn : palette.radioOff,
-                        width: selected ? 5 : 1.5,
-                      ),
+              radio,
+              if (name.code != null) ...[
+                CountryChip(name.code!),
+                const SizedBox(width: 8),
+              ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w500),
                     ),
-                  ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            nodeProtocolLabel(node),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.muted.copyWith(fontSize: 12),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        engineBadge,
+                      ],
+                    ),
+                  ],
                 ),
               ),
+              const SizedBox(width: 8),
+              SizedBox(width: 64, child: widget.latency),
+              menu,
+            ],
+          )
+        : Row(
+            children: [
+              radio,
               Expanded(
                 flex: 16,
                 child: Row(
@@ -594,30 +679,33 @@ class _NodeRowState extends State<_NodeRow> {
               ),
               SizedBox(
                 width: _kEngineWidth,
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: EngineBadge(
-                    engine: widget.engine,
-                    manual: widget.choice != EngineChoice.auto,
-                    fellBack: widget.fellBack,
-                  ),
-                ),
+                child: Align(alignment: Alignment.centerLeft, child: engineBadge),
               ),
               const SizedBox(width: 12),
               SizedBox(width: _kLatencyWidth, child: widget.latency),
-              SizedBox(
-                width: _kMenuWidth,
-                child: _NodeMenu(
-                  choice: widget.choice,
-                  autoEngine:
-                      preferXray(node) ? NodeEngine.xray : NodeEngine.singbox,
-                  onEngineChoice: widget.onEngineChoice,
-                  onPing: widget.onPing,
-                  onEdit: widget.onEdit,
-                ),
-              ),
+              menu,
             ],
+          );
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          padding: const EdgeInsets.fromLTRB(16, 8, 12, 8),
+          decoration: BoxDecoration(
+            color: selected
+                ? palette.accentSoft
+                : _hovered
+                    ? palette.surfaceHeader
+                    : palette.panel,
+            border: Border(top: BorderSide(color: palette.divider)),
           ),
+          child: row,
         ),
       ),
     );
@@ -644,6 +732,7 @@ class _LatencyCell extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = VergePalette.of(context);
     final theme = ShadTheme.of(context);
+    final compact = FormFactor.isCompact(context);
     final ms = latencyMs;
     final Widget content;
     if (loading) {
@@ -669,7 +758,16 @@ class _LatencyCell extends StatelessWidget {
           : failure != null
               ? palette.dangerText
               : theme.colorScheme.mutedForeground;
-      content = Row(
+      final text = Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: monoStyle(fontSize: 12, color: labelColor),
+      );
+      // На телефоне шкала не помещается — остаётся число цветом порога.
+      content = compact
+          ? text
+          : Row(
         children: [
           Container(
             width: 56,
@@ -690,14 +788,7 @@ class _LatencyCell extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: monoStyle(fontSize: 12, color: labelColor),
-            ),
-          ),
+          Flexible(child: text),
         ],
       );
     }
@@ -707,7 +798,10 @@ class _LatencyCell extends StatelessWidget {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
-        child: Align(alignment: Alignment.centerLeft, child: content),
+        child: Align(
+          alignment: compact ? Alignment.centerRight : Alignment.centerLeft,
+          child: content,
+        ),
       ),
     );
   }
@@ -1130,56 +1224,61 @@ class _UsageBar extends StatelessWidget {
             ? palette.warning
             : palette.danger;
     final left = total - used;
+    final bar = Container(
+      height: 6,
+      decoration: BoxDecoration(
+        color: palette.chip,
+        borderRadius: BorderRadius.circular(3),
+      ),
+      alignment: Alignment.centerLeft,
+      child: FractionallySizedBox(
+        // Хоть какой-то след даже при почти нулевом расходе.
+        widthFactor: fraction == 0 ? 0 : math.max(fraction, 0.02),
+        child: Container(
+          decoration: BoxDecoration(
+            color: fill,
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
+      ),
+    );
+    final caption = Text.rich(
+      TextSpan(children: [
+        TextSpan(
+          text: '${format(used)} из ${format(total)}',
+          style: TextStyle(
+            fontWeight: FontWeight.w500,
+            color: theme.colorScheme.foreground,
+          ),
+        ),
+        TextSpan(
+          text: left > 0 ? '  ·  осталось ${format(left)}' : '  ·  лимит исчерпан',
+          style: TextStyle(
+            color: left > 0
+                ? theme.colorScheme.mutedForeground
+                : palette.dangerText,
+          ),
+        ),
+      ]),
+      style: const TextStyle(fontSize: 12),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+    // Телефон: подпись под полоской, а не справа от неё.
+    if (FormFactor.isCompact(context)) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [bar, const SizedBox(height: 6), caption],
+      );
+    }
     return Row(
       children: [
         ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 260, minWidth: 120),
-          child: Container(
-            height: 6,
-            decoration: BoxDecoration(
-              color: palette.chip,
-              borderRadius: BorderRadius.circular(3),
-            ),
-            alignment: Alignment.centerLeft,
-            child: FractionallySizedBox(
-              // Хоть какой-то след даже при почти нулевом расходе.
-              widthFactor: fraction == 0 ? 0 : math.max(fraction, 0.02),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: fill,
-                  borderRadius: BorderRadius.circular(3),
-                ),
-              ),
-            ),
-          ),
+          child: bar,
         ),
         const SizedBox(width: 12),
-        Flexible(
-          child: Text.rich(
-            TextSpan(children: [
-              TextSpan(
-                text: '${format(used)} из ${format(total)}',
-                style: TextStyle(
-                  fontWeight: FontWeight.w500,
-                  color: theme.colorScheme.foreground,
-                ),
-              ),
-              TextSpan(
-                text: left > 0
-                    ? '  ·  осталось ${format(left)}'
-                    : '  ·  лимит исчерпан',
-                style: TextStyle(
-                  color: left > 0
-                      ? theme.colorScheme.mutedForeground
-                      : palette.dangerText,
-                ),
-              ),
-            ]),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12),
-          ),
-        ),
+        Flexible(child: caption),
       ],
     );
   }

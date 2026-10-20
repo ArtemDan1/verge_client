@@ -55,3 +55,7 @@ cache-tun.db
 test_output.txt
 
 /docs/superpowers/**
+
+# Android: движки собирает CI (scripts/android), в репозитории их нет
+/android/app/libs/
+/android/app/src/main/jniLibs/

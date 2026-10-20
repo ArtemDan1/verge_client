@@ -7,6 +7,7 @@ import '../app/app_controller.dart';
 import '../models/log_entry.dart';
 import '../theme/app_theme.dart';
 import '../theme/verge_palette.dart';
+import 'form_factor.dart';
 import 'widgets/paper.dart';
 
 class LogsScreen extends StatefulWidget {
@@ -50,7 +51,7 @@ class _LogsScreenState extends State<LogsScreen> {
 
     final palette = VergePalette.of(context);
     return Padding(
-      padding: kScreenPadding,
+      padding: screenPadding(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -250,6 +251,24 @@ class _LogRow extends StatelessWidget {
     );
 
     final palette = VergePalette.of(context);
+    final message = Text.rich(
+      TextSpan(
+        children: [
+          if (entry.source != null)
+            TextSpan(
+              text: '${entry.source}  ',
+              style: mono.copyWith(
+                color: muted,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          TextSpan(
+            text: entry.message,
+            style: mono.copyWith(color: theme.colorScheme.foreground),
+          ),
+        ],
+      ),
+    );
     return Container(
       decoration: BoxDecoration(
         color: entry.level == LogLevel.error
@@ -258,7 +277,25 @@ class _LogRow extends StatelessWidget {
         border: Border(bottom: BorderSide(color: palette.divider)),
       ),
       padding: const EdgeInsets.fromLTRB(14, 5, 14, 5),
-      child: Row(
+      child: FormFactor.isCompact(context)
+          // Телефон: метки строкой сверху, сообщение — во всю ширину под ними.
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(entry.timeLabel, style: mono.copyWith(color: muted)),
+                    const SizedBox(width: 10),
+                    _tag(entry.level.label, color, filled: true),
+                    const SizedBox(width: 6),
+                    _tag(entry.origin.label, _originColor(entry.origin, theme)),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                message,
+              ],
+            )
+          : Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(entry.timeLabel, style: mono.copyWith(color: muted)),
@@ -274,26 +311,7 @@ class _LogRow extends StatelessWidget {
             child: _tag(entry.origin.label, _originColor(entry.origin, theme)),
           ),
           const SizedBox(width: 8),
-          Expanded(
-            child: Text.rich(
-              TextSpan(
-                children: [
-                  if (entry.source != null)
-                    TextSpan(
-                      text: '${entry.source}  ',
-                      style: mono.copyWith(
-                        color: muted,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  TextSpan(
-                    text: entry.message,
-                    style: mono.copyWith(color: theme.colorScheme.foreground),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          Expanded(child: message),
         ],
       ),
     );

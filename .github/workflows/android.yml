@@ -1,0 +1,136 @@
+name: Android
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    # По тегу релиза APK прикрепляются к GitHub Release.
+    tags: ['v*']
+    # TEMP: проверка сборки на ветке порта, убрать перед мержем.
+    branches: [claude/wonderful-bardeen-rj79fx]
+  workflow_dispatch:
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      # Версии движков — те же, что в десктопных сборках.
+      SINGBOX_VERSION: v1.14.1
+      XRAY_VERSION: v26.3.27
+      # NDK, которым собирают официальный libbox (cmd/internal/build_shared).
+      NDK_VERSION: 28.0.13004108
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: false
+
+      - name: Install NDK
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;$NDK_VERSION" > /dev/null
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+
+      # libbox собирается 10–20 минут — кешируем по версии sing-box и скрипту.
+      - name: Cache libbox
+        id: libbox
+        uses: actions/cache@v4
+        with:
+          path: android/app/libs/libbox.aar
+          key: libbox-${{ env.SINGBOX_VERSION }}-${{ hashFiles('scripts/android/build_libbox.sh') }}
+
+      - name: Build libbox (sing-box)
+        if: steps.libbox.outputs.cache-hit != 'true'
+        run: scripts/android/build_libbox.sh
+
+      - name: Fetch Xray
+        run: scripts/android/fetch_xray.sh
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.44.1
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
+
+      # Ключ подписи — из секретов репозитория (см. docs/ANDROID.md). Без него
+      # APK подписывается debug-ключом: поставить можно, а вот обновить им
+      # установленную ранее версию — нет.
+      - name: Signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::warning::Нет секрета ANDROID_KEYSTORE_BASE64 — APK подписан debug-ключом"
+            exit 0
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > android/release.jks
+          cat > android/key.properties <<PROPS
+          storeFile=release.jks
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=${KEY_PASSWORD:-$KEYSTORE_PASSWORD}
+          PROPS
+
+      # versionCode растёт вместе с версией: 1.2.1 → 10201. Android не ставит
+      # APK с меньшим versionCode поверх большего.
+      - name: Version
+        id: version
+        run: |
+          v="$(grep -m1 '^version:' pubspec.yaml | sed 's/version: *//; s/+.*//')"
+          IFS=. read -r major minor patch <<< "$v"
+          echo "name=$v" >> "$GITHUB_OUTPUT"
+          echo "code=$((major * 10000 + minor * 100 + patch))" >> "$GITHUB_OUTPUT"
+
+      - name: Build APK
+        run: >
+          flutter build apk --release --split-per-abi
+          --target-platform android-arm,android-arm64,android-x64
+          --build-number=${{ steps.version.outputs.code }}
+
+      # Имя ассета заканчивается на «android-<abi>.apk»: так его ищет
+      # UpdateService (lib/main.dart) для своей архитектуры.
+      - name: Collect APKs
+        run: |
+          mkdir -p dist
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            cp "build/app/outputs/flutter-apk/app-$abi-release.apk" \
+               "dist/Verge_${{ steps.version.outputs.name }}_android-$abi.apk"
+          done
+          ls -la dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verge-android
+          path: dist/*.apk
+          retention-days: 14
+
+      - name: Test
+        run: flutter test
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.apk
+          fail_on_unmatched_files: true

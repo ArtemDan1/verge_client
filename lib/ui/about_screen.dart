@@ -1,9 +1,11 @@
+import 'package:flutter/material.dart' show Scaffold;
 import 'package:flutter/widgets.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../app/app_controller.dart';
 import '../services/link_opener.dart';
 import '../theme/app_theme.dart';
 import '../theme/verge_palette.dart';
+import 'form_factor.dart';
 import 'widgets/paper.dart';
 import 'widgets/update_banner.dart';
 import 'widgets/verge_logo.dart';
@@ -198,4 +200,41 @@ class _UpdateBlockState extends State<_UpdateBlock> {
 
     return UpdateCard(controller: c, inline: true);
   }
+}
+
+/// «О приложении» на телефоне — отдельная страница с кнопкой «назад».
+void openAboutPage(BuildContext context, AppController controller) {
+  Navigator.of(context).push(PageRouteBuilder<void>(
+    pageBuilder: (context, _, _) => FormFactor(
+      compact: true,
+      child: Scaffold(
+        backgroundColor: VergePalette.of(context).panel,
+        body: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(6, 6, 6, 0),
+                child: ShadIconButton.ghost(
+                  icon: const Icon(LucideIcons.arrowLeft, size: 20),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ),
+              Expanded(
+                child: AnimatedBuilder(
+                  animation: controller,
+                  builder: (context, _) => AboutScreen(controller: controller),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+    transitionsBuilder: (context, animation, _, child) => SlideTransition(
+      position: Tween(begin: const Offset(1, 0), end: Offset.zero).animate(
+          CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+      child: child,
+    ),
+  ));
 }
