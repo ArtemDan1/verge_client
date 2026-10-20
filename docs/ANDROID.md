@@ -1,0 +1,75 @@
+# Verge для Android
+
+Android-версия раздаётся APK-файлом из [GitHub Releases](https://github.com/ArtemDan1/verge_client/releases/latest), без Google Play.
+
+## Установка
+
+1. Скачайте APK под свой телефон:
+   - `Verge_<версия>_android-arm64-v8a.apk` — почти все телефоны последних лет. Не знаете, какой брать, — берите этот.
+   - `…-armeabi-v7a.apk` — старые и самые бюджетные 32-битные устройства.
+   - `…-x86_64.apk` — эмуляторы и Chromebook.
+2. Откройте скачанный файл. Android попросит разрешить установку из этого источника (браузер или «Файлы») — разрешите.
+3. Google Play Защита может предупредить о незнакомом приложении: **«Подробнее» → «Всё равно установить»**.
+4. Запустите Verge, добавьте подписку и нажмите на тумблер. При первом подключении Android спросит разрешение на VPN — подтвердите.
+
+Требуется Android 8.0 и новее.
+
+## Как это работает
+
+- Весь трафик телефона идёт через VPN (`VpnService`). Отдельного режима «системный прокси», как на десктопе, на Android нет.
+- Сам Verge в свой VPN не попадает: так соединения ядра не зацикливаются, а пинг до серверов честный. Для обновления гео-наборов приложение ходит через локальный прокси `127.0.0.1:<порт из настроек>`.
+- Внутри два движка, как на десктопе: sing-box (встроен в приложение) и Xray (отдельный процесс для `hysteria2` и `vless+xhttp`). В сборке `armeabi-v7a` Xray нет: у Xray нет официальной 32-битной Android-сборки, поэтому такие ноды поднимаются на sing-box.
+- VPN продолжает работать, если смахнуть приложение из недавних. Отключить его можно кнопкой в уведомлении.
+- Ссылки `verge://import/...` открываются в приложении.
+- Обновления: Verge сам находит новую версию в релизах и скачивает APK под свою архитектуру. При первом обновлении Android попросит разрешить Verge установку приложений.
+
+## Для разработчиков
+
+### Сборка
+
+Нужны Flutter, JDK 17, Android SDK с NDK и Go (версия — из `go.mod` sing-box).
+
+```bash
+scripts/android/build_libbox.sh   # sing-box → android/app/libs/libbox.aar (10–20 минут)
+scripts/android/fetch_xray.sh     # Xray → android/app/src/main/jniLibs/<abi>/libxray.so
+flutter build apk --release --split-per-abi
+```
+
+Движков в репозитории нет — их собирает или скачивает CI (`.github/workflows/android.yml`). Версии sing-box и Xray заданы в workflow и скриптах и должны совпадать с десктопными (`windows/runner/resources/README.md`).
+
+Нативная часть — `android/app/src/main/kotlin/com/singboxclient/verge/`: `VergeVpnService` (TUN и боевой sing-box), `MainActivity` (платформенные каналы с теми же именами, что на десктопе), `XrayRunner`, `BoxEngine` (обёртка над libbox).
+
+### Подпись релизов
+
+Android обновляет приложение поверх старого, только если оба APK подписаны **одним и тем же ключом**. Поэтому ключ создаётся один раз и хранится в секретах репозитория. Потеряете его — пользователям придётся удалить приложение и поставить заново.
+
+1. Создайте ключ (один раз) и сохраните файл и пароль в надёжном месте:
+
+   ```bash
+   keytool -genkeypair -v -keystore verge-release.jks -alias verge \
+     -keyalg RSA -keysize 4096 -validity 10000
+   ```
+
+2. Добавьте секреты в **Settings → Secrets and variables → Actions**:
+
+   | Секрет | Значение |
+   |---|---|
+   | `ANDROID_KEYSTORE_BASE64` | `base64 -w0 verge-release.jks` |
+   | `ANDROID_KEYSTORE_PASSWORD` | пароль хранилища |
+   | `ANDROID_KEY_ALIAS` | `verge` |
+   | `ANDROID_KEY_PASSWORD` | пароль ключа (если совпадает с паролем хранилища — можно не задавать) |
+
+Без секретов CI подписывает APK debug-ключом и пишет предупреждение: такой APK можно поставить, но обновить им установленную версию нельзя.
+
+Локально ключ подключается файлом `android/key.properties` (в git не попадает):
+
+```properties
+storeFile=verge-release.jks
+storePassword=...
+keyAlias=verge
+keyPassword=...
+```
+
+### Релиз
+
+При пуше тега `v*` workflow собирает три APK и прикрепляет их к GitHub Release. Имя файла обязано заканчиваться на `android-<abi>.apk` — по нему приложение находит обновление для своей архитектуры.

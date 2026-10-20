@@ -75,6 +75,12 @@ flutter_launcher_icons:
     image_path: "assets/branding/verge-app-icon-macos-1024.png"
     icon_size: 256
   ios: true
+  # Android: обычная иконка (до 8.0) и адаптивная — знак на фоне цвета плитки,
+  # форму маски выбирает лаунчер.
+  android: true
+  min_sdk_android: 26
+  adaptive_icon_background: "#FBFAF7"
+  adaptive_icon_foreground: "assets/branding/verge-app-icon-android-foreground.png"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

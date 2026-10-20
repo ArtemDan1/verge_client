@@ -4,13 +4,13 @@
 
 # Verge
 
-**Быстрый и понятный прокси-клиент для macOS и Windows**
+**Быстрый и понятный прокси-клиент для macOS, Windows и Android**
 
 Вставьте подписку — Verge сделает остальное.
 
 [![Release](https://img.shields.io/github/v/release/ArtemDan1/verge_client?style=flat-square&label=release&color=1a1a1a)](https://github.com/ArtemDan1/verge_client/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/ArtemDan1/verge_client/total?style=flat-square&color=1a1a1a)](https://github.com/ArtemDan1/verge_client/releases)
-[![Platforms](https://img.shields.io/badge/macOS%20%7C%20Windows-1a1a1a?style=flat-square)](#-скачать)
+[![Platforms](https://img.shields.io/badge/macOS%20%7C%20Windows%20%7C%20Android-1a1a1a?style=flat-square)](#-скачать)
 [![License](https://img.shields.io/github/license/ArtemDan1/verge_client?style=flat-square&color=1a1a1a)](LICENSE)
 
 <br>
@@ -30,8 +30,9 @@
 |---|---|---|
 | **macOS** | [![PKG](https://img.shields.io/badge/PKG-Universal-000000?style=flat-square&logo=apple)](https://github.com/ArtemDan1/verge_client/releases/latest) | Apple Silicon или Intel |
 | **Windows** | [![Setup](https://img.shields.io/badge/Setup-x64-0078d7?style=flat-square&logo=windows)](https://github.com/ArtemDan1/verge_client/releases/latest) | Windows 10 (1809) и новее |
+| **Android** | [![APK](https://img.shields.io/badge/APK-arm64-3ddc84?style=flat-square&logo=android&logoColor=white)](https://github.com/ArtemDan1/verge_client/releases/latest) | Android 8.0 и новее |
 
-> Сборки пока не подписаны. На macOS откройте установщик через **правый клик → Открыть**, на Windows в окне SmartScreen нажмите **Подробнее → Выполнить в любом случае**. Подробнее — [macOS](docs/INSTALL.md), [Windows](docs/WINDOWS.md).
+> Сборки пока не подписаны. На macOS откройте установщик через **правый клик → Открыть**, на Windows в окне SmartScreen нажмите **Подробнее → Выполнить в любом случае**. На Android разрешите установку из браузера или «Файлов»; почти всем телефонам подходит файл `android-arm64-v8a.apk`. Подробнее — [macOS](docs/INSTALL.md), [Windows](docs/WINDOWS.md), [Android](docs/ANDROID.md).
 
 ## ✨ Почему Verge
 
@@ -70,6 +71,21 @@
   </tr>
 </table>
 
+<details>
+<summary><b>📱 Android</b></summary>
+
+<br>
+
+<table>
+  <tr>
+    <td width="33%"><img src="docs/screenshots/android-home.png" alt="Главная на Android"></td>
+    <td width="33%"><img src="docs/screenshots/android-connections.png" alt="Соединения на Android"></td>
+    <td width="33%"><img src="docs/screenshots/android-routing.png" alt="Роутинг на Android"></td>
+  </tr>
+</table>
+
+</details>
+
 ## 🚀 Как начать
 
 1. Скачайте и установите Verge.
@@ -87,7 +103,7 @@ Verge — это клиент, а не VPN-сервис: серверы и по�
 
 <br>
 
-Verge написан на Flutter (UI на `shadcn_ui`), сетевые движки — [sing-box](https://github.com/SagerNet/sing-box) и [Xray](https://github.com/XTLS/Xray-core). Нативная часть macOS и helper для TUN — на Swift, Windows-часть и служба `VergeTunnel` — на C++.
+Verge написан на Flutter (UI на `shadcn_ui`), сетевые движки — [sing-box](https://github.com/SagerNet/sing-box) и [Xray](https://github.com/XTLS/Xray-core). Нативная часть macOS и helper для TUN — на Swift, Windows-часть и служба `VergeTunnel` — на C++, Android-часть (VpnService, sing-box как библиотека) — на Kotlin.
 
 ```bash
 flutter pub get
@@ -102,12 +118,14 @@ scripts/build_release.sh && scripts/make_pkg.sh              # macOS → .pkg
 flutter build windows --release && pwsh scripts/make_installer.ps1   # Windows → setup.exe
 ```
 
+Android-сборку (APK) делает CI; локально — `scripts/android/build_libbox.sh`, `scripts/android/fetch_xray.sh` и `flutter build apk --split-per-abi`, подробности и настройка ключа подписи — в [docs/ANDROID.md](docs/ANDROID.md).
+
 Для Windows нужны Visual Studio 2022 (Desktop development with C++), Inno Setup 6 и бинарники sing-box, Xray и Wintun — см. [docs/WINDOWS.md](docs/WINDOWS.md).
 
 Скриншоты для README генерируются из настоящих экранов приложения:
 
 ```bash
-VERGE_SCREENSHOTS=1 flutter test --update-goldens test/readme_screenshots
+VERGE_SCREENSHOTS=1 flutter test --update-goldens test/readme_screenshots test/ui/mobile_shell_test.dart
 ```
 
 </details>

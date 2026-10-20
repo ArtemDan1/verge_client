@@ -45,9 +45,11 @@ jobs:
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
 
       # libbox собирается 10–20 минут — кешируем по версии sing-box и скрипту.
-      - name: Cache libbox
+      # Сохраняем сразу после сборки, а не в конце job: иначе любой сбой
+      # дальше (тест, подпись) заставит собирать libbox заново.
+      - name: Restore libbox
         id: libbox
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: android/app/libs/libbox.aar
           key: libbox-${{ env.SINGBOX_VERSION }}-${{ hashFiles('scripts/android/build_libbox.sh') }}
@@ -55,6 +57,13 @@ jobs:
       - name: Build libbox (sing-box)
         if: steps.libbox.outputs.cache-hit != 'true'
         run: scripts/android/build_libbox.sh
+
+      - name: Save libbox
+        if: steps.libbox.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: android/app/libs/libbox.aar
+          key: ${{ steps.libbox.outputs.cache-primary-key }}
 
       - name: Fetch Xray
         run: scripts/android/fetch_xray.sh
