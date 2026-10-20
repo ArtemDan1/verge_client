@@ -15,12 +15,19 @@ abstract interface class AttachableTunnel {
   Future<Map<String, dynamic>?> attach();
 }
 
+/// Туннель с системным уведомлением, в котором показывается подключение.
+abstract interface class DetailedTunnel {
+  /// Сервер и пинг для уведомления; null — просто «Подключено».
+  Future<void> setDetails(String? text);
+}
+
 /// VPN на Android: VpnService + sing-box (libbox) в нативной части.
 ///
 /// Тот же канал `singbox/tun`, что у TUN-режима на десктопе, только под ним
 /// не helper-демон, а VpnService. Системный диалог разрешения VPN нативная
 /// сторона показывает сама, `start` отвечает после реального старта ядра.
-class AndroidVpnTunnel extends TunnelController implements AttachableTunnel {
+class AndroidVpnTunnel extends TunnelController
+    implements AttachableTunnel, DetailedTunnel {
   AndroidVpnTunnel({MethodChannel? channel, EventChannel? events})
       : _channel = channel ?? const MethodChannel('singbox/tun') {
     (events ?? const EventChannel('singbox/tun/events'))
@@ -70,6 +77,15 @@ class AndroidVpnTunnel extends TunnelController implements AttachableTunnel {
       emitLog('VPN остановлен с ошибкой: ${e.message}');
     }
     if (status != TunnelStatus.disconnected) emit(TunnelStatus.disconnected);
+  }
+
+  @override
+  Future<void> setDetails(String? text) async {
+    try {
+      await _channel.invokeMethod('setDetails', {'text': text});
+    } on PlatformException {
+      // Уведомление — украшение: его сбой не должен ломать подключение.
+    }
   }
 
   @override

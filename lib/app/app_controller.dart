@@ -32,6 +32,7 @@ import '../tunnel/android_vpn_tunnel.dart';
 import '../services/ping_service.dart';
 import '../models/connection_info.dart';
 import '../services/clash_api_client.dart';
+import '../services/node_display.dart';
 
 enum TunModeResult { enabled, denied }
 
@@ -285,6 +286,12 @@ class AppController extends ChangeNotifier {
     _restartHealthCheck();
     _restartGstaticPing();
     notifyListeners();
+    if (s == TunnelStatus.connected) {
+      // VPN включили не из приложения (плитка быстрых настроек) — подхватываем
+      // его, как при старте UI: Clash API, движок.
+      if (_activeEngine == null) _attachRunningTunnel().ignore();
+      _pushTunnelDetails();
+    }
     // Туннель поднялся — самое время обновить устаревшие наборы через прокси.
     if (s == TunnelStatus.connected &&
         _geoUpdater != null &&
@@ -1061,6 +1068,7 @@ class AppController extends ChangeNotifier {
     _pings[key] = res;
     _pinging.remove(key);
     notifyListeners();
+    if (_pingKey(node) == _pingKey(selectedNode ?? node)) _pushTunnelDetails();
   }
 
   Future<void> pingNodes(List<NodeConfig> nodes) async {
@@ -1154,12 +1162,15 @@ class AppController extends ChangeNotifier {
   /// пережил движок Flutter). Возвращает true, если туннель уже работает.
   Future<bool> _attachRunningTunnel() async {
     final tunnel = _activeTunnel;
-    if (tunnel is! AttachableTunnel) return false;
+    if (tunnel is! AttachableTunnel || _attaching) return false;
+    _attaching = true;
     final Map<String, dynamic>? config;
     try {
       config = await (tunnel as AttachableTunnel).attach();
     } catch (_) {
       return false;
+    } finally {
+      _attaching = false;
     }
     if (config == null) return false;
     _status = TunnelStatus.connected;
@@ -1170,6 +1181,22 @@ class AppController extends ChangeNotifier {
     _appendLog('VPN уже был подключён — продолжаем работу с ним');
     notifyListeners();
     return true;
+  }
+
+  bool _attaching = false;
+
+  /// Сервер и пинг активной ноды — в системное уведомление VPN (Android).
+  void _pushTunnelDetails() {
+    final tunnel = _activeTunnel;
+    if (tunnel is! DetailedTunnel || _status != TunnelStatus.connected) return;
+    final node = selectedNode;
+    if (node == null) return;
+    final ms = pingFor(node)?.latencyMs;
+    final text = [
+      splitCountryFlag(node.name).name,
+      if (ms != null) '$ms мс',
+    ].join(' · ');
+    (tunnel as DetailedTunnel).setDetails(text).ignore();
   }
 
   /// Движок по собранному конфигу: в Xray sing-box ходит socks-outbound'ом

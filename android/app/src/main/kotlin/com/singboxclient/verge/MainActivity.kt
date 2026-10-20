@@ -153,6 +153,12 @@ class MainActivity : FlutterActivity() {
                     }
                 }
                 "stop" -> stopVpn(result)
+                // Сервер и пинг для уведомления VPN.
+                "setDetails" -> {
+                    VpnState.details = call.argument<String>("text")
+                    VergeVpnService.refreshNotification()
+                    result.success(null)
+                }
                 "state" -> result.success(
                     mapOf(
                         "status" to VpnState.status.wire,

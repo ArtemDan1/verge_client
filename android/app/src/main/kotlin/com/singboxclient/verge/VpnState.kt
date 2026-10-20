@@ -35,6 +35,13 @@ object VpnState {
     @Volatile
     var runningConfig: String? = null
 
+    /**
+     * Строка подключения для уведомления: сервер и пинг. Задаёт Dart; null —
+     * просто «Подключено».
+     */
+    @Volatile
+    var details: String? = null
+
     /** Конфиг, который сервис должен поднять при следующем старте. */
     @Volatile
     var pendingConfig: String? = null

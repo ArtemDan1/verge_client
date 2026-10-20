@@ -38,6 +38,24 @@ class VergeVpnService : VpnService() {
             context.startForegroundService(intent)
         }
 
+        /** Работающий сервис — чтобы обновить уведомление извне. */
+        @Volatile
+        private var instance: VergeVpnService? = null
+
+        /** Перерисовать уведомление после смены сервера или пинга. */
+        fun refreshNotification() {
+            val service = instance ?: return
+            if (VpnState.status == VpnState.Status.CONNECTED) {
+                service.goForeground(service.connectedText())
+            }
+        }
+
+        /**
+         * Конфиг последнего успешного подключения — с ним плитка быстрых
+         * настроек включает VPN, не открывая приложение.
+         */
+        fun lastConfigFile(context: Context) = java.io.File(context.filesDir, "last-config.json")
+
         fun stop(context: Context) {
             if (VpnState.status == VpnState.Status.DISCONNECTED) return
             val intent = Intent(context, VergeVpnService::class.java).setAction(ACTION_STOP)
@@ -69,6 +87,7 @@ class VergeVpnService : VpnService() {
 
     override fun onCreate() {
         super.onCreate()
+        instance = this
         Engines.init(this)
     }
 
@@ -112,8 +131,9 @@ class VergeVpnService : VpnService() {
                 closeTun()
                 engine.start(config)
                 VpnState.runningConfig = config
+                runCatching { lastConfigFile(this).writeText(config) }
                 VpnState.update(VpnState.Status.CONNECTED)
-                goForeground(getString(R.string.vpn_connected))
+                goForeground(connectedText())
             } catch (e: Exception) {
                 engine.stop()
                 closeTun()
@@ -156,6 +176,7 @@ class VergeVpnService : VpnService() {
             closeTun()
             VpnState.update(VpnState.Status.DISCONNECTED)
         }
+        if (instance === this) instance = null
         worker.shutdown()
         super.onDestroy()
     }
@@ -225,6 +246,12 @@ class VergeVpnService : VpnService() {
 
     @androidx.annotation.RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private fun RoutePrefix.toIpPrefix() = IpPrefix(InetAddress.getByName(address()), prefix())
+
+    private fun connectedText(): String {
+        val connected = getString(R.string.vpn_connected)
+        val details = VpnState.details
+        return if (details.isNullOrBlank()) connected else "$connected · $details"
+    }
 
     private fun goForeground(text: String) {
         val manager = getSystemService(NotificationManager::class.java)

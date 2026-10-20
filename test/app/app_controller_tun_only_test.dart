@@ -17,13 +17,24 @@ import 'package:singbox_client/tunnel/tunnel_controller.dart';
 import 'app_controller_test.dart' show FakePlatformInfo, FakeTunnel, fakeSub;
 
 /// VPN, который может быть уже поднят к старту UI.
-class FakeVpn extends TunnelController implements AttachableTunnel {
+class FakeVpn extends TunnelController
+    implements AttachableTunnel, DetailedTunnel {
   FakeVpn({this.running});
 
   /// Конфиг «уже работающего» туннеля; null — VPN не поднят.
   Map<String, dynamic>? running;
   int startCalls = 0;
   Map<String, dynamic>? lastConfig;
+  final details = <String?>[];
+
+  @override
+  Future<void> setDetails(String? text) async => details.add(text);
+
+  /// VPN поднялся сам (плитка быстрых настроек), а не через start().
+  void startedOutside(Map<String, dynamic> config) {
+    running = config;
+    emit(TunnelStatus.connected);
+  }
 
   @override
   Future<void> start(Map<String, dynamic> config,
@@ -181,6 +192,46 @@ void main() {
     final c = make(vpn: vpn, repo: repo);
     await c.init();
     expect(vpn.startCalls, 1);
+    await c.disconnect();
+  });
+
+  test('VPN, включённый плиткой при открытом приложении, подхватывается',
+      () async {
+    final vpn = FakeVpn();
+    final c = make(vpn: vpn);
+    await c.init();
+    expect(c.status, TunnelStatus.disconnected);
+
+    vpn.startedOutside({
+      'outbounds': [
+        {'type': 'vless', 'tag': 'proxy'},
+      ],
+      'experimental': {
+        'clash_api': {'external_controller': '127.0.0.1:40001', 'secret': 'k'},
+      },
+    });
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(c.status, TunnelStatus.connected);
+    expect(c.activeEngine, NodeEngine.singbox);
+    expect(openedUrls, contains('ws://127.0.0.1:40001/traffic?token=k'));
+    await c.disconnect();
+  });
+
+  test('в уведомление уходят сервер и пинг активной ноды', () async {
+    final vpn = FakeVpn();
+    final c = make(vpn: vpn);
+    await c.init();
+    await c.addProfile('Sub', 'https://x');
+    await c.connect();
+    await Future<void>.delayed(Duration.zero);
+    expect(vpn.details.last, 'A');
+
+    await c.pingNode(c.selectedNode!);
+    // Пинг в тестовой среде не проходит — строка остаётся без мс, но
+    // отправляется заново после каждого замера активной ноды.
+    expect(vpn.details.length, greaterThanOrEqualTo(2));
     await c.disconnect();
   });
 }

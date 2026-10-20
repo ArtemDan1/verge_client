@@ -4,4 +4,5 @@
     <string name="vpn_connecting">Подключение…</string>
     <string name="vpn_connected">Подключено</string>
     <string name="vpn_disconnect">Отключить</string>
+    <string name="tile_off">Выключен</string>
 </resources>
