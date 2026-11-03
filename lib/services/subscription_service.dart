@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import '../models/node_config.dart';
 import '../models/subscription_info.dart';
 import '../models/subscription_meta.dart';
+import 'device_info.dart';
 import 'share_link_parser.dart';
 import 'xray_config_parser.dart';
 
@@ -31,17 +32,38 @@ class SubscriptionException implements Exception {
 class SubscriptionService {
   final Fetcher _fetcher;
 
-  SubscriptionService({Fetcher? fetcher, String? hwid, http.Client? client})
-      : _fetcher = fetcher ?? _defaultFetcher(hwid, client ?? http.Client());
+  /// [deviceInfo] вызывается один раз, при первом HTTP-запросе: опрос железа
+  /// (system_profiler на macOS) незачем тащить в старт приложения.
+  SubscriptionService({
+    Fetcher? fetcher,
+    String? hwid,
+    Future<DeviceInfo> Function()? deviceInfo,
+    http.Client? client,
+  }) : _fetcher = fetcher ??
+            _defaultFetcher(
+              hwid: hwid,
+              userAgent: userAgent,
+              deviceInfo: deviceInfo,
+              client: client ?? http.Client(),
+            );
 
-  // Многие панели (Remnawave и др.) отдают конфиг в зависимости от User-Agent;
-  // без него возвращается пустой Clash-шаблон. UA клиента на базе sing-box даёт
-  // либо нативный sing-box JSON, либо Xray JSON со списком нод.
-  static const _userAgent = 'v2rayNG/1.8.0';
+  // Многие панели (Remnawave и др.) выбирают формат ответа по началу
+  // User-Agent. С этим UA приходит Xray JSON с полными outbound'ами; на любой
+  // другой (пробовали «Verge/…») — share-ссылки без VLESS-шифрования (mlkem768)
+  // и finalmask, и Xray-ноды перестают работать.
+  static const userAgent = 'v2rayNG/1.8.0';
 
   // Панели с HWID-привязкой (Remnawave) отдают реальный конфиг только при
   // наличии стабильного заголовка x-hwid; иначе возвращают ноды-заглушки.
-  static Fetcher _defaultFetcher(String? hwid, http.Client client) {
+  // x-device-os / x-ver-os / x-device-model — чтобы устройство в панели не
+  // было «неизвестным».
+  static Fetcher _defaultFetcher({
+    required String? hwid,
+    required String userAgent,
+    required Future<DeviceInfo> Function()? deviceInfo,
+    required http.Client client,
+  }) {
+    Future<Map<String, String>>? deviceHeaders;
     return (String url) async {
       // Не-HTTP ввод (вставленные share-ссылки vless://, base64, список нод)
       // обрабатываем как сам контент, без сетевого запроса.
@@ -49,8 +71,14 @@ class SubscriptionService {
       if (scheme != 'http' && scheme != 'https') {
         return FetchResult(url, const {});
       }
-      final headers = <String, String>{'User-Agent': _userAgent};
+      final headers = <String, String>{'User-Agent': userAgent};
       if (hwid != null && hwid.isNotEmpty) headers['x-hwid'] = hwid;
+      if (deviceInfo != null) {
+        deviceHeaders ??= deviceInfo()
+            .then((d) => d.headers)
+            .catchError((Object _) => const <String, String>{});
+        headers.addAll(await deviceHeaders!);
+      }
       final resp = await _getFollowingRedirects(client, Uri.parse(url), headers);
       if (resp.statusCode != 200) {
         throw SubscriptionException('HTTP ${resp.statusCode}');

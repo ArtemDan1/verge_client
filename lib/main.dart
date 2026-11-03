@@ -28,14 +28,18 @@ Future<void> main() async {
   final dir = await getApplicationSupportDirectory();
   final repo = FileStateRepository(File(p.join(dir.path, 'state.json')));
   final hwid = await resolveHwid(repo);
+  final platform = PlatformInfo();
   final geoAssetDir = await GeoAssetInstaller(dir.path).install();
   final controller = AppController(
-    subscription: SubscriptionService(hwid: hwid),
+    subscription: SubscriptionService(
+      hwid: hwid,
+      deviceInfo: platform.deviceInfo,
+    ),
     builder: const ConfigBuilder(),
     proxyTunnel: MacOSProcessTunnel(),
     tunTunnel: TunHelperTunnel(),
     repo: repo,
-    platform: PlatformInfo(),
+    platform: platform,
     geoAssetDir: geoAssetDir,
     geoUpdater: GeoUpdater(geoAssetDir),
   );

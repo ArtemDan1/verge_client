@@ -26,6 +26,78 @@ void main() {
     expect(preferXray(_node(NodeProtocol.vless)), isFalse);
   });
 
+  group('фичи Xray, которых нет в sing-box → Xray', () {
+    NodeConfig xray(Map<String, dynamic> user, Map<String, dynamic> stream) =>
+        NodeConfig(
+          name: 'n', protocol: NodeProtocol.vless, host: 'h', port: 443,
+          params: const {}, rawSchema: RawSchema.xray,
+          rawOutbound: {
+            'protocol': 'vless',
+            'settings': {
+              'vnext': [
+                {'address': 'h', 'port': 443, 'users': [{'id': 'u', ...user}]}
+              ]
+            },
+            'streamSettings': stream,
+          },
+        );
+    const reality = {'network': 'tcp', 'security': 'reality'};
+
+    test('VLESS-шифрование (mlkem768) в Xray JSON', () {
+      expect(
+          preferXray(xray({'encryption': 'mlkem768x25519plus.native.0rtt.abc'},
+              reality)),
+          isTrue);
+    });
+
+    test('finalmask в Xray JSON', () {
+      expect(
+          preferXray(xray({'encryption': 'none'}, {
+            ...reality,
+            'finalmask': {
+              'tcp': [{'type': 'fragment'}]
+            },
+          })),
+          isTrue);
+    });
+
+    test('gRPC multiMode в Xray JSON', () {
+      expect(
+          preferXray(xray({'encryption': 'none'}, {
+            'network': 'grpc',
+            'security': 'tls',
+            'grpcSettings': {'serviceName': 's', 'multiMode': true},
+          })),
+          isTrue);
+    });
+
+    test('обычный reality / gRPC без multiMode остаётся на sing-box', () {
+      expect(preferXray(xray({'encryption': 'none'}, reality)), isFalse);
+      expect(
+          preferXray(xray({'encryption': 'none'}, {
+            'network': 'grpc',
+            'grpcSettings': {'serviceName': 's', 'multiMode': false},
+          })),
+          isFalse);
+    });
+
+    test('share-ссылка: encryption и gRPC mode=multi', () {
+      expect(
+          preferXray(_node(NodeProtocol.vless, params: {
+            'type': 'tcp', 'encryption': 'mlkem768x25519plus.native.0rtt.abc',
+          })),
+          isTrue);
+      expect(
+          preferXray(_node(NodeProtocol.vless,
+              params: {'type': 'grpc', 'mode': 'multi'})),
+          isTrue);
+      expect(
+          preferXray(_node(NodeProtocol.vless,
+              params: {'type': 'grpc', 'mode': 'gun', 'encryption': 'none'})),
+          isFalse);
+    });
+  });
+
   test('naive → sing-box', () {
     expect(preferXray(_node(NodeProtocol.naive)), isFalse);
   });
