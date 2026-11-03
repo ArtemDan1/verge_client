@@ -8,7 +8,7 @@
 |---|---|---|---|
 | sing-box.exe | [SagerNet/sing-box](https://github.com/SagerNet/sing-box/releases), `sing-box-1.14.1-windows-amd64.zip` | 1.14.1 | `b838de45bd0b2e6ddbed1977e4745622f7dffab3b293807ff4c6b1b640fed909` |
 | libcronet.dll | оттуда же | 1.14.1 (NaiveProxy 150.0.7871.63) | `3217c6260fbca5f16072e0b79735742f40109a63bb0ff88fd6b96dd6b54a2928` |
-| xray.exe | [XTLS/Xray-core](https://github.com/XTLS/Xray-core/releases), `Xray-windows-64.zip` | 26.3.27 | `15c2d007954ac53ba69b80ec91242786b3c0b71d52649165b4ca1d5cc96ef8f1` |
+| xray.exe | [XTLS/Xray-core](https://github.com/XTLS/Xray-core/releases), `Xray-windows-64.zip` | 26.10.31 | `d5b558191cccb1e92a5772b68b8cab67717b26f634b0f15153215f65ae982a7e` |
 | wintun.dll | [wintun.net](https://www.wintun.net/), `wintun-0.14.1.zip`, `bin/amd64/` | 0.14.1 | `e5da8447dc2c320edc0fc52fa01885c103de8c118481f683643cacc3220dafce` |
 
 `libcronet.dll` идёт в официальном архиве sing-box рядом с exe — кладём вместе

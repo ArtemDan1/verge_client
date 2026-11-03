@@ -74,6 +74,37 @@ std::wstring Widen(const std::string& s) {
   return out;
 }
 
+// Строка из HKLM\HARDWARE\DESCRIPTION\System\BIOS в UTF-8; "" если нет.
+std::string ReadBiosString(const wchar_t* name) {
+  wchar_t buf[256];
+  DWORD size = sizeof(buf);
+  if (::RegGetValueW(HKEY_LOCAL_MACHINE,
+                     L"HARDWARE\\DESCRIPTION\\System\\BIOS", name,
+                     RRF_RT_REG_SZ, nullptr, buf, &size) != ERROR_SUCCESS) {
+    return "";
+  }
+  std::wstring w(buf);
+  int len = ::WideCharToMultiByte(CP_UTF8, 0, w.c_str(),
+                                  static_cast<int>(w.size()), nullptr, 0,
+                                  nullptr, nullptr);
+  std::string out(len, '\0');
+  ::WideCharToMultiByte(CP_UTF8, 0, w.c_str(), static_cast<int>(w.size()),
+                        out.data(), len, nullptr, nullptr);
+  return out;
+}
+
+// Модель устройства для заголовка x-device-model подписки. Реестр читаем
+// здесь, а не через `reg query` из Dart: консольный процесс из GUI-приложения
+// мигает окном.
+EncodableMap DeviceModel() {
+  return EncodableMap{
+      {EncodableValue("manufacturer"),
+       EncodableValue(ReadBiosString(L"SystemManufacturer"))},
+      {EncodableValue("product"),
+       EncodableValue(ReadBiosString(L"SystemProductName"))},
+  };
+}
+
 const EncodableValue* Find(const EncodableMap& map, const char* key) {
   auto it = map.find(EncodableValue(key));
   return it == map.end() ? nullptr : &it->second;
@@ -203,6 +234,8 @@ void RegisterTunnelChannel(flutter::FlutterEngine* engine) {
     } else if (name == "xrayVersion") {
       result->Success(EncodableValue(ParseXrayVersion(
           ChildProcess::RunAndCapture(L"xray.exe", L"version"))));
+    } else if (name == "deviceModel") {
+      result->Success(EncodableValue(DeviceModel()));
     } else if (name == "listNetworkServices") {
       // На Windows прокси общесистемный, выбирать нечего — UI прячет секцию.
       result->Success(EncodableValue(flutter::EncodableList{}));

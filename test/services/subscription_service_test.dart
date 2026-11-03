@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:singbox_client/models/node_config.dart';
+import 'package:singbox_client/services/device_info.dart';
 import 'package:singbox_client/services/subscription_service.dart';
 
 void main() {
@@ -117,6 +118,43 @@ void main() {
     await svc.load('https://example.com/sub');
     expect(captured.headers['x-hwid'], 'dev-777');
     expect(captured.headers['User-Agent'], 'v2rayNG/1.8.0');
+  });
+
+  test('шлёт ОС, версию ОС и модель; устройство опрашивается один раз', () async {
+    final requests = <http.BaseRequest>[];
+    var calls = 0;
+    final body = base64.encode(utf8.encode('vless://u@h:443#A'));
+    final svc = SubscriptionService(
+      deviceInfo: () async {
+        calls++;
+        return const DeviceInfo(
+            os: 'macOS', osVersion: '15.6', model: 'MacBook Air (MacBookAir10,1)');
+      },
+      client: MockClient((req) async {
+        requests.add(req);
+        return http.Response(body, 200);
+      }),
+    );
+    await svc.load('https://example.com/sub');
+    await svc.load('https://example.com/sub');
+    expect(calls, 1);
+    expect(requests.last.headers['x-device-os'], 'macOS');
+    expect(requests.last.headers['x-ver-os'], '15.6');
+    expect(requests.last.headers['x-device-model'], 'MacBook Air (MacBookAir10,1)');
+  });
+
+  test('сбой опроса устройства не ломает загрузку подписки', () async {
+    late http.Request captured;
+    final body = base64.encode(utf8.encode('vless://u@h:443#A'));
+    final svc = SubscriptionService(
+      deviceInfo: () async => throw Exception('нет system_profiler'),
+      client: MockClient((req) async {
+        captured = req;
+        return http.Response(body, 200);
+      }),
+    );
+    expect(await svc.load('https://example.com/sub'), hasLength(1));
+    expect(captured.headers.containsKey('x-device-os'), isFalse);
   });
 
   test('без hwid заголовок x-hwid не отправляется', () async {

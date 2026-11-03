@@ -1,8 +1,44 @@
+import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import '../services/device_info.dart';
 
 class PlatformInfo {
   static const _channel = MethodChannel('singbox/tunnel');
+
+  /// ОС, её версия и модель устройства — для заголовков запроса подписки.
+  /// Любой сбой оставляет поле пустым: из-за этого подписка падать не должна.
+  Future<DeviceInfo> deviceInfo() async {
+    final version = parseOsVersion(Platform.operatingSystemVersion);
+    if (Platform.isMacOS) {
+      return DeviceInfo(os: 'macOS', osVersion: version, model: await _macModel());
+    }
+    if (Platform.isWindows) {
+      return DeviceInfo(
+          os: 'Windows', osVersion: version, model: await _windowsModel());
+    }
+    return DeviceInfo(os: Platform.operatingSystem, osVersion: version);
+  }
+
+  Future<String> _macModel() async {
+    try {
+      final r = await Process.run('/usr/sbin/system_profiler',
+              ['SPHardwareDataType', '-json'])
+          .timeout(const Duration(seconds: 5));
+      return r.exitCode == 0 ? parseMacModel(r.stdout as String) : '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  Future<String> _windowsModel() async {
+    try {
+      final m = await _channel.invokeMapMethod<String, String>('deviceModel');
+      return windowsModel(m?['manufacturer'] ?? '', m?['product'] ?? '');
+    } catch (_) {
+      return '';
+    }
+  }
 
   Future<String> singboxVersion() async =>
       (await _channel.invokeMethod<String>('singboxVersion')) ?? 'unknown';
