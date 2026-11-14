@@ -6,6 +6,7 @@ import '../../services/link_opener.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/verge_palette.dart';
 import 'paper.dart';
+import '../../l10n/l10n.dart';
 
 /// Карточка о новой версии — всплывает в углу окна, не сдвигая контент.
 /// Модального диалога намеренно нет: обновление не должно перегораживать
@@ -112,7 +113,7 @@ class UpdateCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Доступна версия ${info.version}',
+                      l10n.versionAvailable(info.version),
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
@@ -122,11 +123,10 @@ class UpdateCard extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       installing
-                          ? 'Запускаем установщик — Verge закроется и '
-                              'обновится'
+                          ? l10n.launchingInstaller
                           : downloading
-                              ? 'Загружаем обновление…'
-                              : 'Новая версия Verge готова к установке',
+                              ? l10n.downloadingUpdate
+                              : l10n.updateReady,
                       style: theme.textTheme.muted.copyWith(fontSize: 13),
                     ),
                   ],
@@ -146,7 +146,7 @@ class UpdateCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
-                  'Не удалось скачать: $error',
+                  l10n.downloadFailed(error),
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 12, color: palette.dangerText),
@@ -167,14 +167,14 @@ class UpdateCard extends StatelessWidget {
                     error != null ? LucideIcons.rotateCw : LucideIcons.download,
                     size: 15,
                   ),
-                  child: Text(error != null ? 'Повторить' : 'Обновить'),
+                  child: Text(error != null ? l10n.retry : l10n.update),
                 ),
                 if (!inline) ...[
                   const SizedBox(width: 6),
                   ShadButton.ghost(
                     size: ShadButtonSize.sm,
                     onPressed: c.dismissUpdateBanner,
-                    child: const Text('Позже'),
+                    child: Text(l10n.later),
                   ),
                 ],
               ],
@@ -192,14 +192,14 @@ class UpdateCard extends StatelessWidget {
                     foregroundColor: palette.accentText,
                     onPressed: () => openLink(info.releaseUrl),
                     trailing: const Icon(LucideIcons.arrowUpRight, size: 14),
-                    child: const Text('Что нового'),
+                    child: Text(l10n.whatsNew),
                   ),
                 ShadButton.link(
                   size: ShadButtonSize.sm,
                   padding: EdgeInsets.zero,
                   foregroundColor: theme.colorScheme.mutedForeground,
                   onPressed: () => c.skipUpdateVersion(),
-                  child: const Text('Пропустить версию'),
+                  child: Text(l10n.skipVersion),
                 ),
               ],
             ),
@@ -247,7 +247,7 @@ class _Progress extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                value == null ? 'Устанавливаем…' : 'Скачиваем',
+                value == null ? l10n.installing : l10n.downloading,
                 style: theme.textTheme.muted.copyWith(fontSize: 12),
               ),
             ),

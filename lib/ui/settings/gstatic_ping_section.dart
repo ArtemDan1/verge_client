@@ -3,6 +3,7 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../app/app_controller.dart';
 import '../../models/app_settings.dart';
 import 'general_section.dart';
+import '../../l10n/l10n.dart';
 
 /// Вкл/выкл, интервал и адрес фонового пинга активного соединения (бейдж у
 /// таймера). Независим от Автовыбора — просто индикатор активного соединения.
@@ -83,12 +84,11 @@ class _GstaticPingSectionState extends State<GstaticPingSection> {
     final c = widget.controller;
     final s = c.settings;
     return SettingsSection(
-      title: 'Пинг активного соединения',
+      title: l10n.activeConnectionPing,
       children: [
         SettingsRow(
-          label: 'Показывать пинг',
-          description: 'Задержка до сервера на главной, рядом с таймером '
-              'подключения',
+          label: l10n.showPing,
+          description: l10n.showPingDescription,
           trailing: ShadSwitch(
             value: s.gstaticPingEnabled,
             onChanged: (v) =>
@@ -97,10 +97,11 @@ class _GstaticPingSectionState extends State<GstaticPingSection> {
         ),
         if (s.gstaticPingEnabled) ...[
           SettingsRow(
-            label: 'Интервал обновления, с',
-            description: 'От ${AppSettings.minGstaticPingIntervalSeconds} до '
-                '${AppSettings.maxGstaticPingIntervalSeconds} с, по умолчанию '
-                '${AppSettings.defaultGstaticPingIntervalSeconds}',
+            label: l10n.pingIntervalSeconds,
+            description: l10n.pingIntervalDescription(
+                AppSettings.minGstaticPingIntervalSeconds,
+                AppSettings.maxGstaticPingIntervalSeconds,
+                AppSettings.defaultGstaticPingIntervalSeconds),
             trailing: SettingsInput(
               inputKey: const Key('gstaticPingInterval'),
               controller: _interval,
@@ -110,10 +111,8 @@ class _GstaticPingSectionState extends State<GstaticPingSection> {
             ),
           ),
           SettingsField(
-            label: 'Адрес проверки',
-            description: 'В TUN-режиме до этого адреса проверяется наличие '
-                'интернета мимо туннеля; в Proxy — задержка через локальный '
-                'прокси',
+            label: l10n.probeUrl,
+            description: l10n.probeUrlDescription,
             child: ShadInput(
               key: const Key('gstaticPingUrl'),
               controller: _url,

@@ -59,6 +59,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     return EXIT_FAILURE;
   }
   window.SetQuitOnClose(false);
+  window.RestorePlacement();
 
   ::MSG msg;
   while (::GetMessage(&msg, nullptr, 0, 0)) {

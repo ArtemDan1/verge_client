@@ -24,6 +24,7 @@ class AppDelegate: FlutterAppDelegate {
     xrayTestChannel.register(with: controller.registrar(forPlugin: "XrayTestChannel"))
     bypassPingChannel.register(with: controller.registrar(forPlugin: "BypassPingChannel"))
     WindowControlChannel.register(with: controller.registrar(forPlugin: "WindowControlChannel"))
+    HotkeyChannel.register(with: controller.registrar(forPlugin: "HotkeyChannel"))
     super.applicationDidFinishLaunching(notification)
   }
 

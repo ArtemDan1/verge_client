@@ -20,6 +20,7 @@ import 'widgets/hero_panel.dart';
 import 'widgets/paper.dart';
 import 'add_profile_dialog.dart';
 import 'edit_node_dialog.dart';
+import '../l10n/l10n.dart';
 
 /// Диалог переименования профиля. После него имя считается ручным и больше
 /// не перетирается profile-title из подписки.
@@ -28,18 +29,18 @@ void _showRenameDialog(BuildContext context, AppController c, Profile p) {
   showShadDialog(
     context: context,
     builder: (ctx) => ShadDialog(
-      title: const Text('Переименовать профиль'),
+      title: Text(l10n.renameProfile),
       actions: [
         ShadButton.outline(
           onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('Отмена'),
+          child: Text(l10n.cancel),
         ),
         ShadButton(
           onPressed: () {
             c.renameProfile(p.id, controller.text);
             Navigator.of(ctx).pop();
           },
-          child: const Text('Сохранить'),
+          child: Text(l10n.save),
         ),
       ],
       child: Padding(
@@ -94,7 +95,7 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
       final err = c.refreshError;
       if (err == null) {
         ShadToaster.of(context)
-            .show(const ShadToast(description: Text('Подписки обновлены')));
+            .show(ShadToast(description: Text(l10n.subscriptionsUpdated)));
       } else {
         ShadToaster.of(context)
             .show(ShadToast.destructive(description: Text(err)));
@@ -106,7 +107,7 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
   }
 
   static String _fmtBytes(int bytes) {
-    const units = ['Б', 'КБ', 'МБ', 'ГБ', 'ТБ'];
+    final units = [l10n.unitB, l10n.unitKB, l10n.unitMB, l10n.unitGB, l10n.unitTB];
     var v = bytes.toDouble();
     var i = 0;
     while (v >= 1024 && i < units.length - 1) {
@@ -125,12 +126,12 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
     final used = info.used;
     final total = info.total;
     if (used != null && (total == null || total <= 0)) {
-      parts.add('использовано ${_fmtBytes(used)} · без лимита');
+      parts.add(l10n.usedNoLimit(_fmtBytes(used)));
     }
     final exp = info.expire;
     if (exp != null) {
       parts.add(
-          'до ${exp.day.toString().padLeft(2, '0')}.${exp.month.toString().padLeft(2, '0')}.${exp.year}');
+          l10n.validUntil('${exp.day.toString().padLeft(2, '0')}.${exp.month.toString().padLeft(2, '0')}.${exp.year}'));
     }
     return parts;
   }
@@ -145,7 +146,7 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
       return _LatencyCell(latencyMs: res.latencyMs, onTap: reping);
     }
     return _LatencyCell(
-        failure: res.timedOut ? 'таймаут' : 'ошибка', onTap: reping);
+        failure: res.timedOut ? l10n.timeout : l10n.error, onTap: reping);
   }
 
   @override
@@ -164,20 +165,20 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
               const Spacer(),
               IconAction(
                 icon: LucideIcons.activity,
-                tooltip: 'Пинг всех',
+                tooltip: l10n.pingAll,
                 onPressed: c.pingAll,
               ),
               const SizedBox(width: 8),
               IconAction(
                 icon: LucideIcons.refreshCw,
-                tooltip: 'Обновить подписки',
+                tooltip: l10n.refreshSubscriptions,
                 onPressed: c.isRefreshingAll ? null : c.refreshAllProfiles,
               ),
               const SizedBox(width: 8),
               ShadButton(
                 onPressed: () => showAddProfileDialog(context, c),
                 leading: const Icon(LucideIcons.plus, size: 16),
-                child: const Text('Добавить подписку'),
+                child: Text(l10n.addSubscription),
               ),
             ],
           ),
@@ -186,13 +187,13 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
           const SizedBox(height: 18),
           Row(
             children: [
-              Text('Серверы',
+              Text(l10n.servers,
                   style: theme.textTheme.large.copyWith(fontSize: 16)),
               const Spacer(),
               // Перебор занимает секунды и молча меняет выбранную ноду —
               // без индикатора он неотличим от неработающей кнопки.
               if (c.isAutoSelecting) ...[
-                Text('Подбираем ноду…', style: theme.textTheme.muted),
+                Text(l10n.pickingNode, style: theme.textTheme.muted),
                 const SizedBox(width: 8),
               ],
               // Включённый автовыбор подсвечен кобальтом: состояние фичи
@@ -205,7 +206,7 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
           Expanded(
             child: c.profiles.isEmpty
                 ? Center(
-                    child: Text('Нет подписок. Добавьте первую.',
+                    child: Text(l10n.noSubscriptions,
                         style: theme.textTheme.muted),
                   )
                 : _ScrollFadeShadow(
@@ -309,7 +310,7 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
     if (nodes.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Text('В подписке нет серверов', style: theme.textTheme.muted),
+        child: Text(l10n.subscriptionHasNoServers, style: theme.textTheme.muted),
       );
     }
     return Column(
@@ -417,9 +418,9 @@ class _ActiveBadge extends StatelessWidget {
         color: palette.accent,
         borderRadius: BorderRadius.circular(999),
       ),
-      child: const Text(
-        'активен',
-        style: TextStyle(
+      child: Text(
+        l10n.active,
+        style: const TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w600,
           color: Color(0xFFFFFFFF),
@@ -450,12 +451,12 @@ class _NodeTableHeader extends StatelessWidget {
       child: Row(
         children: [
           const SizedBox(width: _kRadioWidth),
-          Expanded(flex: 16, child: Text('Сервер', style: style)),
-          Expanded(flex: 11, child: Text('Протокол', style: style)),
-          SizedBox(width: _kEngineWidth, child: Text('Движок', style: style)),
+          Expanded(flex: 16, child: Text(l10n.columnServer, style: style)),
+          Expanded(flex: 11, child: Text(l10n.columnProtocol, style: style)),
+          SizedBox(width: _kEngineWidth, child: Text(l10n.columnEngine, style: style)),
           const SizedBox(width: 12),
           SizedBox(
-              width: _kLatencyWidth, child: Text('Задержка', style: style)),
+              width: _kLatencyWidth, child: Text(l10n.columnLatency, style: style)),
           const SizedBox(width: _kMenuWidth),
         ],
       ),
@@ -663,7 +664,7 @@ class _LatencyCell extends StatelessWidget {
           : failure != null
               ? palette.panelBorder
               : palette.chip;
-      final label = ms != null ? '$ms мс' : (failure ?? '—');
+      final label = ms != null ? l10n.ms(ms) : (failure ?? '—');
       final labelColor = ms != null
           ? palette.latencyText(ms)
           : failure != null
@@ -745,7 +746,7 @@ class _NodeMenuState extends State<_NodeMenu> {
   }
 
   String get _autoLabel =>
-      'Авто (${widget.autoEngine == NodeEngine.xray ? 'Xray' : 'sing-box'})';
+      l10n.engineAuto(widget.autoEngine == NodeEngine.xray ? 'Xray' : 'sing-box');
 
   @override
   Widget build(BuildContext context) {
@@ -784,12 +785,12 @@ class _NodeMenuState extends State<_NodeMenu> {
         ShadContextMenuItem(
           leading: const Icon(LucideIcons.pencil, size: 16),
           onPressed: () => act(widget.onEdit),
-          child: const Text('Редактировать'),
+          child: Text(l10n.edit),
         ),
         ShadContextMenuItem(
           leading: const Icon(LucideIcons.radar, size: 16),
           onPressed: () => act(widget.onPing),
-          child: const Text('Пинг'),
+          child: Text(l10n.ping),
         ),
       ],
       child: ShadButton.ghost(
@@ -844,12 +845,12 @@ class _ProfileMenuState extends State<_ProfileMenu> {
         ShadContextMenuItem(
           leading: const Icon(LucideIcons.refreshCw, size: 16),
           onPressed: () => act(() => c.refreshProfile(p.id)),
-          child: const Text('Обновить'),
+          child: Text(l10n.refresh),
         ),
         ShadContextMenuItem(
           leading: const Icon(LucideIcons.radar, size: 16),
           onPressed: () => act(() => c.pingProfile(p.id)),
-          child: const Text('Пинг'),
+          child: Text(l10n.ping),
         ),
         ShadContextMenuItem(
           leading: const Icon(LucideIcons.link, size: 16),
@@ -857,36 +858,36 @@ class _ProfileMenuState extends State<_ProfileMenu> {
             await Clipboard.setData(ClipboardData(text: p.url));
             if (!context.mounted) return;
             ShadToaster.of(context).show(
-              const ShadToast(
-                  description: Text('Ссылка на подписку скопирована')),
+              ShadToast(
+                  description: Text(l10n.subscriptionLinkCopied)),
             );
           }),
-          child: const Text('Подписка'),
+          child: Text(l10n.subscription),
         ),
         if (p.subscriptionMeta?.webPageUrl != null)
           ShadContextMenuItem(
             leading: const Icon(LucideIcons.externalLink, size: 16),
             onPressed: () =>
                 act(() => openLink(p.subscriptionMeta!.webPageUrl!)),
-            child: const Text('Личный кабинет'),
+            child: Text(l10n.accountPage),
           ),
         if (p.subscriptionMeta?.supportUrl != null)
           ShadContextMenuItem(
             leading: const Icon(LucideIcons.lifeBuoy, size: 16),
             onPressed: () =>
                 act(() => openLink(p.subscriptionMeta!.supportUrl!)),
-            child: const Text('Поддержка'),
+            child: Text(l10n.support),
           ),
         ShadContextMenuItem(
           leading: const Icon(LucideIcons.timer, size: 16),
           onPressed: () => act(() => _editRefreshInterval(context, c, p)),
           trailing: Text(_refreshLabel(p), style: theme.textTheme.muted),
-          child: const Text('Автообновление'),
+          child: Text(l10n.autoRefresh),
         ),
         ShadContextMenuItem(
           leading: const Icon(LucideIcons.pencil, size: 16),
           onPressed: () => act(() => _showRenameDialog(context, c, p)),
-          child: const Text('Переименовать'),
+          child: Text(l10n.rename),
         ),
         const Padding(
           padding: EdgeInsets.symmetric(vertical: 4),
@@ -896,7 +897,7 @@ class _ProfileMenuState extends State<_ProfileMenu> {
           leading: Icon(LucideIcons.trash2,
               size: 16, color: theme.colorScheme.destructive),
           onPressed: () => act(() => c.removeProfile(p.id)),
-          child: Text('Удалить',
+          child: Text(l10n.delete,
               style: TextStyle(color: theme.colorScheme.destructive)),
         ),
       ],
@@ -924,7 +925,7 @@ class _AutoSelectButton extends StatelessWidget {
     final leading = c.isAutoSelecting
         ? const Spinner(size: 14)
         : const Icon(LucideIcons.zap, size: 14);
-    final label = Text(on ? 'Автовыбор: вкл' : 'Автовыбор');
+    final label = Text(on ? l10n.autoSelectOn : l10n.autoSelect);
     void open() => showAutoSelectDialog(context, c);
     final palette = VergePalette.of(context);
     return on
@@ -1035,10 +1036,10 @@ class _ScrollFadeShadowState extends State<_ScrollFadeShadow> {
 /// ложную точность.
 String _refreshLabel(Profile p) {
   final own = p.refreshIntervalMinutesOverride;
-  if (own != null && own > 0) return 'Своё: ${_asHours(own)} ч';
+  if (own != null && own > 0) return l10n.refreshOwn(_asHours(own));
   final hours = p.subscriptionMeta?.updateIntervalHours;
-  if (hours != null && hours > 0) return 'По подписке: $hours ч';
-  return 'Выключено';
+  if (hours != null && hours > 0) return l10n.refreshBySubscription(hours);
+  return l10n.off;
 }
 
 /// Хранение в минутах, показ в часах. Округляем вверх, чтобы интервал,
@@ -1055,16 +1056,16 @@ Future<void> _editRefreshInterval(
   final result = await showShadDialog<String?>(
     context: context,
     builder: (ctx) => ShadDialog(
-      title: const Text('Интервал автообновления'),
+      title: Text(l10n.autoRefreshInterval),
       constraints: const BoxConstraints(maxWidth: 380),
       actions: [
         ShadButton.outline(
           onPressed: () => Navigator.of(ctx).pop(null),
-          child: const Text('Отмена'),
+          child: Text(l10n.cancel),
         ),
         ShadButton(
           onPressed: () => Navigator.of(ctx).pop(ctrl.text.trim()),
-          child: const Text('Сохранить'),
+          child: Text(l10n.save),
         ),
       ],
       child: Column(
@@ -1073,15 +1074,14 @@ Future<void> _editRefreshInterval(
         children: [
           ShadInput(
             controller: ctrl,
-            placeholder: const Text('Часы'),
+            placeholder: Text(l10n.hours),
             keyboardType: TextInputType.number,
           ),
           const SizedBox(height: 8),
           Text(
             p.subscriptionMeta?.updateIntervalHours != null
-                ? 'Пусто — использовать интервал из подписки '
-                    '(${p.subscriptionMeta!.updateIntervalHours} ч)'
-                : 'Пусто — не обновлять автоматически',
+                ? l10n.emptyUseSubscriptionInterval(p.subscriptionMeta!.updateIntervalHours!)
+                : l10n.emptyNoAutoRefresh,
             style: ShadTheme.of(ctx).textTheme.muted,
           ),
         ],
@@ -1097,13 +1097,7 @@ Future<void> _editRefreshInterval(
 
 /// «1 сервер», «3 сервера», «12 серверов».
 String _nodesLabel(int n) {
-  final mod10 = n % 10, mod100 = n % 100;
-  final word = mod10 == 1 && mod100 != 11
-      ? 'сервер'
-      : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)
-          ? 'сервера'
-          : 'серверов';
-  return '$n $word';
+  return l10n.serverCount(n);
 }
 
 /// Расход трафика подписки: полоска и «40.8 из 500 ГБ · осталось 459 ГБ».
@@ -1158,7 +1152,7 @@ class _UsageBar extends StatelessWidget {
           child: Text.rich(
             TextSpan(children: [
               TextSpan(
-                text: '${format(used)} из ${format(total)}',
+                text: l10n.usedOfTotal(format(used), format(total)),
                 style: TextStyle(
                   fontWeight: FontWeight.w500,
                   color: theme.colorScheme.foreground,
@@ -1166,8 +1160,8 @@ class _UsageBar extends StatelessWidget {
               ),
               TextSpan(
                 text: left > 0
-                    ? '  ·  осталось ${format(left)}'
-                    : '  ·  лимит исчерпан',
+                    ? '  ·  ${l10n.remaining(format(left))}'
+                    : '  ·  ${l10n.limitExhausted}',
                 style: TextStyle(
                   color: left > 0
                       ? theme.colorScheme.mutedForeground

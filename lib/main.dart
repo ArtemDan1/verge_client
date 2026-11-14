@@ -5,6 +5,7 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'app/app_controller.dart';
+import 'app/hotkey.dart';
 import 'app/tray_popover_controller.dart';
 import 'app/tray_service.dart';
 import 'app/window_control_channel.dart';
@@ -22,9 +23,12 @@ import 'tunnel/tun_helper_tunnel.dart';
 import 'ui/app_shell.dart';
 import 'ui/tray_popover.dart';
 import 'theme/app_theme.dart';
+import 'l10n/l10n.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // До загрузки настроек — язык системы: контроллер пишет в лог уже в init.
+  setAppLocale(resolveAppLocale(null));
   final dir = await getApplicationSupportDirectory();
   final repo = FileStateRepository(File(p.join(dir.path, 'state.json')));
   final hwid = await resolveHwid(repo);
@@ -44,16 +48,20 @@ Future<void> main() async {
     geoUpdater: GeoUpdater(geoAssetDir),
   );
   await controller.init();
+  setAppLocale(_localeFor(controller.settings));
   final popover = TrayPopoverController(WindowControlChannel());
   await TrayService(controller, popover).init();
   final deepLink = DeepLinkService();
   await deepLink.init();
-  runApp(SingboxApp(
-    controller: controller,
-    deepLink: deepLink,
-    popover: popover,
-  ));
+  await HotkeyService(controller).init();
+  runApp(
+    SingboxApp(controller: controller, deepLink: deepLink, popover: popover),
+  );
 }
+
+Locale _localeFor(AppSettings s) => resolveAppLocale(
+  s.language == AppSettings.systemLanguage ? null : s.language,
+);
 
 class SingboxApp extends StatefulWidget {
   final AppController controller;
@@ -80,10 +88,10 @@ class _SingboxAppState extends State<SingboxApp> {
   }
 
   ThemeMode _mode(AppThemeMode m) => switch (m) {
-        AppThemeMode.system => ThemeMode.system,
-        AppThemeMode.light => ThemeMode.light,
-        AppThemeMode.dark => ThemeMode.dark,
-      };
+    AppThemeMode.system => ThemeMode.system,
+    AppThemeMode.light => ThemeMode.light,
+    AppThemeMode.dark => ThemeMode.dark,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -91,32 +99,46 @@ class _SingboxAppState extends State<SingboxApp> {
     final popover = widget.popover;
     return AnimatedBuilder(
       animation: Listenable.merge([controller, popover]),
-      builder: (context, _) => ShadApp(
-        title: 'Verge',
-        theme: AppTheme.light,
-        darkTheme: AppTheme.dark,
-        themeMode: _mode(controller.settings.themeMode),
-        // Мини-окно трея рисуется в том же окне, что и главный экран: пока
-        // оно открыто, нативная сторона ужимает окно до его размеров.
-        home: popover.isOpen
-            ? TrayPopover(controller: controller, popover: popover)
-            : AppShell(
-                controller: controller,
-                deepLink: widget.deepLink,
-                navIndex: _navIndex,
-              ),
-        // Emoji-фолбэк нужен и здесь, а не только в ShadThemeData: обычные
-        // Text без стиля (например, имена нод — Text(p.name)) берут стиль из
-        // DefaultTextStyle, который Material строит из своей textTheme, и до
-        // ShadTextTheme не доходят. Без этой строки флаги стран в именах нод
-        // на Windows так и остаются буквами.
-        materialThemeBuilder: (context, theme) => theme.copyWith(
-          textTheme: theme.textTheme.apply(
-            fontFamily: kUiFontFamily,
-            fontFamilyFallback: kEmojiFontFallback,
+      builder: (context, _) {
+        // Строки берутся из глобального l10n (см. lib/l10n/l10n.dart), поэтому
+        // язык выставляется до сборки дерева, а само дерево при смене языка
+        // пересоздаётся ключом — иначе const-виджеты и состояния экранов
+        // остались бы со старыми строками.
+        setAppLocale(_localeFor(controller.settings));
+        final locale = appLocale;
+        return ShadApp(
+          title: 'Verge',
+          locale: locale,
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          theme: AppTheme.light,
+          darkTheme: AppTheme.dark,
+          themeMode: _mode(controller.settings.themeMode),
+          // Мини-окно трея рисуется в том же окне, что и главный экран: пока
+          // оно открыто, нативная сторона ужимает окно до его размеров.
+          home: KeyedSubtree(
+            key: ValueKey(locale),
+            child: popover.isOpen
+                ? TrayPopover(controller: controller, popover: popover)
+                : AppShell(
+                    controller: controller,
+                    deepLink: widget.deepLink,
+                    navIndex: _navIndex,
+                  ),
           ),
-        ),
-      ),
+          // Emoji-фолбэк нужен и здесь, а не только в ShadThemeData: обычные
+          // Text без стиля (например, имена нод — Text(p.name)) берут стиль из
+          // DefaultTextStyle, который Material строит из своей textTheme, и до
+          // ShadTextTheme не доходят. Без этой строки флаги стран в именах нод
+          // на Windows так и остаются буквами.
+          materialThemeBuilder: (context, theme) => theme.copyWith(
+            textTheme: theme.textTheme.apply(
+              fontFamily: kUiFontFamily,
+              fontFamilyFallback: kEmojiFontFallback,
+            ),
+          ),
+        );
+      },
     );
   }
 }

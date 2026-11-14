@@ -12,6 +12,7 @@ import '../theme/app_theme.dart';
 import '../theme/verge_palette.dart';
 import '../tunnel/tunnel_controller.dart';
 import 'widgets/paper.dart';
+import '../l10n/l10n.dart';
 
 /// Поиск идёт по домену, IP и имени приложения; пустой набор [kinds] означает
 /// «не фильтровать», а не «ничего не показывать».
@@ -32,11 +33,11 @@ List<ConnectionInfo> filterConnections(
   ];
 }
 
-const _kindLabels = {
-  OutboundKind.proxy: 'Прокси',
-  OutboundKind.direct: 'Напрямую',
-  OutboundKind.block: 'Блок',
-};
+Map<OutboundKind, String> get _kindLabels => {
+      OutboundKind.proxy: l10n.kindProxy,
+      OutboundKind.direct: l10n.groupDirect,
+      OutboundKind.block: l10n.kindBlock,
+    };
 
 /// Группа соединений одного приложения.
 class _AppGroup {
@@ -49,7 +50,7 @@ class _AppGroup {
 
 /// Соединения без известного процесса (TUN без атрибуции, системные службы)
 /// собираются в одну группу.
-const _kUnknownApp = 'Другие';
+String get _kUnknownApp => l10n.otherApps;
 
 List<_AppGroup> _groupByApp(List<ConnectionInfo> list) {
   final byName = <String, _AppGroup>{};
@@ -120,14 +121,14 @@ class _ConnectionsScreenState extends State<ConnectionsScreen> {
             body = Center(
               child: Text(
                 widget.controller.status == TunnelStatus.connected
-                    ? 'Нет активных соединений'
-                    : 'VPN отключён',
+                    ? l10n.noActiveConnections
+                    : l10n.vpnDisconnected,
                 style: theme.textTheme.muted,
               ),
             );
           } else if (list.isEmpty) {
             body = Center(
-              child: Text('Ничего не найдено', style: theme.textTheme.muted),
+              child: Text(l10n.nothingFound, style: theme.textTheme.muted),
             );
           } else if (_grouped) {
             final groups = _groupByApp(list);
@@ -167,7 +168,7 @@ class _ConnectionsScreenState extends State<ConnectionsScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               ScreenHeader(
-                title: 'Соединения',
+                title: l10n.connections,
                 actions: [
                   SizedBox(
                     width: 260,
@@ -175,9 +176,9 @@ class _ConnectionsScreenState extends State<ConnectionsScreen> {
                       value: _grouped,
                       height: 36,
                       onChanged: (v) => setState(() => _grouped = v),
-                      options: const [
-                        SegmentedOption(value: true, label: 'По приложениям'),
-                        SegmentedOption(value: false, label: 'Списком'),
+                      options: [
+                        SegmentedOption(value: true, label: l10n.byApp),
+                        SegmentedOption(value: false, label: l10n.asList),
                       ],
                     ),
                   ),
@@ -189,7 +190,7 @@ class _ConnectionsScreenState extends State<ConnectionsScreen> {
                   Expanded(
                     child: ShadInput(
                       controller: _search,
-                      placeholder: const Text('Домен, IP или приложение'),
+                      placeholder: Text(l10n.connectionsSearchHint),
                       leading: const Icon(LucideIcons.search, size: 16),
                       decoration: ShadDecoration(color: palette.surface),
                       onChanged: (_) => setState(() {}),
@@ -197,7 +198,7 @@ class _ConnectionsScreenState extends State<ConnectionsScreen> {
                   ),
                   const SizedBox(width: 8),
                   _KindPill(
-                    label: 'Все · ${byQuery.length}',
+                    label: '${l10n.all} · ${byQuery.length}',
                     selected: _kinds.isEmpty,
                     onTap: () => setState(_kinds.clear),
                   ),
@@ -232,7 +233,7 @@ class _ConnectionsScreenState extends State<ConnectionsScreen> {
     showGeneralDialog<void>(
       context: context,
       barrierDismissible: true,
-      barrierLabel: 'Закрыть',
+      barrierLabel: l10n.close,
       barrierColor: const Color(0x33000000),
       transitionDuration: const Duration(milliseconds: 220),
       pageBuilder: (ctx, _, _) => Align(
@@ -316,14 +317,14 @@ class _RouteChip extends StatelessWidget {
       OutboundKind.proxy => (
           dark ? palette.accent.withValues(alpha: 0.18) : const Color(0xFFE8EDFF),
           palette.accentText,
-          'прокси'
+          l10n.kindProxyShort
         ),
       OutboundKind.direct => (
           dark ? palette.success.withValues(alpha: 0.18) : const Color(0xFFE3F4EA),
           palette.successText,
-          'напрямую'
+          l10n.direct
         ),
-      OutboundKind.block => (palette.dangerSoft, palette.dangerText, 'блок'),
+      OutboundKind.block => (palette.dangerSoft, palette.dangerText, l10n.kindBlockShort),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -449,13 +450,7 @@ class _GroupCard extends StatelessWidget {
   }
 
   static String _plural(int n) {
-    final mod10 = n % 10, mod100 = n % 100;
-    final word = mod10 == 1 && mod100 != 11
-        ? 'соединение'
-        : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)
-            ? 'соединения'
-            : 'соединений';
-    return '$n $word';
+    return l10n.connectionCount(n);
   }
 }
 
@@ -623,21 +618,21 @@ class _ConnectionDrawerState extends State<_ConnectionDrawer> {
     };
     String orDash(String v) => v.isEmpty ? '—' : v;
     final rows = <(String, String, bool)>[
-      ('Приложение', c.appName ?? '—', false),
-      ('Путь процесса', orDash(c.processPath), true),
+      (l10n.fieldApp, c.appName ?? '—', false),
+      (l10n.fieldProcessPath, orDash(c.processPath), true),
       (
-        'Сеть',
+        l10n.fieldNetwork,
         '${c.network}${c.sniffedType.isEmpty ? '' : ' / ${c.sniffedType}'}',
         true
       ),
-      ('Источник', c.source, true),
-      ('Назначение', '${c.destinationIP}:${c.destinationPort}', true),
-      ('Домен', orDash(c.host), true),
-      ('Цепочка', orDash(c.chainLabel), false),
-      ('Правило', orDash(c.rule), true),
+      (l10n.fieldSource, c.source, true),
+      (l10n.fieldDestination, '${c.destinationIP}:${c.destinationPort}', true),
+      (l10n.fieldDomain, orDash(c.host), true),
+      (l10n.fieldChain, orDash(c.chainLabel), false),
+      (l10n.fieldRule, orDash(c.rule), true),
       ('Payload', orDash(c.rulePayload), true),
-      ('Длительность', formatDuration(c.durationAt(DateTime.now())), true),
-      ('Начало', _time(c.start.toLocal()), true),
+      (l10n.fieldDuration, formatDuration(c.durationAt(DateTime.now())), true),
+      (l10n.fieldStart, _time(c.start.toLocal()), true),
       ('ID', c.id, true),
     ];
     return DefaultTextStyle(
@@ -698,7 +693,7 @@ class _ConnectionDrawerState extends State<_ConnectionDrawer> {
                             children: [
                               _RouteChip(c.outboundKind),
                               if (_closed)
-                                Text('соединение закрыто',
+                                Text(l10n.connectionClosed,
                                     style: theme.textTheme.muted
                                         .copyWith(fontSize: 12)),
                             ],
@@ -722,7 +717,7 @@ class _ConnectionDrawerState extends State<_ConnectionDrawer> {
                   children: [
                     Expanded(
                       child: _TrafficTile(
-                        label: 'Отправлено',
+                        label: l10n.sent,
                         value: formatBytes(c.upload),
                         color: palette.accentText,
                       ),
@@ -730,7 +725,7 @@ class _ConnectionDrawerState extends State<_ConnectionDrawer> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: _TrafficTile(
-                        label: 'Получено',
+                        label: l10n.received,
                         value: formatBytes(c.download),
                         color: palette.successText,
                       ),

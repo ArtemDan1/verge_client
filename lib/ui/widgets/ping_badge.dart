@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shadcn_ui/shadcn_ui.dart' show LucideIcons;
 import '../../theme/app_colors.dart';
+import '../../l10n/l10n.dart';
 
 /// Бейдж задержки пинга.
 ///
@@ -63,19 +64,19 @@ class _PingBadgeState extends State<PingBadge> {
       return _chip(
         color: AppColors.pingBad,
         icon: LucideIcons.triangleAlert,
-        label: 'нет интернета',
+        label: l10n.noInternet,
       );
     }
     if (timedOut || error) {
       return _chip(
         color: AppColors.pingBad,
         icon: LucideIcons.triangleAlert,
-        label: timedOut ? 'таймаут' : 'ошибка',
+        label: timedOut ? l10n.timeout : l10n.error,
       );
     }
     if (latencyMs != null) {
       return _chip(
-          color: AppColors.pingColor(latencyMs), label: '$latencyMs мс');
+          color: AppColors.pingColor(latencyMs), label: l10n.ms(latencyMs));
     }
     return const SizedBox.shrink();
   }

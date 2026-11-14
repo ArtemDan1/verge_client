@@ -1,8 +1,11 @@
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../app/app_controller.dart';
+import '../../app/hotkey.dart';
 import '../../models/app_settings.dart';
 import '../../theme/verge_palette.dart';
+import '../../l10n/l10n.dart';
 
 /// Внутри вкладки настроек заголовок секции совпадает с подписью вкладки,
 /// поэтому экран вкладок прячет его через эту область.
@@ -72,8 +75,7 @@ class SettingsGroup extends StatelessWidget {
                       // Строки разделяем линиями сами — строкам не нужно
                       // знать, первые они или нет (часть из них условная).
                       for (var i = 0; i < children.length; i++) ...[
-                        if (i > 0)
-                          Container(height: 1, color: palette.divider),
+                        if (i > 0) Container(height: 1, color: palette.divider),
                         children[i],
                       ],
                     ],
@@ -181,16 +183,16 @@ class SettingsField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _SettingLabel(label: label, description: description),
-            const SizedBox(height: 10),
-            child,
-          ],
-        ),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SettingLabel(label: label, description: description),
+        const SizedBox(height: 10),
+        child,
+      ],
+    ),
+  );
 }
 
 /// Предупреждение внутри группы настроек.
@@ -214,14 +216,22 @@ class SettingsNotice extends StatelessWidget {
           children: [
             Padding(
               padding: const EdgeInsets.only(top: 2),
-              child: Icon(LucideIcons.triangleAlert,
-                  size: 15, color: palette.dangerText),
+              child: Icon(
+                LucideIcons.triangleAlert,
+                size: 15,
+                color: palette.dangerText,
+              ),
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(text,
-                  style: TextStyle(
-                      fontSize: 13, height: 1.4, color: palette.dangerText)),
+              child: Text(
+                text,
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.4,
+                  color: palette.dangerText,
+                ),
+              ),
             ),
           ],
         ),
@@ -255,18 +265,18 @@ class SettingsInput extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-        width: width,
-        child: ShadInput(
-          key: inputKey,
-          controller: controller,
-          initialValue: controller == null ? initialValue : null,
-          focusNode: focusNode,
-          placeholder: placeholder == null ? null : Text(placeholder!),
-          keyboardType: number ? TextInputType.number : null,
-          textAlign: TextAlign.right,
-          onSubmitted: onSubmitted,
-        ),
-      );
+    width: width,
+    child: ShadInput(
+      key: inputKey,
+      controller: controller,
+      initialValue: controller == null ? initialValue : null,
+      focusNode: focusNode,
+      placeholder: placeholder == null ? null : Text(placeholder!),
+      keyboardType: number ? TextInputType.number : null,
+      textAlign: TextAlign.right,
+      onSubmitted: onSubmitted,
+    ),
+  );
 }
 
 /// Секция одной вкладки настроек (TUN, DNS, TLS…). Заголовок показывается
@@ -285,24 +295,24 @@ class SettingsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SettingsGroup(
-        title: SettingsTabScope.hidesTitles(context) ? null : title,
-        description: description,
-        padded: false,
-        children: children,
-      );
+    title: SettingsTabScope.hidesTitles(context) ? null : title,
+    description: description,
+    padded: false,
+    children: children,
+  );
 }
 
-/// Вкладка «Общие»: тема, запуск, локальный порт.
+/// Вкладка «Общие»: тема, язык, запуск, горячая клавиша, локальный порт.
 class GeneralSection extends StatelessWidget {
   const GeneralSection({super.key, required this.controller});
 
   final AppController controller;
 
   static String _themeLabel(AppThemeMode m) => switch (m) {
-        AppThemeMode.system => 'Как в системе',
-        AppThemeMode.light => 'Светлая',
-        AppThemeMode.dark => 'Тёмная',
-      };
+    AppThemeMode.system => l10n.themeSystem,
+    AppThemeMode.light => l10n.themeLight,
+    AppThemeMode.dark => l10n.themeDark,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -312,7 +322,7 @@ class GeneralSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SettingsGroup(
-          title: 'Тема',
+          title: l10n.theme,
           children: [
             Row(
               children: [
@@ -327,8 +337,7 @@ class GeneralSection extends StatelessWidget {
                       mode: m,
                       label: _themeLabel(m),
                       selected: s.themeMode == m,
-                      onTap: () =>
-                          c.updateSettings(s.copyWith(themeMode: m)),
+                      onTap: () => c.updateSettings(s.copyWith(themeMode: m)),
                     ),
                   ),
                 ],
@@ -337,12 +346,44 @@ class GeneralSection extends StatelessWidget {
           ],
         ),
         SettingsGroup(
-          title: 'Запуск',
+          title: l10n.language,
           padded: false,
           children: [
             SettingsRow(
-              label: 'Автозапуск',
-              description: 'Подключать последнюю ноду при старте',
+              label: l10n.interfaceLanguage,
+              trailing: SizedBox(
+                width: 200,
+                child: ShadSelect<String>(
+                  key: const Key('language-select'),
+                  initialValue: s.language,
+                  options: [
+                    ShadOption(
+                      value: AppSettings.systemLanguage,
+                      child: Text(l10n.languageSystem),
+                    ),
+                    for (final e in appLanguages.entries)
+                      ShadOption(value: e.key, child: Text(e.value)),
+                  ],
+                  selectedOptionBuilder: (ctx, value) => Text(
+                    value == AppSettings.systemLanguage
+                        ? l10n.languageSystem
+                        : appLanguages[value] ?? value,
+                  ),
+                  onChanged: (v) {
+                    if (v != null) c.updateSettings(s.copyWith(language: v));
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
+        SettingsGroup(
+          title: l10n.startup,
+          padded: false,
+          children: [
+            SettingsRow(
+              label: l10n.autostart,
+              description: l10n.autostartDescription,
               trailing: ShadSwitch(
                 value: s.autostart,
                 onChanged: (v) => c.updateSettings(s.copyWith(autostart: v)),
@@ -351,12 +392,30 @@ class GeneralSection extends StatelessWidget {
           ],
         ),
         SettingsGroup(
-          title: 'Прокси',
+          title: l10n.hotkeys,
           padded: false,
           children: [
             SettingsRow(
-              label: 'Локальный порт прокси',
-              description: 'HTTP + SOCKS на 127.0.0.1',
+              label: l10n.toggleHotkey,
+              description: c.hotkeyFailed
+                  ? l10n.hotkeyTaken
+                  : l10n.toggleHotkeyDescription,
+              trailing: HotkeyRecorder(
+                value: HotkeySpec.tryParse(s.toggleHotkey),
+                onChanged: (spec) => c.updateSettings(
+                  s.copyWith(toggleHotkey: spec?.toString() ?? ''),
+                ),
+              ),
+            ),
+          ],
+        ),
+        SettingsGroup(
+          title: l10n.kindProxy,
+          padded: false,
+          children: [
+            SettingsRow(
+              label: l10n.localProxyPort,
+              description: l10n.localProxyPortDescription,
               trailing: SettingsInput(
                 initialValue: '${s.localPort}',
                 number: true,
@@ -396,21 +455,21 @@ class _ThemeCard extends StatelessWidget {
     const l = VergePalette.light;
     const d = VergePalette.dark;
     Widget half(Color chrome, Color panel, int flex) => Expanded(
-          flex: flex,
-          child: Row(
-            children: [
-              Expanded(flex: 3, child: Container(color: chrome)),
-              Expanded(flex: 7, child: Container(color: panel)),
-            ],
-          ),
-        );
+      flex: flex,
+      child: Row(
+        children: [
+          Expanded(flex: 3, child: Container(color: chrome)),
+          Expanded(flex: 7, child: Container(color: panel)),
+        ],
+      ),
+    );
     final preview = switch (mode) {
       AppThemeMode.light => [half(l.chrome, l.panel, 1)],
       AppThemeMode.dark => [half(d.chrome, d.panel, 1)],
       AppThemeMode.system => [
-          Expanded(child: Container(color: l.chrome)),
-          Expanded(child: Container(color: d.panel)),
-        ],
+        Expanded(child: Container(color: l.chrome)),
+        Expanded(child: Container(color: d.panel)),
+      ],
     };
     return Semantics(
       button: true,
@@ -428,8 +487,8 @@ class _ThemeCard extends StatelessWidget {
               border: Border.all(
                 color: selected
                     ? (theme.brightness == Brightness.dark
-                        ? palette.accentText
-                        : palette.accent)
+                          ? palette.accentText
+                          : palette.accent)
                     : palette.panelBorder,
                 width: selected ? 2 : 1,
               ),
@@ -459,6 +518,132 @@ class _ThemeCard extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Поле записи сочетания клавиш: клик — ждём нажатия, Esc — отмена,
+/// крестик — снять сочетание.
+class HotkeyRecorder extends StatefulWidget {
+  const HotkeyRecorder({
+    super.key,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final HotkeySpec? value;
+  final ValueChanged<HotkeySpec?> onChanged;
+
+  @override
+  State<HotkeyRecorder> createState() => _HotkeyRecorderState();
+}
+
+class _HotkeyRecorderState extends State<HotkeyRecorder> {
+  final _focus = FocusNode(debugLabel: 'hotkey-recorder');
+  bool _recording = false;
+  bool _needsModifier = false;
+
+  @override
+  void dispose() {
+    _focus.dispose();
+    super.dispose();
+  }
+
+  void _start() {
+    setState(() {
+      _recording = true;
+      _needsModifier = false;
+    });
+    _focus.requestFocus();
+  }
+
+  void _stop() {
+    if (!mounted) return;
+    setState(() => _recording = false);
+    _focus.unfocus();
+  }
+
+  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+    if (!_recording) return KeyEventResult.ignored;
+    if (event is KeyUpEvent) return KeyEventResult.handled;
+    if (event.logicalKey == LogicalKeyboardKey.escape) {
+      _stop();
+      return KeyEventResult.handled;
+    }
+    final spec = HotkeySpec.fromKey(
+      event.physicalKey,
+      HardwareKeyboard.instance.logicalKeysPressed,
+    );
+    // Модификатор сам по себе или клавиша, которую назначить нельзя, —
+    // ждём дальше.
+    if (spec == null) return KeyEventResult.handled;
+    if (!spec.isValid) {
+      setState(() => _needsModifier = true);
+      return KeyEventResult.handled;
+    }
+    _stop();
+    widget.onChanged(spec);
+    return KeyEventResult.handled;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = ShadTheme.of(context);
+    final palette = VergePalette.of(context);
+    final value = widget.value;
+    final String text;
+    if (_recording) {
+      text = _needsModifier ? l10n.hotkeyNeedsModifier : l10n.hotkeyPress;
+    } else {
+      text = value?.label() ?? l10n.hotkeyNotSet;
+    }
+    return Focus(
+      focusNode: _focus,
+      onKeyEvent: _onKey,
+      onFocusChange: (has) {
+        if (!has && _recording) _stop();
+      },
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ShadButton.outline(
+            key: const Key('hotkey-recorder'),
+            size: ShadButtonSize.sm,
+            onPressed: _recording ? _stop : _start,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 96),
+              child: Text(
+                text,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: value != null && !_recording
+                      ? 'JetBrains Mono'
+                      : null,
+                  color: _recording
+                      ? (_needsModifier
+                            ? palette.dangerText
+                            : theme.colorScheme.mutedForeground)
+                      : null,
+                ),
+              ),
+            ),
+          ),
+          if (value != null && !_recording) ...[
+            const SizedBox(width: 6),
+            ShadTooltip(
+              builder: (_) => Text(l10n.hotkeyClear),
+              child: ShadButton.ghost(
+                key: const Key('hotkey-clear'),
+                size: ShadButtonSize.sm,
+                width: 32,
+                padding: EdgeInsets.zero,
+                onPressed: () => widget.onChanged(null),
+                child: const Icon(LucideIcons.x, size: 16),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

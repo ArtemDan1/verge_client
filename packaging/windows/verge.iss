@@ -37,7 +37,31 @@ RestartApplications=no
 ChangesAssociations=yes
 
 [Languages]
+; Первый язык — запасной, если язык системы не в списке.
+Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
+
+[CustomMessages]
+english.DownloadTitle=Downloading components
+english.DownloadDescription=Downloading Microsoft Visual C++ Redistributable, which Verge needs to run.
+english.DownloadFailed=Failed to download Microsoft Visual C++ Redistributable:
+english.DownloadContinue=Continue the installation without it? If it is not on this computer, Verge will not start — then install it manually:
+english.DownloadRetryHint=Click "No" to try again.
+english.InstallingVCRedist=Installing Microsoft Visual C++ Redistributable...
+english.DesktopIcon=Create a desktop shortcut
+english.AdditionalTasks=Additional:
+english.ServiceDescription=Privileged part of Verge: brings up the TUN tunnel
+english.LaunchApp=Launch %1
+russian.DownloadTitle=Загрузка компонентов
+russian.DownloadDescription=Скачивается Microsoft Visual C++ Redistributable, он нужен для работы Verge.
+russian.DownloadFailed=Не удалось скачать Microsoft Visual C++ Redistributable:
+russian.DownloadContinue=Продолжить установку без него? Если на компьютере его нет, Verge не запустится — тогда установите его вручную:
+russian.DownloadRetryHint=Нажмите «Нет», чтобы попробовать ещё раз.
+russian.InstallingVCRedist=Установка Microsoft Visual C++ Redistributable...
+russian.DesktopIcon=Создать ярлык на рабочем столе
+russian.AdditionalTasks=Дополнительно:
+russian.ServiceDescription=Привилегированная часть Verge: поднимает TUN-туннель
+russian.LaunchApp=Запустить %1
 
 [Code]
 // Microsoft Visual C++ Redistributable 2015–2022 (x64). Без него приложение и
@@ -80,8 +104,8 @@ end;
 procedure InitializeWizard;
 begin
   DownloadPage := CreateDownloadPage(
-    'Загрузка компонентов',
-    'Скачивается Microsoft Visual C++ Redistributable, он нужен для работы Verge.',
+    CustomMessage('DownloadTitle'),
+    CustomMessage('DownloadDescription'),
     nil);
 end;
 
@@ -102,12 +126,11 @@ begin
       Log('VC++ Redistributable: загрузка не удалась: ' + GetExceptionMessage);
       if not DownloadPage.AbortedByUser then
         Result := SuppressibleMsgBox(
-          'Не удалось скачать Microsoft Visual C++ Redistributable:' + #13#10 +
+          CustomMessage('DownloadFailed') + #13#10 +
           GetExceptionMessage + #13#10#13#10 +
-          'Продолжить установку без него? Если на компьютере его нет, Verge ' +
-          'не запустится — тогда установите его вручную:' + #13#10 +
+          CustomMessage('DownloadContinue') + #13#10 +
           VCRedistUrl + #13#10#13#10 +
-          'Нажмите «Нет», чтобы попробовать ещё раз.',
+          CustomMessage('DownloadRetryHint'),
           mbError, MB_YESNO, IDYES) = IDYES
       else
         Result := False;
@@ -137,7 +160,7 @@ begin
     end;
   end;
   WizardForm.StatusLabel.Caption :=
-    'Установка Microsoft Visual C++ Redistributable...';
+    CustomMessage('InstallingVCRedist');
   if not Exec(Path, '/install /quiet /norestart', '', SW_HIDE,
               ewWaitUntilTerminated, ResultCode) then
   begin
@@ -187,8 +210,8 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; \
   Tasks: desktopicon
 
 [Tasks]
-Name: "desktopicon"; Description: "Создать ярлык на рабочем столе"; \
-  GroupDescription: "Дополнительно:"
+Name: "desktopicon"; Description: "{cm:DesktopIcon}"; \
+  GroupDescription: "{cm:AdditionalTasks}"
 
 [Registry]
 ; Схема verge:// — импорт подписки одним кликом из браузера. На macOS её
@@ -210,7 +233,7 @@ Filename: "{sys}\sc.exe"; \
   Parameters: "create VergeTunnel binPath= ""{app}\verge_service.exe"" start= auto DisplayName= ""Verge Tunnel"""; \
   Flags: runhidden
 Filename: "{sys}\sc.exe"; \
-  Parameters: "description VergeTunnel ""Привилегированная часть Verge: поднимает TUN-туннель"""; \
+  Parameters: "description VergeTunnel ""{cm:ServiceDescription}"""; \
   Flags: runhidden
 ; Автоперезапуск при сбое: без службы TUN-режим недоступен целиком, и
 ; единичное падение не должно требовать переустановки. Счётчик сбоев
@@ -220,7 +243,7 @@ Filename: "{sys}\sc.exe"; \
   Flags: runhidden
 Filename: "{sys}\sc.exe"; Parameters: "start VergeTunnel"; Flags: runhidden
 
-Filename: "{app}\{#AppExeName}"; Description: "Запустить {#AppName}"; \
+Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchApp,{#AppName}}"; \
   Flags: nowait postinstall skipifsilent
 
 [UninstallRun]

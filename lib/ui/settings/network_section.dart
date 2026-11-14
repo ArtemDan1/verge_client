@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../app/app_controller.dart';
 import 'general_section.dart';
+import '../../l10n/l10n.dart';
 
 class NetworkSection extends StatelessWidget {
   const NetworkSection({super.key, required this.controller});
@@ -12,12 +13,11 @@ class NetworkSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final n = controller.networkSettings;
     return SettingsSection(
-      title: 'Сеть',
+      title: l10n.network,
       children: [
         SettingsRow(
           label: 'IPv6',
-          description: 'Выключен по умолчанию: многие серверы ходят только по '
-              'IPv4, и IPv6-соединения зависают вместо отката',
+          description: l10n.ipv6Description,
           trailing: ShadSwitch(
             key: const Key('ipv6-switch'),
             value: n.ipv6Enabled,

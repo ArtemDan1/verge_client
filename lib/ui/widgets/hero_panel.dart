@@ -8,6 +8,8 @@ import '../../services/node_display.dart';
 import '../../theme/verge_palette.dart';
 import '../../tunnel/tunnel_controller.dart';
 import 'paper.dart';
+import '../../l10n/l10n.dart';
+import '../../services/routing_presets.dart';
 
 /// Карточка подключения: тумблер, статус и сервер, режим и роутинг, под ней —
 /// плитки времени и задержки.
@@ -73,20 +75,12 @@ class _HeroPanelState extends State<HeroPanel> {
     final mm = minutes.toString().padLeft(2, '0');
     final ss = seconds.toString().padLeft(2, '0');
     // ignore: unnecessary_brace_in_string_interps — скобки нужны: «д» слипается.
-    if (days > 0) return '${days}д $hours:$mm:$ss';
+    if (days > 0) return '${l10n.daysShort(days)} $hours:$mm:$ss';
     if (hours > 0) return '$hours:$mm:$ss';
     return '$mm:$ss';
   }
 
-  Future<void> _togglePower() async {
-    final c = widget.controller;
-    if (c.status == TunnelStatus.connected ||
-        c.status == TunnelStatus.connecting) {
-      await c.disconnect();
-    } else {
-      await c.connect();
-    }
-  }
+  Future<void> _togglePower() => widget.controller.toggleConnection();
 
   Future<void> _selectMode(TunnelMode mode) async {
     final c = widget.controller;
@@ -111,12 +105,12 @@ class _HeroPanelState extends State<HeroPanel> {
 
     final (cardBg, cardBorder, titleColor, title) = running
         ? (palette.successSoft, palette.successBorder, palette.successText,
-            'Подключено')
+            l10n.connected)
         : connecting
             ? (palette.warningSoft, palette.warningBorder, palette.warningText,
-                'Подключаемся…')
+                l10n.connecting)
             : (palette.surfaceHeader, palette.panelBorder,
-                theme.colorScheme.foreground, 'Не подключено');
+                theme.colorScheme.foreground, l10n.notConnected);
 
     final node = c.selectedNode;
     final nodeName = node == null ? null : splitCountryFlag(node.name);
@@ -164,7 +158,7 @@ class _HeroPanelState extends State<HeroPanel> {
                         Flexible(
                           child: Text(
                             nodeName == null
-                                ? 'Выберите сервер ниже'
+                                ? l10n.chooseServerBelow
                                 : [
                                     nodeName.name,
                                     if (c.activeProfile != null)
@@ -189,10 +183,10 @@ class _HeroPanelState extends State<HeroPanel> {
                     Segmented<TunnelMode>(
                       value: c.settings.tunnelMode,
                       onChanged: _switchingTun ? null : _selectMode,
-                      options: const [
+                      options: [
                         SegmentedOption(
                           value: TunnelMode.systemProxy,
-                          label: 'Прокси',
+                          label: l10n.kindProxy,
                           icon: LucideIcons.globe,
                         ),
                         SegmentedOption(
@@ -218,7 +212,7 @@ class _HeroPanelState extends State<HeroPanel> {
           children: [
             Expanded(
               child: StatTile(
-                label: 'Время',
+                label: l10n.time,
                 child: Text(running
                     ? _formatUptime(DateTime.now()
                         .difference(c.connectedAt ?? DateTime.now()))
@@ -228,7 +222,7 @@ class _HeroPanelState extends State<HeroPanel> {
             const SizedBox(width: 10),
             Expanded(
               child: StatTile(
-                label: 'Задержка',
+                label: l10n.columnLatency,
                 child: running && c.settings.gstaticPingEnabled
                     ? _heroPing(context, c)
                     : const Text('—'),
@@ -253,13 +247,13 @@ class _HeroPanelState extends State<HeroPanel> {
       value = Spinner(
           size: 14, color: ShadTheme.of(context).colorScheme.mutedForeground);
     } else if (c.gstaticPingFailed) {
-      value = Text('нет интернета', style: TextStyle(color: palette.dangerText));
+      value = Text(l10n.noInternet, style: TextStyle(color: palette.dangerText));
     } else if (res != null && (res.timedOut || res.error != null)) {
-      value = Text(res.timedOut ? 'таймаут' : 'ошибка',
+      value = Text(res.timedOut ? l10n.timeout : l10n.error,
           style: TextStyle(color: palette.dangerText));
     } else if (res?.latencyMs != null) {
       final ms = res!.latencyMs!;
-      value = Text('$ms мс', style: TextStyle(color: palette.latencyText(ms)));
+      value = Text(l10n.ms(ms), style: TextStyle(color: palette.latencyText(ms)));
     } else {
       value = const Text('—');
     }
@@ -284,7 +278,7 @@ class _RoutingSelect extends StatelessWidget {
     final theme = ShadTheme.of(context);
     String nameOf(String id) {
       for (final p in c.routingProfiles) {
-        if (p.id == id) return p.name;
+        if (p.id == id) return p.displayName;
       }
       return '';
     }
@@ -294,11 +288,11 @@ class _RoutingSelect extends StatelessWidget {
       child: ShadSelect<String>(
         minWidth: 236,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        placeholder: const Text('Правила роутинга'),
+        placeholder: Text(l10n.routingRules),
         initialValue: c.activeRoutingProfileId,
         options: [
           for (final p in c.routingProfiles)
-            ShadOption(value: p.id, child: Text(p.name)),
+            ShadOption(value: p.id, child: Text(p.displayName)),
         ],
         selectedOptionBuilder: (ctx, value) => Row(
           children: [
@@ -374,7 +368,7 @@ class _ConnectToggleState extends State<ConnectToggle> {
     return Semantics(
       toggled: running,
       button: true,
-      label: running || connecting ? 'Отключиться' : 'Подключиться',
+      label: running || connecting ? l10n.disconnect : l10n.connect,
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
         child: GestureDetector(

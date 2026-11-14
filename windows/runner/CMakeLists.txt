@@ -20,6 +20,7 @@ add_executable(${BINARY_NAME} WIN32
   "test_channels.cpp"
   "helper_channel.cpp"
   "window_control_channel.cpp"
+  "hotkey_channel.cpp"
   "deep_link_channel.cpp"
   "bypass_ping_channel.cpp"
   "${FLUTTER_MANAGED_DIR}/generated_plugin_registrant.cc"

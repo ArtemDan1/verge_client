@@ -48,12 +48,18 @@ bool FlutterWindow::OnCreate() {
   RegisterHelperChannel(flutter_controller_->engine());
   window_channel_ =
       CreateWindowControlChannel(flutter_controller_->engine(), this);
+  hotkey_channel_ =
+      std::make_unique<HotkeyChannel>(flutter_controller_->engine(), GetHandle());
   RegisterDeepLinkChannel(flutter_controller_->engine());
   RegisterBypassPingChannel(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
-    this->Show();
+    if (restore_maximized_) {
+      ::ShowWindow(GetHandle(), SW_SHOWMAXIMIZED);
+    } else {
+      this->Show();
+    }
   });
 
   // Flutter can complete the first frame before the "show window" callback is
@@ -65,6 +71,7 @@ bool FlutterWindow::OnCreate() {
 }
 
 void FlutterWindow::OnDestroy() {
+  hotkey_channel_ = nullptr;
   window_channel_ = nullptr;
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
@@ -103,9 +110,30 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
       if (in_popover_) {
         ExitPopover(/*show_main=*/false, /*notify=*/true);
       } else {
+        SavePlacement();
         ::ShowWindow(hwnd, SW_HIDE);
       }
       return 0;
+    case WM_HOTKEY:
+      if (hotkey_channel_ && hotkey_channel_->HandleHotkey(wparam)) {
+        return 0;
+      }
+      break;
+    case WM_EXITSIZEMOVE:
+      // Конец перетаскивания или ресайза рамкой.
+      SavePlacement();
+      break;
+    case WM_SIZE:
+      // Развернули или вернули из развёрнутого — WM_EXITSIZEMOVE тут нет.
+      // Обычный ресайз рамкой сюда тоже идёт, но на каждый шаг; его
+      // сохраняет WM_EXITSIZEMOVE.
+      if (!in_popover_ && wparam != SIZE_MINIMIZED &&
+          ::IsWindowVisible(hwnd)) {
+        const bool maximized = wparam == SIZE_MAXIMIZED;
+        if (maximized || last_size_maximized_) SavePlacement();
+        last_size_maximized_ = maximized;
+      }
+      break;
     case WM_ACTIVATE:
       // Мини-окно трея закрывается, как только пользователь кликнул мимо.
       if (in_popover_ && LOWORD(wparam) == WA_INACTIVE) {
@@ -135,8 +163,74 @@ void FlutterWindow::ShowMain() {
   }
   HWND hwnd = GetHandle();
   ::ShowWindow(hwnd, SW_SHOW);
-  ::ShowWindow(hwnd, SW_RESTORE);
+  // SW_RESTORE только свёрнутому: развёрнутое окно он вернул бы к обычному
+  // размеру, и развёрнутость не переживала бы даже прятанье в трей.
+  if (::IsIconic(hwnd)) ::ShowWindow(hwnd, SW_RESTORE);
   ::SetForegroundWindow(hwnd);
+}
+
+// Положение окна между запусками: HKCU\Software\Verge, значение
+// WindowPlacement — обычная (не развёрнутая) рамка и флаг «развёрнуто».
+namespace {
+
+constexpr wchar_t kPlacementKey[] = L"Software\\Verge";
+constexpr wchar_t kPlacementValue[] = L"WindowPlacement";
+
+struct StoredPlacement {
+  RECT normal;
+  DWORD maximized;
+};
+
+}  // namespace
+
+void FlutterWindow::SavePlacement() {
+  HWND hwnd = GetHandle();
+  // Скрытое окно (в трее, на переходах мини-окна) двигает только сам код —
+  // запоминаем лишь то, что пользователь видел.
+  if (hwnd == nullptr || in_popover_ || !::IsWindowVisible(hwnd)) return;
+  WINDOWPLACEMENT placement{};
+  placement.length = sizeof(placement);
+  if (!::GetWindowPlacement(hwnd, &placement)) return;
+  const RECT& rc = placement.rcNormalPosition;
+  // Временная рамка за экраном из ShowPopover — не то, что надо помнить.
+  if (rc.left <= -30000 || rc.top <= -30000) return;
+  if (rc.right - rc.left < 200 || rc.bottom - rc.top < 200) return;
+  StoredPlacement stored{
+      rc, placement.showCmd == SW_SHOWMAXIMIZED ||
+              (::IsIconic(hwnd) &&
+               (placement.flags & WPF_RESTORETOMAXIMIZED) != 0)
+          ? 1u
+          : 0u};
+  ::RegSetKeyValueW(HKEY_CURRENT_USER, kPlacementKey, kPlacementValue,
+                    REG_BINARY, &stored, sizeof(stored));
+}
+
+void FlutterWindow::RestorePlacement() {
+  HWND hwnd = GetHandle();
+  if (hwnd == nullptr) return;
+  StoredPlacement stored{};
+  DWORD size = sizeof(stored);
+  if (::RegGetValueW(HKEY_CURRENT_USER, kPlacementKey, kPlacementValue,
+                     RRF_RT_REG_BINARY, nullptr, &stored,
+                     &size) != ERROR_SUCCESS ||
+      size != sizeof(stored)) {
+    return;
+  }
+  const RECT& rc = stored.normal;
+  if (rc.right - rc.left < 200 || rc.bottom - rc.top < 200) return;
+  // Монитор, на котором было окно, могли отключить — тогда остаётся место
+  // по умолчанию, а не окно за пределами экрана.
+  if (::MonitorFromRect(&rc, MONITOR_DEFAULTTONULL) == nullptr) return;
+  WINDOWPLACEMENT placement{};
+  placement.length = sizeof(placement);
+  if (!::GetWindowPlacement(hwnd, &placement)) return;
+  placement.flags = 0;
+  // Окно ещё не показано: показ — после первого кадра (OnCreate).
+  placement.showCmd = SW_HIDE;
+  placement.rcNormalPosition = rc;
+  ::SetWindowPlacement(hwnd, &placement);
+  restore_maximized_ = stored.maximized != 0;
+  last_size_maximized_ = restore_maximized_;
 }
 
 // DWMWA_WINDOW_CORNER_PREFERENCE и его значения есть только в свежих SDK —

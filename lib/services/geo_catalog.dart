@@ -1,11 +1,24 @@
 import 'package:flutter/foundation.dart';
+import '../l10n/l10n.dart';
 
 @immutable
 class GeoCategory {
   final String tag;
-  final String label;
+  final String _label;
   final String srsUrl;
-  const GeoCategory(this.tag, this.label, this.srsUrl);
+  const GeoCategory(this.tag, this._label, this.srsUrl);
+
+  /// Подпись на языке интерфейса; у брендов (Google, Telegram…) — как есть.
+  String get label => switch (tag) {
+        'geosite-category-ru' => l10n.geoRuSites,
+        'geoip-ru' => l10n.geoRuIp,
+        'geosite-category-ads-all' => l10n.geoAds,
+        'geosite-private' => l10n.geoPrivate,
+        'geosite-category-porn' => l10n.geoAdult,
+        'geoip-cn' => l10n.geoCnIp,
+        'geosite-cn' => l10n.geoCnSites,
+        _ => _label,
+      };
 }
 
 const _geosite = 'https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set';

@@ -8,6 +8,7 @@
 
 #include <memory>
 
+#include "hotkey_channel.h"
 #include "win32_window.h"
 
 // A window that does nothing but host a Flutter view.
@@ -31,6 +32,11 @@ class FlutterWindow : public Win32Window {
   // Вернуть окну прежний вид. |show_main| — сразу показать главное окно,
   // |notify| — сообщить Dart, что мини-окно закрылось не по его команде.
   void ExitPopover(bool show_main, bool notify);
+
+  // Вернуть положение и размер окна с прошлого запуска (из реестра). Зовётся
+  // после Create, до первого показа; окно, которое было развёрнуто на весь
+  // экран, при показе развернётся снова.
+  void RestorePlacement();
 
  protected:
   // Win32Window:
@@ -57,6 +63,18 @@ class FlutterWindow : public Win32Window {
   LONG_PTR saved_style_ = 0;
   LONG_PTR saved_ex_style_ = 0;
   WINDOWPLACEMENT saved_placement_{};
+
+  // Глобальная горячая клавиша (канал verge/hotkey).
+  std::unique_ptr<HotkeyChannel> hotkey_channel_;
+
+  // Запомнить положение и размер обычного окна в реестре.
+  void SavePlacement();
+
+  // Окно с прошлого запуска было развёрнуто — показать развёрнутым.
+  bool restore_maximized_ = false;
+  // Последний WM_SIZE обычного окна был SIZE_MAXIMIZED — чтобы сохранить и
+  // обратный переход из развёрнутого.
+  bool last_size_maximized_ = false;
 };
 
 #endif  // RUNNER_FLUTTER_WINDOW_H_
