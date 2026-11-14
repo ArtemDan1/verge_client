@@ -29,13 +29,24 @@ class AppSettings {
   /// настройках: у gstatic бывают свои проблемы с доступностью.
   final String gstaticPingUrl;
 
+  /// Язык интерфейса: код из `appLanguages` или [systemLanguage].
+  final String language;
+
+  /// Глобальная горячая клавиша «подключить/отключить» в виде
+  /// `ctrl+alt+V` (см. HotkeySpec), пустая строка — выключена.
+  final String toggleHotkey;
+
+  static const systemLanguage = 'system';
+
   static const defaultGstaticPingIntervalSeconds = 60;
   static const minGstaticPingIntervalSeconds = 1;
   static const maxGstaticPingIntervalSeconds = 3600;
   static const defaultGstaticPingUrl = 'https://www.gstatic.com/generate_204';
 
   static int clampGstaticPingInterval(int seconds) => seconds.clamp(
-      minGstaticPingIntervalSeconds, maxGstaticPingIntervalSeconds);
+    minGstaticPingIntervalSeconds,
+    maxGstaticPingIntervalSeconds,
+  );
 
   const AppSettings({
     this.themeMode = AppThemeMode.system,
@@ -48,6 +59,8 @@ class AppSettings {
     this.gstaticPingEnabled = true,
     this.gstaticPingIntervalSeconds = defaultGstaticPingIntervalSeconds,
     this.gstaticPingUrl = defaultGstaticPingUrl,
+    this.language = systemLanguage,
+    this.toggleHotkey = '',
   });
 
   AppSettings copyWith({
@@ -61,58 +74,65 @@ class AppSettings {
     bool? gstaticPingEnabled,
     int? gstaticPingIntervalSeconds,
     String? gstaticPingUrl,
-  }) =>
-      AppSettings(
-        themeMode: themeMode ?? this.themeMode,
-        localPort: localPort ?? this.localPort,
-        networkService: networkService ?? this.networkService,
-        autostart: autostart ?? this.autostart,
-        tunnelMode: tunnelMode ?? this.tunnelMode,
-        lastUpdateCheckAt: lastUpdateCheckAt ?? this.lastUpdateCheckAt,
-        skippedVersion: skippedVersion ?? this.skippedVersion,
-        gstaticPingEnabled: gstaticPingEnabled ?? this.gstaticPingEnabled,
-        gstaticPingIntervalSeconds: gstaticPingIntervalSeconds == null
-            ? this.gstaticPingIntervalSeconds
-            : clampGstaticPingInterval(gstaticPingIntervalSeconds),
-        gstaticPingUrl: (gstaticPingUrl == null || gstaticPingUrl.trim().isEmpty)
-            ? this.gstaticPingUrl
-            : gstaticPingUrl.trim(),
-      );
+    String? language,
+    String? toggleHotkey,
+  }) => AppSettings(
+    themeMode: themeMode ?? this.themeMode,
+    localPort: localPort ?? this.localPort,
+    networkService: networkService ?? this.networkService,
+    autostart: autostart ?? this.autostart,
+    tunnelMode: tunnelMode ?? this.tunnelMode,
+    lastUpdateCheckAt: lastUpdateCheckAt ?? this.lastUpdateCheckAt,
+    skippedVersion: skippedVersion ?? this.skippedVersion,
+    gstaticPingEnabled: gstaticPingEnabled ?? this.gstaticPingEnabled,
+    gstaticPingIntervalSeconds: gstaticPingIntervalSeconds == null
+        ? this.gstaticPingIntervalSeconds
+        : clampGstaticPingInterval(gstaticPingIntervalSeconds),
+    gstaticPingUrl: (gstaticPingUrl == null || gstaticPingUrl.trim().isEmpty)
+        ? this.gstaticPingUrl
+        : gstaticPingUrl.trim(),
+    language: language ?? this.language,
+    toggleHotkey: toggleHotkey ?? this.toggleHotkey,
+  );
 
   Map<String, dynamic> toJson() => {
-        'themeMode': themeMode.name,
-        'localPort': localPort,
-        'networkService': networkService,
-        'autostart': autostart,
-        'tunnelMode': tunnelMode.name,
-        'lastUpdateCheckAt': lastUpdateCheckAt?.toUtc().toIso8601String(),
-        'skippedVersion': skippedVersion,
-        'gstaticPingEnabled': gstaticPingEnabled,
-        'gstaticPingIntervalSeconds': gstaticPingIntervalSeconds,
-        'gstaticPingUrl': gstaticPingUrl,
-      };
+    'themeMode': themeMode.name,
+    'localPort': localPort,
+    'networkService': networkService,
+    'autostart': autostart,
+    'tunnelMode': tunnelMode.name,
+    'lastUpdateCheckAt': lastUpdateCheckAt?.toUtc().toIso8601String(),
+    'skippedVersion': skippedVersion,
+    'gstaticPingEnabled': gstaticPingEnabled,
+    'gstaticPingIntervalSeconds': gstaticPingIntervalSeconds,
+    'gstaticPingUrl': gstaticPingUrl,
+    'language': language,
+    'toggleHotkey': toggleHotkey,
+  };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
-        themeMode: AppThemeMode.values.byName(json['themeMode'] as String),
-        localPort: (json['localPort'] as num).toInt(),
-        networkService: json['networkService'] as String,
-        autostart: json['autostart'] as bool,
-        tunnelMode: TunnelMode.values
-            .byName(json['tunnelMode'] as String? ?? 'systemProxy'),
-        lastUpdateCheckAt: json['lastUpdateCheckAt'] == null
-            ? null
-            : DateTime.parse(json['lastUpdateCheckAt'] as String),
-        skippedVersion: json['skippedVersion'] as String?,
-        gstaticPingEnabled: json['gstaticPingEnabled'] as bool? ?? true,
-        gstaticPingIntervalSeconds: (json['gstaticPingIntervalSeconds']
-                as num?)
-                ?.toInt() ??
-            defaultGstaticPingIntervalSeconds,
-        gstaticPingUrl:
-            (json['gstaticPingUrl'] as String?)?.trim().isNotEmpty == true
-                ? (json['gstaticPingUrl'] as String).trim()
-                : defaultGstaticPingUrl,
-      );
+    themeMode: AppThemeMode.values.byName(json['themeMode'] as String),
+    localPort: (json['localPort'] as num).toInt(),
+    networkService: json['networkService'] as String,
+    autostart: json['autostart'] as bool,
+    tunnelMode: TunnelMode.values.byName(
+      json['tunnelMode'] as String? ?? 'systemProxy',
+    ),
+    lastUpdateCheckAt: json['lastUpdateCheckAt'] == null
+        ? null
+        : DateTime.parse(json['lastUpdateCheckAt'] as String),
+    skippedVersion: json['skippedVersion'] as String?,
+    gstaticPingEnabled: json['gstaticPingEnabled'] as bool? ?? true,
+    gstaticPingIntervalSeconds:
+        (json['gstaticPingIntervalSeconds'] as num?)?.toInt() ??
+        defaultGstaticPingIntervalSeconds,
+    gstaticPingUrl:
+        (json['gstaticPingUrl'] as String?)?.trim().isNotEmpty == true
+        ? (json['gstaticPingUrl'] as String).trim()
+        : defaultGstaticPingUrl,
+    language: json['language'] as String? ?? systemLanguage,
+    toggleHotkey: json['toggleHotkey'] as String? ?? '',
+  );
 
   @override
   bool operator ==(Object other) =>
@@ -126,18 +146,23 @@ class AppSettings {
       other.skippedVersion == skippedVersion &&
       other.gstaticPingEnabled == gstaticPingEnabled &&
       other.gstaticPingIntervalSeconds == gstaticPingIntervalSeconds &&
-      other.gstaticPingUrl == gstaticPingUrl;
+      other.gstaticPingUrl == gstaticPingUrl &&
+      other.language == language &&
+      other.toggleHotkey == toggleHotkey;
 
   @override
   int get hashCode => Object.hash(
-      themeMode,
-      localPort,
-      networkService,
-      autostart,
-      tunnelMode,
-      lastUpdateCheckAt,
-      skippedVersion,
-      gstaticPingEnabled,
-      gstaticPingIntervalSeconds,
-      gstaticPingUrl);
+    themeMode,
+    localPort,
+    networkService,
+    autostart,
+    tunnelMode,
+    lastUpdateCheckAt,
+    skippedVersion,
+    gstaticPingEnabled,
+    gstaticPingIntervalSeconds,
+    gstaticPingUrl,
+    language,
+    toggleHotkey,
+  );
 }

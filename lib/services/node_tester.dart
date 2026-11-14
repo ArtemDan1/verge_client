@@ -8,6 +8,7 @@ import '../tunnel/xray_process.dart' show pickFreePort;
 import 'engine_selector.dart';
 import 'ping_service.dart';
 import 'test_config_builder.dart';
+import '../l10n/l10n.dart';
 
 typedef ProcessStarter = Future<void> Function(Map<String, dynamic> config);
 typedef ProcessStopper = Future<void> Function();
@@ -50,12 +51,12 @@ Future<int?> _defaultProbe(String url, int proxyPort, Duration timeout,
     sw.stop();
     await res.drain<void>();
     if (res.statusCode >= 400) {
-      log?.call('порт $proxyPort: HTTP ${res.statusCode}');
+      log?.call('${l10n.port} $proxyPort: HTTP ${res.statusCode}');
       return null;
     }
     return sw.elapsedMilliseconds;
   } catch (e) {
-    log?.call('порт $proxyPort: $e');
+    log?.call('${l10n.port} $proxyPort: $e');
     return null;
   } finally {
     client.close(force: true);
@@ -243,7 +244,7 @@ class NodeTester {
     } on Object catch (e) {
       // Процесс не поднялся (в том числе MissingPluginException не на macOS) —
       // считаем, что HTTP-фаза не дала результатов.
-      _onLog?.call('тестовый процесс не запустился: $e');
+      _onLog?.call(l10n.testProcessFailed('$e'));
       return const {};
     } finally {
       for (final stop in started) {

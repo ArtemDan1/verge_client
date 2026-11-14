@@ -9,9 +9,11 @@ import 'settings/network_section.dart';
 import 'settings/tls_section.dart';
 import 'settings/tun_section.dart';
 import 'widgets/paper.dart';
+import '../l10n/l10n.dart';
 
 /// Вкладки экрана настроек — в порядке показа.
-const settingsTabs = ['Общие', 'TUN', 'DNS', 'TLS', 'Сеть', 'Пинг'];
+List<String> get settingsTabs =>
+    [l10n.general, 'TUN', 'DNS', 'TLS', l10n.network, l10n.ping];
 
 class SettingsScreen extends StatefulWidget {
   final AppController controller;
@@ -49,20 +51,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           ScreenHeader(
-            title: 'Настройки',
+            title: l10n.settings,
             // Настройки применяются при сборке конфига, а живой туннель
             // собран на старых. Перезапускать его молча нельзя —
             // пользователь может быть в середине важного соединения.
             actions: [
               if (c.isConnected) ...[
                 Text(
-                  'Изменения применятся после переподключения',
+                  l10n.changesApplyAfterReconnect,
                   style: TextStyle(fontSize: 13, color: palette.warningText),
                 ),
                 ShadButton(
                   size: ShadButtonSize.sm,
                   onPressed: () => c.reconnect(),
-                  child: const Text('Переподключить'),
+                  child: Text(l10n.reconnect),
                 ),
               ],
             ],

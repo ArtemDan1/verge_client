@@ -74,4 +74,26 @@ void main() {
     expect(s.copyWith(gstaticPingUrl: '   ').gstaticPingUrl,
         'https://example.com/ping');
   });
+
+  test('язык и горячая клавиша переживают round-trip', () {
+    const s = AppSettings(language: 'fa', toggleHotkey: 'ctrl+alt+V');
+    final back = AppSettings.fromJson(s.toJson());
+    expect(back.language, 'fa');
+    expect(back.toggleHotkey, 'ctrl+alt+V');
+    expect(back, s);
+  });
+
+  test('старый JSON без языка и горячей клавиши даёт дефолты', () {
+    final json = const AppSettings().toJson()
+      ..remove('language')
+      ..remove('toggleHotkey');
+    final s = AppSettings.fromJson(json);
+    expect(s.language, AppSettings.systemLanguage);
+    expect(s.toggleHotkey, isEmpty);
+  });
+
+  test('горячую клавишу можно снять пустой строкой', () {
+    const s = AppSettings(toggleHotkey: 'ctrl+alt+V');
+    expect(s.copyWith(toggleHotkey: '').toggleHotkey, isEmpty);
+  });
 }

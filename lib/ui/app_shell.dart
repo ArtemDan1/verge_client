@@ -14,6 +14,7 @@ import 'logs_screen.dart';
 import 'connections_screen.dart';
 import 'routing_screen.dart';
 import 'about_screen.dart';
+import '../l10n/l10n.dart';
 
 class AppShell extends StatefulWidget {
   final AppController controller;
@@ -64,15 +65,15 @@ class _AppShellState extends State<AppShell> {
     final ok = await showShadDialog<bool>(
       context: context,
       builder: (ctx) => ShadDialog(
-        title: const Text('Добавить подписку'),
+        title: Text(l10n.addSubscription),
         actions: [
           ShadButton.outline(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Отмена'),
+            child: Text(l10n.cancel),
           ),
           ShadButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Добавить'),
+            child: Text(l10n.add),
           ),
         ],
         child: Padding(
@@ -81,7 +82,7 @@ class _AppShellState extends State<AppShell> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Имя: ${req.name}'),
+              Text('${l10n.name}: ${req.name}'),
               const SizedBox(height: 4),
               Text('URL: ${req.url}'),
             ],

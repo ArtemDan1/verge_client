@@ -1,4 +1,5 @@
 import 'dart:io';
+import '../l10n/l10n.dart';
 
 /// Замеряет задержку HTTP-запроса к [url]. [proxyPort] — локальный proxy-порт
 /// (тот, что слушает уже запущенное ядро sing-box/xray) для режима «Proxy»;
@@ -27,12 +28,12 @@ Future<int?> httpProbeLatency(
     sw.stop();
     await res.drain<void>();
     if (res.statusCode >= 400) {
-      log?.call('порт $proxyPort: HTTP ${res.statusCode}');
+      log?.call('${l10n.port} $proxyPort: HTTP ${res.statusCode}');
       return null;
     }
     return sw.elapsedMilliseconds;
   } catch (e) {
-    log?.call('порт $proxyPort: $e');
+    log?.call('${l10n.port} $proxyPort: $e');
     return null;
   } finally {
     client.close(force: true);

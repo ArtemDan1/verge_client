@@ -8,6 +8,7 @@ import '../models/log_entry.dart';
 import '../theme/app_theme.dart';
 import '../theme/verge_palette.dart';
 import 'widgets/paper.dart';
+import '../l10n/l10n.dart';
 
 class LogsScreen extends StatefulWidget {
   const LogsScreen({super.key, required this.controller});
@@ -55,8 +56,8 @@ class _LogsScreenState extends State<LogsScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           ScreenHeader(
-            title: 'Логи',
-            subtitle: Text('${logs.length} из ${all.length}'),
+            title: l10n.logs,
+            subtitle: Text(l10n.usedOfTotal('${logs.length}', '${all.length}')),
             actions: [
               ShadButton.outline(
                 onPressed: () => Clipboard.setData(
@@ -65,19 +66,19 @@ class _LogsScreenState extends State<LogsScreen> {
                   ),
                 ),
                 leading: const Icon(LucideIcons.clipboard, size: 16),
-                child: const Text('Копировать'),
+                child: Text(l10n.copy),
               ),
               ShadButton.outline(
                 onPressed: c.clearLogs,
                 foregroundColor: palette.dangerText,
                 leading: const Icon(LucideIcons.trash2, size: 16),
-                child: const Text('Очистить'),
+                child: Text(l10n.clear),
               ),
             ],
           ),
           const SizedBox(height: 16),
           ShadInput(
-            placeholder: const Text('Поиск по логам'),
+            placeholder: Text(l10n.searchLogs),
             leading: const Icon(LucideIcons.search, size: 16),
             decoration: ShadDecoration(color: palette.surface),
             onChanged: (v) => setState(() => _query = v),
@@ -115,7 +116,7 @@ class _LogsScreenState extends State<LogsScreen> {
                     _levels.clear();
                     _origins.clear();
                   }),
-                  child: const Text('Сбросить'),
+                  child: Text(l10n.reset),
                 ),
             ],
           ),
@@ -132,8 +133,8 @@ class _LogsScreenState extends State<LogsScreen> {
                   ? Center(
                       child: Text(
                         all.isEmpty
-                            ? 'Логов пока нет'
-                            : 'Ничего не найдено по фильтру',
+                            ? l10n.noLogsYet
+                            : l10n.nothingMatchesFilter,
                         style: theme.textTheme.muted,
                       ),
                     )

@@ -4,6 +4,7 @@ import '../app/app_controller.dart';
 import '../models/node_config.dart';
 import '../services/node_editor.dart';
 import 'widgets/json_editor.dart';
+import '../l10n/l10n.dart';
 
 /// Диалог редактирования ноды: имя + сырой outbound-JSON. Формы больше нет —
 /// у каждого протокола свой набор полей, и поддерживать их таблицами дороже,
@@ -107,7 +108,7 @@ class _EditNodeDialogState extends State<_EditNodeDialog> {
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
     return ShadDialog(
-      title: const Text('Редактировать ноду'),
+      title: Text(l10n.editNode),
       // Ширина — родным параметром диалога, а скролл целиком отдан ShadDialog
       // (scrollable: true по умолчанию). Свой SingleChildScrollView внутри
       // получал бы от внешнего неограниченную высоту, считал что контент влез,
@@ -116,18 +117,18 @@ class _EditNodeDialogState extends State<_EditNodeDialog> {
       actions: [
         ShadButton.outline(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Отмена'),
+          child: Text(l10n.cancel),
         ),
         ShadButton(
           onPressed: _error == null ? _save : null,
-          child: const Text('Сохранить'),
+          child: Text(l10n.save),
         ),
       ],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('Имя', style: theme.textTheme.muted),
+          Text(l10n.name, style: theme.textTheme.muted),
           const SizedBox(height: 4),
           // Имя живёт в NodeConfig.name, а не в outbound-JSON, поэтому
           // отдельным полем, а не внутри редактора.
@@ -137,15 +138,15 @@ class _EditNodeDialogState extends State<_EditNodeDialog> {
             children: [
               Text(
                 widget.node.rawSchema == RawSchema.xray
-                    ? 'Схема: Xray'
-                    : 'Схема: sing-box',
+                    ? l10n.schema('Xray')
+                    : l10n.schema('sing-box'),
                 style: theme.textTheme.muted,
               ),
               const Spacer(),
               ShadButton.ghost(
                 size: ShadButtonSize.sm,
                 onPressed: _format,
-                child: const Text('Форматировать'),
+                child: Text(l10n.format),
               ),
             ],
           ),
@@ -165,7 +166,7 @@ class _EditNodeDialogState extends State<_EditNodeDialog> {
           ],
           const SizedBox(height: 12),
           Text(
-            'Изменения будут перезаписаны при обновлении подписки',
+            l10n.changesOverwrittenOnRefresh,
             style: theme.textTheme.muted,
           ),
         ],

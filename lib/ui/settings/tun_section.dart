@@ -3,6 +3,7 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../app/app_controller.dart';
 import '../../models/network_settings.dart';
 import 'general_section.dart';
+import '../../l10n/l10n.dart';
 
 /// Параметры TUN под спойлером: их нынешние значения подобраны эмпирически,
 /// и каждое «более разумное» значение уже ломало работу — см. комментарии к
@@ -44,10 +45,8 @@ class _TunSectionState extends State<TunSection> {
       title: 'TUN',
       children: [
         SettingsRow(
-          label: 'Расширенные',
-          description: 'Адрес интерфейса, MTU, сетевой стек и маршруты. '
-              'Подобраны под большинство сетей — трогать, только если TUN '
-              'работает с проблемами',
+          label: l10n.advanced,
+          description: l10n.tunAdvancedDescription,
           onTap: () => setState(() => _expanded = !_expanded),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
@@ -56,7 +55,7 @@ class _TunSectionState extends State<TunSection> {
                 ShadButton.outline(
                   size: ShadButtonSize.sm,
                   onPressed: _reset,
-                  child: const Text('Сбросить'),
+                  child: Text(l10n.reset),
                 ),
                 const SizedBox(width: 8),
               ],
@@ -69,13 +68,11 @@ class _TunSectionState extends State<TunSection> {
           ),
         ),
         if (_expanded) ...[
-          const SettingsNotice(
-            'Менять эти значения стоит, только если понимаете последствия. '
-            'MTU 9000 обрывает SSH и MySQL, адрес из 172.16.0.0/12 ломает '
-            'docker-сети, строгий маршрут перехватывает трафик локальной сети.',
+          SettingsNotice(
+            l10n.tunAdvancedWarning,
           ),
           SettingsField(
-            label: 'Адрес интерфейса',
+            label: l10n.interfaceAddress,
             child: ShadInput(
               initialValue: n.tunAddressV4,
               onSubmitted: (v) => update(n.copyWith(tunAddressV4: v.trim())),
@@ -83,7 +80,7 @@ class _TunSectionState extends State<TunSection> {
           ),
           SettingsRow(
             label: 'MTU',
-            description: 'От 576 до 9000',
+            description: l10n.rangeFromTo(576, 9000),
             trailing: SettingsInput(
               initialValue: '${n.tunMtu}',
               number: true,
@@ -96,9 +93,8 @@ class _TunSectionState extends State<TunSection> {
             ),
           ),
           SettingsRow(
-            label: 'Сетевой стек',
-            description: 'gvisor — совместимость, system — скорость, '
-                'mixed — баланс',
+            label: l10n.networkStack,
+            description: l10n.networkStackDescription,
             trailing: SizedBox(
               width: 140,
               child: ShadSelect<TunStack>(
@@ -116,16 +112,16 @@ class _TunSectionState extends State<TunSection> {
             ),
           ),
           SettingsRow(
-            label: 'Строгий маршрут',
-            description: 'Не даёт трафику уйти мимо туннеля',
+            label: l10n.strictRoute,
+            description: l10n.strictRouteDescription,
             trailing: ShadSwitch(
               value: n.tunStrictRoute,
               onChanged: (v) => update(n.copyWith(tunStrictRoute: v)),
             ),
           ),
           SettingsRow(
-            label: 'Маршрут по умолчанию',
-            description: 'Весь трафик системы идёт в туннель',
+            label: l10n.autoRoute,
+            description: l10n.autoRouteDescription,
             trailing: ShadSwitch(
               value: n.tunAutoRoute,
               onChanged: (v) => update(n.copyWith(tunAutoRoute: v)),

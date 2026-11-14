@@ -4,6 +4,7 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 import '../app/app_controller.dart';
 import '../services/subscription_service.dart';
 import '../theme/verge_palette.dart';
+import '../l10n/l10n.dart';
 
 /// Имя профиля из ссылки: фрагмент после `#`, иначе хост, иначе «Профиль».
 String deriveProfileName(String link) {
@@ -19,7 +20,7 @@ String deriveProfileName(String link) {
   }
   final uri = Uri.tryParse(first);
   if (uri != null && uri.host.isNotEmpty) return uri.host;
-  return 'Профиль';
+  return l10n.profile;
 }
 
 /// Диалог добавления подписки: из буфера обмена одной кнопкой или вводом
@@ -54,7 +55,7 @@ class _AddProfileSheetState extends State<_AddProfileSheet> {
   Future<void> _add(String link) async {
     final trimmed = link.trim();
     if (trimmed.isEmpty) {
-      setState(() => _error = 'Пустая ссылка');
+      setState(() => _error = l10n.emptyLink);
       return;
     }
     setState(() {
@@ -81,7 +82,7 @@ class _AddProfileSheetState extends State<_AddProfileSheet> {
     final data = await Clipboard.getData('text/plain');
     final text = data?.text ?? '';
     if (text.trim().isEmpty) {
-      setState(() => _error = 'Буфер обмена пуст');
+      setState(() => _error = l10n.clipboardEmpty);
       return;
     }
     await _add(text);
@@ -92,18 +93,17 @@ class _AddProfileSheetState extends State<_AddProfileSheet> {
     final theme = ShadTheme.of(context);
     final palette = VergePalette.of(context);
     return ShadDialog(
-      title: const Text('Добавить подписку'),
-      description: const Text(
-          'URL подписки, share-ссылка (vless://, ss://…) или JSON-конфиг'),
+      title: Text(l10n.addSubscription),
+      description: Text(l10n.addSubscriptionDescription),
       constraints: const BoxConstraints(maxWidth: 440),
       actions: [
         ShadButton.outline(
           onPressed: _busy ? null : () => Navigator.of(context).pop(false),
-          child: const Text('Отмена'),
+          child: Text(l10n.cancel),
         ),
         ShadButton(
           onPressed: _busy ? null : () => _add(_linkCtrl.text),
-          child: const Text('Добавить'),
+          child: Text(l10n.add),
         ),
       ],
       child: Padding(
@@ -126,7 +126,7 @@ class _AddProfileSheetState extends State<_AddProfileSheet> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'Скопировали ссылку? Добавим прямо из буфера обмена',
+                      l10n.pasteFromClipboardHint,
                       style: TextStyle(
                           fontSize: 13, color: theme.colorScheme.foreground),
                     ),
@@ -137,7 +137,7 @@ class _AddProfileSheetState extends State<_AddProfileSheet> {
                     backgroundColor: palette.accent,
                     foregroundColor: const Color(0xFFFFFFFF),
                     onPressed: _busy ? null : _fromClipboard,
-                    child: const Text('Вставить'),
+                    child: Text(l10n.paste),
                   ),
                 ],
               ),
@@ -149,7 +149,7 @@ class _AddProfileSheetState extends State<_AddProfileSheet> {
                     child: Container(height: 1, color: palette.panelBorder)),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 10),
-                  child: Text('или',
+                  child: Text(l10n.or,
                       style: theme.textTheme.muted.copyWith(fontSize: 12)),
                 ),
                 Expanded(
@@ -160,7 +160,7 @@ class _AddProfileSheetState extends State<_AddProfileSheet> {
             ShadInput(
               controller: _linkCtrl,
               autofocus: true,
-              placeholder: const Text('https://… или vless://…'),
+              placeholder: Text(l10n.subscriptionUrlHint),
               onSubmitted: _busy ? null : (v) => _add(v),
             ),
             if (_error != null)

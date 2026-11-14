@@ -1,0 +1,607 @@
+{
+  "@@locale": "en",
+  "renameProfile": "Rename profile",
+  "cancel": "Cancel",
+  "save": "Save",
+  "subscriptionsUpdated": "Subscriptions updated",
+  "unitB": "B",
+  "unitKB": "KB",
+  "unitMB": "MB",
+  "unitGB": "GB",
+  "unitTB": "TB",
+  "usedNoLimit": "{used} used · no limit",
+  "@usedNoLimit": {
+    "placeholders": {
+      "used": {
+        "type": "Object"
+      }
+    }
+  },
+  "validUntil": "until {date}",
+  "@validUntil": {
+    "placeholders": {
+      "date": {
+        "type": "Object"
+      }
+    }
+  },
+  "timeout": "timeout",
+  "error": "error",
+  "pingAll": "Ping all",
+  "refreshSubscriptions": "Refresh subscriptions",
+  "addSubscription": "Add subscription",
+  "servers": "Servers",
+  "pickingNode": "Picking a node…",
+  "noSubscriptions": "No subscriptions yet. Add the first one.",
+  "subscriptionHasNoServers": "This subscription has no servers",
+  "active": "active",
+  "columnServer": "Server",
+  "columnProtocol": "Protocol",
+  "columnEngine": "Engine",
+  "columnLatency": "Latency",
+  "ms": "{ms} ms",
+  "@ms": {
+    "placeholders": {
+      "ms": {
+        "type": "Object"
+      }
+    }
+  },
+  "engineAuto": "Auto ({engine})",
+  "@engineAuto": {
+    "placeholders": {
+      "engine": {
+        "type": "Object"
+      }
+    }
+  },
+  "edit": "Edit",
+  "ping": "Ping",
+  "refresh": "Refresh",
+  "subscriptionLinkCopied": "Subscription link copied",
+  "subscription": "Subscription",
+  "accountPage": "Account",
+  "support": "Support",
+  "autoRefresh": "Auto-refresh",
+  "rename": "Rename",
+  "delete": "Delete",
+  "autoSelectOn": "Auto-select: on",
+  "autoSelect": "Auto-select",
+  "refreshOwn": "Custom: {hours} h",
+  "@refreshOwn": {
+    "placeholders": {
+      "hours": {
+        "type": "Object"
+      }
+    }
+  },
+  "refreshBySubscription": "From subscription: {hours} h",
+  "@refreshBySubscription": {
+    "placeholders": {
+      "hours": {
+        "type": "Object"
+      }
+    }
+  },
+  "off": "Off",
+  "autoRefreshInterval": "Auto-refresh interval",
+  "hours": "Hours",
+  "emptyUseSubscriptionInterval": "Empty — use the subscription interval ({hours} h)",
+  "@emptyUseSubscriptionInterval": {
+    "placeholders": {
+      "hours": {
+        "type": "Object"
+      }
+    }
+  },
+  "emptyNoAutoRefresh": "Empty — don't refresh automatically",
+  "serverCount": "{count, plural, one{{count} server} other{{count} servers}}",
+  "@serverCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "usedOfTotal": "{used} of {total}",
+  "@usedOfTotal": {
+    "placeholders": {
+      "used": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "remaining": "{amount} left",
+  "@remaining": {
+    "placeholders": {
+      "amount": {
+        "type": "Object"
+      }
+    }
+  },
+  "limitExhausted": "limit reached",
+  "newProfile": "New profile",
+  "routing": "Routing",
+  "updateGeo": "Update geo",
+  "profile": "Profile",
+  "routingSubtitle": "What goes through the VPN, what goes direct, and what is blocked",
+  "geoNeverUpdated": "never updated — bundled versions",
+  "geoUpdated": "updated {ago}",
+  "@geoUpdated": {
+    "placeholders": {
+      "ago": {
+        "type": "Object"
+      }
+    }
+  },
+  "geoSets": "Geo sets (.srs): {status}",
+  "@geoSets": {
+    "placeholders": {
+      "status": {
+        "type": "Object"
+      }
+    }
+  },
+  "justNow": "just now",
+  "minutesAgo": "{n} min ago",
+  "@minutesAgo": {
+    "placeholders": {
+      "n": {
+        "type": "Object"
+      }
+    }
+  },
+  "hoursAgo": "{n} h ago",
+  "@hoursAgo": {
+    "placeholders": {
+      "n": {
+        "type": "Object"
+      }
+    }
+  },
+  "daysAgo": "{n} d ago",
+  "@daysAgo": {
+    "placeholders": {
+      "n": {
+        "type": "Object"
+      }
+    }
+  },
+  "restDirect": "the rest direct",
+  "restViaVpn": "the rest via VPN",
+  "builtIn": "Built-in",
+  "custom": "Custom",
+  "allDirect": "everything direct",
+  "allViaVpn": "everything via VPN",
+  "ruleCount": "{count, plural, one{{count} rule} other{{count} rules}}",
+  "@ruleCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "groupViaVpn": "Via VPN",
+  "groupDirect": "Direct",
+  "groupBlock": "Block",
+  "groupExceptions": "Exceptions (override block)",
+  "exceptionsGo": "Exceptions go",
+  "viaVpn": "via VPN",
+  "direct": "direct",
+  "duplicate": "Duplicate",
+  "use": "Use",
+  "builtInProfileReadOnly": "Built-in profiles can't be changed — duplicate one to customize its rules.",
+  "everythingElse": "Everything not matched by rules",
+  "empty": "Empty",
+  "chooseCategory": "Choose a category",
+  "domainOrCidr": "Domain or IP/CIDR",
+  "add": "Add",
+  "domainOrCidrHint": "example.com or 1.2.3.0/24",
+  "geoCategory": "Geo category",
+  "domainOrIp": "Domain or IP",
+  "addRule": "Add rule",
+  "kindProxy": "Proxy",
+  "kindBlock": "Block",
+  "otherApps": "Other",
+  "noActiveConnections": "No active connections",
+  "vpnDisconnected": "VPN is off",
+  "nothingFound": "Nothing found",
+  "connections": "Connections",
+  "byApp": "By app",
+  "asList": "List",
+  "connectionsSearchHint": "Domain, IP or app",
+  "all": "All",
+  "close": "Close",
+  "kindProxyShort": "proxy",
+  "kindBlockShort": "block",
+  "connectionCount": "{count, plural, one{{count} connection} other{{count} connections}}",
+  "@connectionCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "fieldApp": "App",
+  "fieldProcessPath": "Process path",
+  "fieldNetwork": "Network",
+  "fieldSource": "Source",
+  "fieldDestination": "Destination",
+  "fieldDomain": "Domain",
+  "fieldChain": "Chain",
+  "fieldRule": "Rule",
+  "fieldDuration": "Duration",
+  "fieldStart": "Started",
+  "connectionClosed": "connection closed",
+  "sent": "Sent",
+  "received": "Received",
+  "advanced": "Advanced",
+  "tunAdvancedDescription": "Interface address, MTU, network stack and routes. Tuned for most networks — change only if TUN misbehaves",
+  "reset": "Reset",
+  "tunAdvancedWarning": "Change these values only if you understand the consequences. MTU 9000 breaks SSH and MySQL, an address from 172.16.0.0/12 breaks docker networks, strict route captures local network traffic.",
+  "interfaceAddress": "Interface address",
+  "rangeFromTo": "From {min} to {max}",
+  "@rangeFromTo": {
+    "placeholders": {
+      "min": {
+        "type": "Object"
+      },
+      "max": {
+        "type": "Object"
+      }
+    }
+  },
+  "networkStack": "Network stack",
+  "networkStackDescription": "gvisor — compatibility, system — speed, mixed — balance",
+  "strictRoute": "Strict route",
+  "strictRouteDescription": "Keeps traffic from bypassing the tunnel",
+  "autoRoute": "Default route",
+  "autoRouteDescription": "All system traffic goes into the tunnel",
+  "daysShort": "{n}d",
+  "@daysShort": {
+    "placeholders": {
+      "n": {
+        "type": "Object"
+      }
+    }
+  },
+  "connected": "Connected",
+  "connecting": "Connecting…",
+  "notConnected": "Not connected",
+  "chooseServerBelow": "Choose a server below",
+  "time": "Time",
+  "noInternet": "no internet",
+  "routingRules": "Routing rules",
+  "disconnect": "Disconnect",
+  "connect": "Connect",
+  "checkingServer": "Checking the server",
+  "clickToConnect": "Click to connect",
+  "quitVerge": "Quit Verge",
+  "noSubscriptionsTray": "No subscriptions — add them in the main window",
+  "openVerge": "Open Verge",
+  "noResponse": "no response",
+  "skipCertVerify": "Skip certificate verification",
+  "skipCertVerifyDescription": "Lowers security: the connection no longer protects against server spoofing. Enable only for debugging",
+  "tlsFragment": "TLS fragmentation",
+  "tlsFragmentDescription": "Splits the TLS handshake into pieces to get past firewalls that do naive ClientHello matching. Works with sing-box only",
+  "tlsFragmentUnsupported": "The current engine does not support fragmentation",
+  "tlsRecordFragment": "TLS record fragmentation",
+  "tlsRecordFragmentDescription": "Cheaper on performance — worth trying first",
+  "fallbackDelay": "Fallback delay",
+  "fallbackDelayDescription": "How long to wait for a response before retrying without fragmentation",
+  "versionAvailable": "Version {version} is available",
+  "@versionAvailable": {
+    "placeholders": {
+      "version": {
+        "type": "Object"
+      }
+    }
+  },
+  "launchingInstaller": "Launching the installer — Verge will close and update",
+  "downloadingUpdate": "Downloading the update…",
+  "updateReady": "A new version of Verge is ready to install",
+  "downloadFailed": "Download failed: {error}",
+  "@downloadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "Object"
+      }
+    }
+  },
+  "retry": "Retry",
+  "update": "Update",
+  "later": "Later",
+  "whatsNew": "What's new",
+  "skipVersion": "Skip this version",
+  "installing": "Installing…",
+  "downloading": "Downloading",
+  "activeConnectionPing": "Active connection ping",
+  "showPing": "Show ping",
+  "showPingDescription": "Server latency on the home screen, next to the connection timer",
+  "pingIntervalSeconds": "Refresh interval, s",
+  "pingIntervalDescription": "From {min} to {max} s, default {def}",
+  "@pingIntervalDescription": {
+    "placeholders": {
+      "min": {
+        "type": "Object"
+      },
+      "max": {
+        "type": "Object"
+      },
+      "def": {
+        "type": "Object"
+      }
+    }
+  },
+  "probeUrl": "Probe URL",
+  "probeUrlDescription": "In TUN mode this URL checks internet access outside the tunnel; in Proxy mode it measures latency through the local proxy",
+  "autoSelectNode": "Node auto-select",
+  "pickBestNode": "Pick the best node",
+  "healthCheckInterval": "Background check interval, seconds ({min}…{max})",
+  "@healthCheckInterval": {
+    "placeholders": {
+      "min": {
+        "type": "Object"
+      },
+      "max": {
+        "type": "Object"
+      }
+    }
+  },
+  "profiles": "Profiles",
+  "checkNow": "Check now",
+  "lastCheck": "Last check: {time} — {result}",
+  "@lastCheck": {
+    "placeholders": {
+      "time": {
+        "type": "Object"
+      },
+      "result": {
+        "type": "Object"
+      }
+    }
+  },
+  "nodeResponds": "node responds",
+  "lastPick": "Last pick: {result}",
+  "@lastPick": {
+    "placeholders": {
+      "result": {
+        "type": "Object"
+      }
+    }
+  },
+  "emptyLink": "Empty link",
+  "clipboardEmpty": "Clipboard is empty",
+  "addSubscriptionDescription": "Subscription URL, share link (vless://, ss://…) or JSON config",
+  "pasteFromClipboardHint": "Copied a link? Add it straight from the clipboard",
+  "paste": "Paste",
+  "or": "or",
+  "subscriptionUrlHint": "https://… or vless://…",
+  "themeSystem": "System",
+  "themeLight": "Light",
+  "themeDark": "Dark",
+  "theme": "Theme",
+  "startup": "Startup",
+  "autostart": "Auto-connect",
+  "autostartDescription": "Connect to the last node on launch",
+  "localProxyPort": "Local proxy port",
+  "localProxyPortDescription": "HTTP + SOCKS on 127.0.0.1",
+  "home": "Home",
+  "settings": "Settings",
+  "logs": "Logs",
+  "about": "About",
+  "newBadge": "new",
+  "copy": "Copy",
+  "clear": "Clear",
+  "searchLogs": "Search logs",
+  "noLogsYet": "No logs yet",
+  "nothingMatchesFilter": "Nothing matches the filter",
+  "editNode": "Edit node",
+  "name": "Name",
+  "schema": "Schema: {engine}",
+  "@schema": {
+    "placeholders": {
+      "engine": {
+        "type": "Object"
+      }
+    }
+  },
+  "format": "Format",
+  "changesOverwrittenOnRefresh": "Changes will be overwritten when the subscription refreshes",
+  "dnsHijack": "DNS hijack in TUN",
+  "dnsHijackDescription": "Redirects all port 53 traffic to the DNS engine. Without it, queries go to the ISP's DNS and get censored",
+  "dnsProxy": "DNS for proxy",
+  "dnsProxyDescription": "Resolves sites that go through the VPN",
+  "dnsDirect": "DNS for direct connections",
+  "dnsDirectDescription": "For sites that open directly",
+  "aboutTagline": "A proxy client for macOS and Windows built on sing-box and Xray.",
+  "appVersion": "App version",
+  "checking": "Checking…",
+  "checkForUpdates": "Check for updates",
+  "upToDate": "You have the latest version",
+  "general": "General",
+  "network": "Network",
+  "changesApplyAfterReconnect": "Changes will apply after reconnecting",
+  "reconnect": "Reconnect",
+  "ipv6Description": "Off by default: many servers are IPv4-only, and IPv6 connections hang instead of falling back",
+  "presetAllProxy": "Everything via proxy",
+  "presetBypassRu": "Bypass Russia",
+  "presetBlockAds": "Ad blocking only",
+  "geoRuSites": "Russia (sites)",
+  "geoRuIp": "Russia (IP)",
+  "geoAds": "Ads and trackers",
+  "geoPrivate": "Private domains",
+  "geoAdult": "Adult content",
+  "geoCnIp": "China (IP)",
+  "geoCnSites": "China (sites)",
+  "singboxCrashed": "sing-box crashed",
+  "vpnDisconnectedWithReason": "VPN disconnected: {reason}",
+  "@vpnDisconnectedWithReason": {
+    "placeholders": {
+      "reason": {
+        "type": "Object"
+      }
+    }
+  },
+  "geoSetsNotUpdated": "{count} set(s) not updated (check your connection)",
+  "@geoSetsNotUpdated": {
+    "placeholders": {
+      "count": {
+        "type": "Object"
+      }
+    }
+  },
+  "refreshFailed": "Failed to refresh: {names}",
+  "@refreshFailed": {
+    "placeholders": {
+      "names": {
+        "type": "Object"
+      }
+    }
+  },
+  "copyOf": "{name} (copy)",
+  "@copyOf": {
+    "placeholders": {
+      "name": {
+        "type": "Object"
+      }
+    }
+  },
+  "healthCheckOk": "check {node} — ok",
+  "@healthCheckOk": {
+    "placeholders": {
+      "node": {
+        "type": "Object"
+      }
+    }
+  },
+  "healthCheckFailed": "{node} did not respond ({failures} of {limit})",
+  "@healthCheckFailed": {
+    "placeholders": {
+      "node": {
+        "type": "Object"
+      },
+      "failures": {
+        "type": "Object"
+      },
+      "limit": {
+        "type": "Object"
+      }
+    }
+  },
+  "nodeNotRespondingSwitching": "Node {node} is not responding — picking another one",
+  "@nodeNotRespondingSwitching": {
+    "placeholders": {
+      "node": {
+        "type": "Object"
+      }
+    }
+  },
+  "helperNotInstalled": "The system service is not installed. Reinstall the app using the installer (.pkg).",
+  "updateCheckFailed": "Failed to check for updates: {error}",
+  "@updateCheckFailed": {
+    "placeholders": {
+      "error": {
+        "type": "Object"
+      }
+    }
+  },
+  "updateCheckLatest": "Update check: the latest version is installed",
+  "updateCheckAvailable": "Update check: {version} is available",
+  "@updateCheckAvailable": {
+    "placeholders": {
+      "version": {
+        "type": "Object"
+      }
+    }
+  },
+  "updateDownloadFailed": "Failed to download the update: {error}",
+  "@updateDownloadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "Object"
+      }
+    }
+  },
+  "noLiveNodes": "no live nodes found, selection unchanged",
+  "tcpOnlyResult": "TCP {ms} ms (HTTP failed on every node)",
+  "@tcpOnlyResult": {
+    "placeholders": {
+      "ms": {
+        "type": "Object"
+      }
+    }
+  },
+  "xrayFailedFallback": "Xray failed to start, falling back to sing-box",
+  "xrayFailedManual": "Xray failed to start, engine was chosen manually — no fallback",
+  "xrayFailed": "Xray failed to start",
+  "vpnNotConnectedXray": "VPN not connected: Xray failed to start",
+  "xrayConfigUnsupported": "an Xray config can't be built for this node",
+  "xrayStartFailed": "Xray did not start: {error}",
+  "@xrayStartFailed": {
+    "placeholders": {
+      "error": {
+        "type": "Object"
+      }
+    }
+  },
+  "xrayUnavailable": "Xray is not available on this platform",
+  "xraySocksNotResponding": "Xray started, but socks port {port} is not responding",
+  "@xraySocksNotResponding": {
+    "placeholders": {
+      "port": {
+        "type": "Object"
+      }
+    }
+  },
+  "xrayFailedRunningSingbox": "Xray failed to start, running on sing-box",
+  "engineChosenManually": "Engine chosen manually",
+  "engineChosenAutomatically": "Engine chosen automatically",
+  "invalidJson": "Invalid JSON: {message}",
+  "@invalidJson": {
+    "placeholders": {
+      "message": {
+        "type": "Object"
+      }
+    }
+  },
+  "invalidJsonAt": "Invalid JSON: {message} (character {offset})",
+  "@invalidJsonAt": {
+    "placeholders": {
+      "message": {
+        "type": "Object"
+      },
+      "offset": {
+        "type": "Object"
+      }
+    }
+  },
+  "tooManyRedirects": "too many redirects",
+  "subscriptionNoValidNodes": "the subscription has no valid nodes",
+  "subscriptionStubNodes": "the subscription returned placeholder nodes",
+  "invalidJsonConfig": "invalid JSON config",
+  "expectedOutboundObject": "Expected an outbound JSON object",
+  "port": "port",
+  "testProcessFailed": "test process failed to start: {error}",
+  "@testProcessFailed": {
+    "placeholders": {
+      "error": {
+        "type": "Object"
+      }
+    }
+  },
+  "language": "Language",
+  "interfaceLanguage": "Interface language",
+  "languageSystem": "System default",
+  "hotkeys": "Hotkeys",
+  "toggleHotkey": "Connect / disconnect",
+  "toggleHotkeyDescription": "Global shortcut — works even when the Verge window is hidden",
+  "hotkeyTaken": "This shortcut is used by another app — choose a different one",
+  "hotkeyNotSet": "Not set",
+  "hotkeyPress": "Press a shortcut…",
+  "hotkeyNeedsModifier": "Add Ctrl, Alt or ⌘/Win",
+  "hotkeyClear": "Remove shortcut"
+}

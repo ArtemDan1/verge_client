@@ -17,6 +17,7 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:singbox_client/app/app_controller.dart';
 import 'package:singbox_client/app/tray_popover_controller.dart';
 import 'package:singbox_client/app/window_control_channel.dart';
+import 'package:singbox_client/l10n/l10n.dart';
 import 'package:singbox_client/models/node_config.dart';
 import 'package:singbox_client/platform/platform_info.dart';
 import 'package:singbox_client/services/clash_api_client.dart';
@@ -171,18 +172,18 @@ String _node(String proto, String host, String name) {
 }
 
 final _mainSub = [
-  _node('vless', 'nl.vrg.example', '🇳🇱 Нидерланды · Амстердам'),
-  _node('vless', 'de.vrg.example', '🇩🇪 Германия · Франкфурт'),
-  _node('hy2', 'fi.vrg.example', '🇫🇮 Финляндия · Хельсинки'),
-  _node('vless', 'se.vrg.example', '🇸🇪 Швеция · Стокгольм'),
-  _node('vless', 'pl.vrg.example', '🇵🇱 Польша · Варшава'),
-  _node('vless', 'us.vrg.example', '🇺🇸 США · Нью-Йорк'),
-  _node('hy2', 'jp.vrg.example', '🇯🇵 Япония · Токио'),
+  _node('vless', 'nl.vrg.example', '🇳🇱 Netherlands · Amsterdam'),
+  _node('vless', 'de.vrg.example', '🇩🇪 Germany · Frankfurt'),
+  _node('hy2', 'fi.vrg.example', '🇫🇮 Finland · Helsinki'),
+  _node('vless', 'se.vrg.example', '🇸🇪 Sweden · Stockholm'),
+  _node('vless', 'pl.vrg.example', '🇵🇱 Poland · Warsaw'),
+  _node('vless', 'us.vrg.example', '🇺🇸 USA · New York'),
+  _node('hy2', 'jp.vrg.example', '🇯🇵 Japan · Tokyo'),
 ].join('\n');
 
 final _workSub = [
-  _node('vless', 'tr.work.example', '🇹🇷 Турция · Стамбул'),
-  _node('vless', 'kz.work.example', '🇰🇿 Казахстан · Алматы'),
+  _node('vless', 'tr.work.example', '🇹🇷 Turkey · Istanbul'),
+  _node('vless', 'kz.work.example', '🇰🇿 Kazakhstan · Almaty'),
 ].join('\n');
 
 Future<FetchResult> _fetch(String url) async {
@@ -298,7 +299,12 @@ Future<void> _shoot(String name) async {
 void main() {
   setUpAll(() async {
     if (_enabled) await _loadFonts();
+    // README на английском — и скриншоты тоже. Язык можно переопределить:
+    // VERGE_SCREENSHOTS_LOCALE=ru.
+    setAppLocale(
+        Locale(Platform.environment['VERGE_SCREENSHOTS_LOCALE'] ?? 'en'));
   });
+  tearDownAll(() => setAppLocale(const Locale('ru')));
 
   // index — пункт сайдбара: 0 Главная, 1 Настройки, 2 Логи, 3 Соединения,
   // 4 Роутинг.

@@ -7,6 +7,7 @@ import '../theme/verge_palette.dart';
 import 'widgets/paper.dart';
 import 'widgets/update_banner.dart';
 import 'widgets/verge_logo.dart';
+import '../l10n/l10n.dart';
 
 const _repoUrl = 'https://github.com/ArtemDan1/verge_client';
 
@@ -42,7 +43,7 @@ class AboutScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Прокси-клиент для macOS и Windows на базе sing-box и Xray.',
+                  l10n.aboutTagline,
                   style: theme.textTheme.muted
                       .copyWith(fontSize: 15, height: 1.5),
                 ),
@@ -59,7 +60,7 @@ class AboutScreen extends StatelessWidget {
                     ShadButton.outline(
                       size: ShadButtonSize.sm,
                       onPressed: () => openLink('$_repoUrl/releases'),
-                      child: const Text('Что нового'),
+                      child: Text(l10n.whatsNew),
                     ),
                   ],
                 ),
@@ -81,7 +82,7 @@ class AboutScreen extends StatelessWidget {
                   child: Column(
                     children: [
                       _VersionRow(
-                          label: 'Версия приложения',
+                          label: l10n.appVersion,
                           version: c.platform.appVersion(),
                           first: true),
                       _VersionRow(
@@ -180,7 +181,7 @@ class _UpdateBlockState extends State<_UpdateBlock> {
                 ? const Spinner()
                 : const Icon(LucideIcons.refreshCw, size: 16),
             child: Text(
-                c.isCheckingUpdate ? 'Проверка…' : 'Проверить обновления'),
+                c.isCheckingUpdate ? l10n.checking : l10n.checkForUpdates),
           ),
           if (_checked && !c.isCheckingUpdate)
             Row(
@@ -189,7 +190,7 @@ class _UpdateBlockState extends State<_UpdateBlock> {
                 Icon(LucideIcons.circleCheck,
                     size: 16, color: VergePalette.of(context).successText),
                 const SizedBox(width: 6),
-                Text('У вас последняя версия', style: theme.textTheme.muted),
+                Text(l10n.upToDate, style: theme.textTheme.muted),
               ],
             ),
         ],

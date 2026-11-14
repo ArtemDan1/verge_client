@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../app/app_controller.dart';
 import 'general_section.dart';
+import '../../l10n/l10n.dart';
 
 class TlsSection extends StatelessWidget {
   const TlsSection({
@@ -24,9 +25,8 @@ class TlsSection extends StatelessWidget {
       title: 'TLS',
       children: [
         SettingsRow(
-          label: 'Пропустить проверку сертификата',
-          description: 'Понижает безопасность: соединение перестаёт защищать '
-              'от подмены сервера. Включать только для отладки',
+          label: l10n.skipCertVerify,
+          description: l10n.skipCertVerifyDescription,
           trailing: ShadSwitch(
             key: const Key('tls-insecure-switch'),
             value: n.tlsSkipCertVerify,
@@ -35,11 +35,10 @@ class TlsSection extends StatelessWidget {
           ),
         ),
         SettingsRow(
-          label: 'Фрагментация TLS',
+          label: l10n.tlsFragment,
           description: fragmentSupported
-              ? 'Режет TLS-хендшейк на части, чтобы обойти файрволы с плоским '
-                  'matching по ClientHello. Работает только под sing-box'
-              : 'Текущий движок фрагментацию не поддерживает',
+              ? l10n.tlsFragmentDescription
+              : l10n.tlsFragmentUnsupported,
           trailing: ShadSwitch(
             key: const Key('tls-fragment-switch'),
             value: n.tlsFragmentEnabled,
@@ -51,9 +50,9 @@ class TlsSection extends StatelessWidget {
         ),
         if (fragmentSupported && n.tlsFragmentEnabled) ...[
           SettingsRow(
-            label: 'Фрагментация по TLS-записям',
+            label: l10n.tlsRecordFragment,
             description:
-                'Дешевле по производительности — стоит пробовать первым',
+                l10n.tlsRecordFragmentDescription,
             trailing: ShadSwitch(
               value: n.tlsRecordFragment,
               onChanged: (v) => controller
@@ -61,9 +60,8 @@ class TlsSection extends StatelessWidget {
             ),
           ),
           SettingsRow(
-            label: 'Задержка резервного варианта',
-            description: 'Сколько ждать ответа, прежде чем пробовать без '
-                'фрагментации',
+            label: l10n.fallbackDelay,
+            description: l10n.fallbackDelayDescription,
             trailing: SettingsInput(
               initialValue: n.tlsFragmentFallbackDelay,
               placeholder: '500ms',

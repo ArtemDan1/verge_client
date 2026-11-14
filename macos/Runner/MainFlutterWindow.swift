@@ -4,7 +4,9 @@ import FlutterMacOS
 class MainFlutterWindow: NSWindow, NSWindowDelegate {
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
-    let windowFrame = self.frame
+    // Положение и размер с прошлого запуска; если того экрана больше нет —
+    // остаётся рамка из MainMenu.xib.
+    let windowFrame = Self.restoredFrame() ?? self.frame
     self.contentViewController = flutterViewController
     self.setFrame(windowFrame, display: true)
 
@@ -29,6 +31,38 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
     }
     return false
   }
+
+  // MARK: - Положение окна между запусками
+  //
+  // Своя запись в UserDefaults вместо setFrameAutosaveName: автосохранение
+  // AppKit запомнило бы и рамку мини-окна трея — это то же окно, временно
+  // ужатое под значок. Здесь пишем только рамку обычного режима.
+
+  private static let frameDefaultsKey = "VergeMainWindowFrame"
+
+  /// Сохранённая рамка, если она хоть немного видна на одном из экранов.
+  private static func restoredFrame() -> NSRect? {
+    guard let saved = UserDefaults.standard.string(forKey: frameDefaultsKey)
+    else { return nil }
+    let frame = NSRectFromString(saved)
+    guard frame.width >= 200, frame.height >= 200 else { return nil }
+    let visible = NSScreen.screens.contains { screen in
+      let overlap = screen.visibleFrame.intersection(frame)
+      return overlap.width >= 100 && overlap.height >= 100
+    }
+    return visible ? frame : nil
+  }
+
+  private func saveFrame() {
+    // В мини-окне и в полноэкранном режиме рамка не та, что надо помнить.
+    guard !inPopover, !styleMask.contains(.fullScreen), !isMiniaturized
+    else { return }
+    UserDefaults.standard.set(NSStringFromRect(frame), forKey: Self.frameDefaultsKey)
+  }
+
+  func windowDidMove(_ notification: Notification) { saveFrame() }
+
+  func windowDidResize(_ notification: Notification) { saveFrame() }
 
   // MARK: - Мини-окно трея
   //

@@ -5,6 +5,7 @@ import '../../models/connection_info.dart';
 import '../../theme/verge_palette.dart';
 import 'traffic_widget.dart';
 import 'verge_logo.dart';
+import '../../l10n/l10n.dart';
 
 class SidebarItem {
   const SidebarItem(this.label, this.icon);
@@ -14,19 +15,19 @@ class SidebarItem {
 
 /// Пункты сайдбара. «О приложении» вынесен в самый низ отдельно,
 /// поэтому здесь только верхняя группа.
-const sidebarItems = <SidebarItem>[
-  SidebarItem('Главная', LucideIcons.house),
-  SidebarItem('Настройки', LucideIcons.slidersVertical),
-  SidebarItem('Логи', LucideIcons.fileText),
-  SidebarItem('Соединения', LucideIcons.arrowLeftRight),
-  SidebarItem('Роутинг', LucideIcons.route),
-];
+List<SidebarItem> get sidebarItems => <SidebarItem>[
+      SidebarItem(l10n.home, LucideIcons.house),
+      SidebarItem(l10n.settings, LucideIcons.slidersVertical),
+      SidebarItem(l10n.logs, LucideIcons.fileText),
+      SidebarItem(l10n.connections, LucideIcons.arrowLeftRight),
+      SidebarItem(l10n.routing, LucideIcons.route),
+    ];
 
-const aboutItem = SidebarItem('О приложении', LucideIcons.info);
+SidebarItem get aboutItem => SidebarItem(l10n.about, LucideIcons.info);
 // Индекс вычисляется, чтобы добавление пункта не ломало навигацию.
 final aboutIndex = sidebarItems.length;
 final connectionsIndex =
-    sidebarItems.indexWhere((e) => e.label == 'Соединения');
+    sidebarItems.indexWhere((e) => e.icon == LucideIcons.arrowLeftRight);
 
 /// Сайдбар в тон фону окна: сам он «бумага», а контент лежит на отдельной
 /// панели справа (см. AppShell).
@@ -196,8 +197,8 @@ class _NewBadge extends StatelessWidget {
         color: VergePalette.of(context).accent,
         borderRadius: BorderRadius.circular(999),
       ),
-      child: const Text(
-        'новое',
+      child: Text(
+        l10n.newBadge,
         style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w600,

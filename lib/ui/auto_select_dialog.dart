@@ -4,6 +4,7 @@ import 'widgets/paper.dart';
 import '../app/app_controller.dart';
 import '../models/auto_select_settings.dart';
 import '../tunnel/tunnel_controller.dart';
+import '../l10n/l10n.dart';
 
 /// Настройки автовыбора: тумблер, адрес для теста, интервал фоновой проверки
 /// и набор профилей, в которых подбирается лучшая нода.
@@ -72,12 +73,12 @@ class _AutoSelectDialogState extends State<_AutoSelectDialog> {
     return AnimatedBuilder(
       animation: c,
       builder: (context, _) => ShadDialog(
-        title: const Text('Автовыбор ноды'),
+        title: Text(l10n.autoSelectNode),
         constraints: const BoxConstraints(maxWidth: 460),
         actions: [
           ShadButton.outline(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Отмена'),
+            child: Text(l10n.cancel),
           ),
           ShadButton(
             onPressed: () {
@@ -88,7 +89,7 @@ class _AutoSelectDialogState extends State<_AutoSelectDialog> {
               });
               Navigator.of(context).pop();
             },
-            child: const Text('Сохранить'),
+            child: Text(l10n.save),
           ),
         ],
         child: Padding(
@@ -101,7 +102,7 @@ class _AutoSelectDialogState extends State<_AutoSelectDialog> {
                 children: [
                   Expanded(
                     child: Text(
-                      'Подбирать лучшую ноду',
+                      l10n.pickBestNode,
                       style: theme.textTheme.p,
                     ),
                   ),
@@ -112,7 +113,7 @@ class _AutoSelectDialogState extends State<_AutoSelectDialog> {
                 ],
               ),
               const SizedBox(height: 12),
-              Text('Адрес для проверки', style: theme.textTheme.muted),
+              Text(l10n.probeUrl, style: theme.textTheme.muted),
               const SizedBox(height: 4),
               ShadInput(
                 controller: _url,
@@ -120,9 +121,8 @@ class _AutoSelectDialogState extends State<_AutoSelectDialog> {
               ),
               const SizedBox(height: 12),
               Text(
-                'Интервал фоновой проверки, секунды '
-                '(${AutoSelectSettings.minIntervalSeconds}…'
-                '${AutoSelectSettings.maxIntervalSeconds})',
+                l10n.healthCheckInterval(AutoSelectSettings.minIntervalSeconds,
+                    AutoSelectSettings.maxIntervalSeconds),
                 style: theme.textTheme.muted,
               ),
               const SizedBox(height: 4),
@@ -134,7 +134,7 @@ class _AutoSelectDialogState extends State<_AutoSelectDialog> {
                 ),
               ),
               const SizedBox(height: 12),
-              Text('Профили', style: theme.textTheme.muted),
+              Text(l10n.profiles, style: theme.textTheme.muted),
               const SizedBox(height: 4),
               // Прокручивается только список: профилей может быть десяток,
               // а поля и кнопки должны оставаться на виду.
@@ -177,20 +177,20 @@ class _AutoSelectDialogState extends State<_AutoSelectDialog> {
                 leading: c.isAutoSelecting
                     ? const Spinner()
                     : const Icon(LucideIcons.zap, size: 16),
-                child: const Text('Проверить сейчас'),
+                child: Text(l10n.checkNow),
               ),
               if (c.lastHealthCheckAt != null) ...[
                 const SizedBox(height: 8),
                 Text(
-                  'Последняя проверка: ${_time(c.lastHealthCheckAt!)} — '
-                  '${c.lastHealthCheckOk == true ? 'нода отвечает' : 'нет ответа'}',
+                  l10n.lastCheck(_time(c.lastHealthCheckAt!),
+                      c.lastHealthCheckOk == true ? l10n.nodeResponds : l10n.noResponse),
                   style: theme.textTheme.muted,
                 ),
               ],
               if (c.lastAutoSelectResult != null) ...[
                 const SizedBox(height: 8),
                 Text(
-                  'Последний подбор: ${c.lastAutoSelectResult}',
+                  l10n.lastPick(c.lastAutoSelectResult!),
                   style: theme.textTheme.muted,
                 ),
               ],

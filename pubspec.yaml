@@ -18,7 +18,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # of the product and file versions while build-number is used as the build suffix.
 # Версия = дата релиза ГГГГ.М.Д без ведущих нулей (2026.11.3). Ставится
 # скриптом scripts/set_version.sh перед сборкой релиза.
-version: 2026.11.3
+version: 2026.11.14
 
 environment:
   sdk: ^3.12.1
@@ -32,6 +32,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  intl: any
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -83,6 +86,8 @@ flutter_launcher_icons:
 
 # The following section is specific to Flutter packages.
 flutter:
+  # Локализация: ARB-файлы в lib/l10n, классы генерирует gen-l10n (l10n.yaml).
+  generate: true
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

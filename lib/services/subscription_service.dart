@@ -6,6 +6,7 @@ import '../models/subscription_meta.dart';
 import 'device_info.dart';
 import 'share_link_parser.dart';
 import 'xray_config_parser.dart';
+import '../l10n/l10n.dart';
 
 class FetchResult {
   final String body;
@@ -111,7 +112,7 @@ class SubscriptionService {
       _collectCookies(resp.headers['set-cookie'], cookies);
       uri = uri.resolve(location);
     }
-    throw SubscriptionException('слишком много редиректов');
+    throw SubscriptionException(l10n.tooManyRedirects);
   }
 
   static const _redirectCodes = {301, 302, 303, 307, 308};
@@ -143,7 +144,7 @@ class SubscriptionService {
       _ => _parseShareLinks(decoded),
     };
     if (nodes.isEmpty) {
-      throw SubscriptionException('подписка не содержит валидных нод');
+      throw SubscriptionException(l10n.subscriptionNoValidNodes);
     }
     // Панели с HWID-привязкой при отсутствии/непринятии x-hwid отдают
     // ноды-заглушки с адресом 0.0.0.0 и человекочитаемым remark
@@ -151,7 +152,7 @@ class SubscriptionService {
     if (nodes.every((n) => n.host == '0.0.0.0')) {
       final msg = nodes.map((n) => n.name).where((n) => n.isNotEmpty).join('; ');
       throw SubscriptionException(
-          msg.isEmpty ? 'подписка вернула ноды-заглушки' : msg);
+          msg.isEmpty ? l10n.subscriptionStubNodes : msg);
     }
     final info = SubscriptionInfo.parseHeader(
         fetched.headers['subscription-userinfo']);
@@ -172,7 +173,7 @@ class SubscriptionService {
     try {
       cfg = jsonDecode(text) as Map<String, dynamic>;
     } catch (_) {
-      throw SubscriptionException('невалидный JSON-конфиг');
+      throw SubscriptionException(l10n.invalidJsonConfig);
     }
     final outbounds = (cfg['outbounds'] as List?) ?? const [];
     return outbounds

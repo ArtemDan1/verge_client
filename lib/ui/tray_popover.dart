@@ -16,6 +16,7 @@ import '../theme/verge_palette.dart';
 import '../tunnel/tunnel_controller.dart';
 import 'widgets/hero_panel.dart' show ConnectToggle;
 import 'widgets/paper.dart';
+import '../l10n/l10n.dart';
 
 /// Мини-окно трея: тумблер со статусом, сервера активного профиля, режим и
 /// переход в главное окно.
@@ -72,14 +73,7 @@ class _TrayPopoverState extends State<TrayPopover> {
     super.dispose();
   }
 
-  Future<void> _toggle() async {
-    if (c.status == TunnelStatus.connected ||
-        c.status == TunnelStatus.connecting) {
-      await c.disconnect();
-    } else {
-      await c.connect();
-    }
-  }
+  Future<void> _toggle() => c.toggleConnection();
 
   Future<void> _selectMode(TunnelMode mode) async {
     if (mode == c.settings.tunnelMode) return;
@@ -150,20 +144,20 @@ class _TrayPopoverState extends State<TrayPopover> {
             palette.successSoft,
             palette.successBorder,
             palette.successText,
-            'Подключено',
+            l10n.connected,
           )
         : connecting
         ? (
             palette.warningSoft,
             palette.warningBorder,
             palette.warningText,
-            'Подключаемся…',
+            l10n.connecting,
           )
         : (
             palette.surfaceHeader,
             palette.panelBorder,
             theme.colorScheme.foreground,
-            'Не подключено',
+            l10n.notConnected,
           );
     return Container(
       height: TrayPopover._headerHeight,
@@ -214,7 +208,7 @@ class _TrayPopoverState extends State<TrayPopover> {
                   )
                 else
                   Text(
-                    connecting ? 'Проверяем сервер' : 'Нажмите, чтобы подключиться',
+                    connecting ? l10n.checkingServer : l10n.clickToConnect,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.muted.copyWith(fontSize: 12),
@@ -226,7 +220,7 @@ class _TrayPopoverState extends State<TrayPopover> {
           // Меню у значка трея нет — выход живёт здесь. На Windows крестик
           // только прячет окно, так что это единственный способ закрыть Verge.
           ShadTooltip(
-            builder: (_) => const Text('Выйти из Verge'),
+            builder: (_) => Text(l10n.quitVerge),
             child: ShadButton.ghost(
               width: 32,
               height: 32,
@@ -254,8 +248,8 @@ class _TrayPopoverState extends State<TrayPopover> {
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Text(
             profile == null
-                ? 'Нет подписок — добавьте их в главном окне'
-                : 'В подписке нет серверов',
+                ? l10n.noSubscriptionsTray
+                : l10n.subscriptionHasNoServers,
             textAlign: TextAlign.center,
             style: label,
           ),
@@ -274,7 +268,7 @@ class _TrayPopoverState extends State<TrayPopover> {
               child: Align(
                 alignment: Alignment.bottomLeft,
                 child: Text(
-                  'Сервер · ${profile.name}',
+                  '${l10n.columnServer} · ${profile.name}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: label,
@@ -323,8 +317,8 @@ class _TrayPopoverState extends State<TrayPopover> {
               value: c.settings.tunnelMode,
               height: 34,
               onChanged: _switchingTun ? null : _selectMode,
-              options: const [
-                SegmentedOption(value: TunnelMode.systemProxy, label: 'Прокси'),
+              options: [
+                SegmentedOption(value: TunnelMode.systemProxy, label: l10n.kindProxy),
                 SegmentedOption(value: TunnelMode.tun, label: 'TUN'),
               ],
             ),
@@ -333,7 +327,7 @@ class _TrayPopoverState extends State<TrayPopover> {
           ShadButton.outline(
             size: ShadButtonSize.sm,
             onPressed: widget.popover.openMain,
-            child: const Text('Открыть Verge'),
+            child: Text(l10n.openVerge),
           ),
         ],
       ),
@@ -372,9 +366,9 @@ class _ServerRowState extends State<_ServerRow> {
     final name = splitCountryFlag(widget.name);
     final ms = widget.latencyMs;
     final (latency, latencyColor) = ms != null
-        ? ('$ms мс', palette.latencyText(ms))
+        ? (l10n.ms(ms), palette.latencyText(ms))
         : widget.failed
-        ? ('нет ответа', palette.dangerText)
+        ? (l10n.noResponse, palette.dangerText)
         : ('—', theme.colorScheme.mutedForeground);
     final bg = widget.selected
         ? palette.accentSoft

@@ -31,6 +31,7 @@ import '../tunnel/tunnel_controller.dart';
 import '../services/ping_service.dart';
 import '../models/connection_info.dart';
 import '../services/clash_api_client.dart';
+import '../l10n/l10n.dart';
 
 enum TunModeResult { enabled, denied }
 
@@ -44,11 +45,11 @@ class AppController extends ChangeNotifier {
   final Future<String?> Function(String host) _resolveHost;
   final Timer Function(Duration, void Function(Timer)) _timerFactory;
   final Future<int?> Function(String url, int? proxyPort, {Duration timeout})
-      _gstaticProbe;
+  _gstaticProbe;
 
   /// Проверка доступности интернета мимо туннеля (TUN-режим).
   final Future<int?> Function(String host, int port, {Duration timeout})
-      _bypassProbe;
+  _bypassProbe;
   final HelperService _helper;
   final UpdateService _update;
 
@@ -68,8 +69,9 @@ class AppController extends ChangeNotifier {
     if (existing != null) return existing;
     final created = _xrayFactory();
     _xrayInstance = created;
-    _xrayLogSub =
-        created.logs.listen((l) => _appendLog(l, origin: LogOrigin.xray));
+    _xrayLogSub = created.logs.listen(
+      (l) => _appendLog(l, origin: LogOrigin.xray),
+    );
     return created;
   }
 
@@ -105,7 +107,7 @@ class AppController extends ChangeNotifier {
 
   void _setAutoSelectResult(String message) {
     _lastAutoSelectResult = message;
-    _appendLog('Автовыбор: $message');
+    _appendLog('${l10n.autoSelect}: $message');
     notifyListeners();
   }
 
@@ -139,6 +141,7 @@ class AppController extends ChangeNotifier {
   final _uuid = const Uuid();
   late final StreamSubscription<TunnelStatus> _proxySub;
   late final StreamSubscription<TunnelStatus> _tunSub;
+
   /// Логи тестовых процессов подключаются лениво, перед первым замером:
   /// подписка на EventChannel требует платформенного биндинга, которого в
   /// юнит-тестах нет, а с подменённым тестером процессов и не будет.
@@ -149,11 +152,13 @@ class AppController extends ChangeNotifier {
     if (!_ownTester || _testLogSubs.isNotEmpty) return;
     _testLogSubs.addAll([
       SingboxTestProcess.logs.listen(
-          (l) => _appendLog(l, origin: LogOrigin.singbox),
-          onError: (Object _) {}),
-      XrayTestProcess.logs
-          .listen((l) => _appendLog(l, origin: LogOrigin.xray),
-              onError: (Object _) {}),
+        (l) => _appendLog(l, origin: LogOrigin.singbox),
+        onError: (Object _) {},
+      ),
+      XrayTestProcess.logs.listen(
+        (l) => _appendLog(l, origin: LogOrigin.xray),
+        onError: (Object _) {},
+      ),
     ]);
   }
 
@@ -164,7 +169,8 @@ class AppController extends ChangeNotifier {
   final List<LogEntry> _logs = [];
   List<LogEntry> get logs => List.unmodifiable(_logs);
 
-  ValueListenable<List<ConnectionInfo>> get connections => _clashApi.connections;
+  ValueListenable<List<ConnectionInfo>> get connections =>
+      _clashApi.connections;
   ValueListenable<TrafficStats> get traffic => _clashApi.traffic;
 
   void _appendLog(String line, {LogOrigin origin = LogOrigin.app}) {
@@ -222,37 +228,42 @@ class AppController extends ChangeNotifier {
     Future<bool> Function(int port)? probeSocks,
     NodeTester? nodeTester,
     Future<int?> Function(String url, int? proxyPort, {Duration timeout})?
-        gstaticProbe,
+    gstaticProbe,
     Future<int?> Function(String host, int port, {Duration timeout})?
-        bypassProbe,
-  })  : _xrayFactory = xrayFactory ?? XrayProcess.new,
-        _pickPort = pickPort ?? pickFreePort,
-        _probeSocks = probeSocks ?? _defaultProbeSocks,
-        _ping = pingService ?? PingService(),
-        _helper = helper ?? HelperService(),
-        _update = updateService ?? UpdateService(),
-        _clashApi = clashApi ?? ClashApiClient(),
-        _subscription = subscription,
-        _geoUpdater = geoUpdater,
-        _proxyTunnel = proxyTunnel,
-        _tunTunnel = tunTunnel,
-        _repo = repo,
-        _platform = platform,
-        _resolveHost = resolveHost ?? _dnsLookup,
-        _timerFactory = timerFactory ?? Timer.periodic,
-        _gstaticProbe = gstaticProbe ?? httpProbeLatency,
-        _bypassProbe = bypassProbe ?? bypassTcpPing {
-    _proxySub = _proxyTunnel.statusStream.listen((s) => _onStatus(_proxyTunnel, s));
+    bypassProbe,
+  }) : _xrayFactory = xrayFactory ?? XrayProcess.new,
+       _pickPort = pickPort ?? pickFreePort,
+       _probeSocks = probeSocks ?? _defaultProbeSocks,
+       _ping = pingService ?? PingService(),
+       _helper = helper ?? HelperService(),
+       _update = updateService ?? UpdateService(),
+       _clashApi = clashApi ?? ClashApiClient(),
+       _subscription = subscription,
+       _geoUpdater = geoUpdater,
+       _proxyTunnel = proxyTunnel,
+       _tunTunnel = tunTunnel,
+       _repo = repo,
+       _platform = platform,
+       _resolveHost = resolveHost ?? _dnsLookup,
+       _timerFactory = timerFactory ?? Timer.periodic,
+       _gstaticProbe = gstaticProbe ?? httpProbeLatency,
+       _bypassProbe = bypassProbe ?? bypassTcpPing {
+    _proxySub = _proxyTunnel.statusStream.listen(
+      (s) => _onStatus(_proxyTunnel, s),
+    );
     _tunSub = _tunTunnel.statusStream.listen((s) => _onStatus(_tunTunnel, s));
     // Тестер логирует причины провалов замера, а тестовые процессы — свой
     // вывод: без этого «HTTP не прошёл ни у одной ноды» ничем не объяснить.
     _ownTester = nodeTester == null;
     _nodeTester =
-        nodeTester ?? NodeTester(onLog: (m) => _appendLog('Автовыбор: $m'));
-    _proxyLogSub = _proxyTunnel.logStream
-        .listen((l) => _appendLog(l, origin: LogOrigin.singbox));
-    _tunLogSub = _tunTunnel.logStream
-        .listen((l) => _appendLog(l, origin: LogOrigin.singbox));
+        nodeTester ??
+        NodeTester(onLog: (m) => _appendLog('${l10n.autoSelect}: $m'));
+    _proxyLogSub = _proxyTunnel.logStream.listen(
+      (l) => _appendLog(l, origin: LogOrigin.singbox),
+    );
+    _tunLogSub = _tunTunnel.logStream.listen(
+      (l) => _appendLog(l, origin: LogOrigin.singbox),
+    );
   }
 
   void _onStatus(TunnelController src, TunnelStatus s) {
@@ -269,8 +280,8 @@ class AppController extends ChangeNotifier {
     }
     // Аварийное завершение sing-box — показываем причину пользователю.
     if (s == TunnelStatus.error) {
-      _error = src.lastError ?? 'sing-box завершился аварийно';
-      _alertCtrl.add('VPN отключён: ${_error!}');
+      _error = src.lastError ?? l10n.singboxCrashed;
+      _alertCtrl.add(l10n.vpnDisconnectedWithReason(_error!));
     }
     if (s == TunnelStatus.disconnected || s == TunnelStatus.error) {
       _clashApi.stop();
@@ -325,6 +336,19 @@ class AppController extends ChangeNotifier {
   NetworkSettings get networkSettings => _state.networkSettings;
   TunnelStatus get status => _status;
   bool get isConnected => _status == TunnelStatus.connected;
+
+  bool _hotkeyFailed = false;
+
+  /// Глобальную горячую клавишу из настроек не удалось зарегистрировать —
+  /// сочетание занято другим приложением.
+  bool get hotkeyFailed => _hotkeyFailed;
+
+  void setHotkeyFailed(bool value) {
+    if (value == _hotkeyFailed) return;
+    _hotkeyFailed = value;
+    notifyListeners();
+  }
+
   String? get error => _error;
   PlatformInfo get platform => _platform;
   bool get isRefreshingAll => _refreshingAll;
@@ -393,7 +417,7 @@ class AppController extends ChangeNotifier {
       }
       _geoUpdateError = res.ok
           ? null
-          : 'Не обновились: ${res.failed.length} наб. (проверьте подключение)';
+          : l10n.geoSetsNotUpdated(res.failed.length);
     } catch (e) {
       _geoUpdateError = e.toString();
     } finally {
@@ -427,14 +451,13 @@ class AppController extends ChangeNotifier {
       if (_refreshingProfileIds.contains(p.id)) continue;
       final last = p.lastRefreshedAt;
       // Профиль, который никогда не обновлялся, считаем просроченным.
-      if (last != null &&
-          now.difference(last) < Duration(minutes: interval)) {
+      if (last != null && now.difference(last) < Duration(minutes: interval)) {
         continue;
       }
       _refreshingProfileIds.add(p.id);
-      refreshProfile(p.id)
-          .whenComplete(() => _refreshingProfileIds.remove(p.id))
-          .ignore();
+      refreshProfile(
+        p.id,
+      ).whenComplete(() => _refreshingProfileIds.remove(p.id)).ignore();
     }
   }
 
@@ -487,9 +510,10 @@ class AppController extends ChangeNotifier {
       final res = await _subscription.loadWithInfo(old.url);
       final nodes = res.nodes;
       final keepIndex =
-          (old.selectedNodeIndex != null && old.selectedNodeIndex! < nodes.length)
-              ? old.selectedNodeIndex
-              : (nodes.isEmpty ? null : 0);
+          (old.selectedNodeIndex != null &&
+              old.selectedNodeIndex! < nodes.length)
+          ? old.selectedNodeIndex
+          : (nodes.isEmpty ? null : 0);
       final title = res.meta?.title;
       final updated = old.copyWith(
         nodes: nodes,
@@ -523,8 +547,9 @@ class AppController extends ChangeNotifier {
       if (_error != null) failed.add(p.name);
     }
     _refreshingAll = false;
-    _refreshError =
-        failed.isEmpty ? null : 'Не удалось обновить: ${failed.join(", ")}';
+    _refreshError = failed.isEmpty
+        ? null
+        : l10n.refreshFailed(failed.join(', '));
     notifyListeners();
   }
 
@@ -551,11 +576,9 @@ class AppController extends ChangeNotifier {
     if (trimmed.isEmpty) return;
     final idx = _state.profiles.indexWhere((p) => p.id == id);
     if (idx < 0) return;
-    final list = [..._state.profiles]
-      ..[idx] = _state.profiles[idx].copyWith(
-        name: trimmed,
-        nameIsCustom: true,
-      );
+    final list = [
+      ..._state.profiles,
+    ]..[idx] = _state.profiles[idx].copyWith(name: trimmed, nameIsCustom: true);
     _state = _state.copyWith(profiles: list);
     await _persist();
   }
@@ -578,8 +601,7 @@ class AppController extends ChangeNotifier {
 
   /// Заменяет ноду в профиле отредактированной. Правки живут до следующего
   /// обновления подписки — она перезаписывает список нод целиком.
-  Future<void> updateNode(
-      String profileId, int index, NodeConfig node) async {
+  Future<void> updateNode(String profileId, int index, NodeConfig node) async {
     final pi = _state.profiles.indexWhere((p) => p.id == profileId);
     if (pi < 0) return;
     final profile = _state.profiles[pi];
@@ -606,7 +628,10 @@ class AppController extends ChangeNotifier {
   /// Смена движка ноды. Если это активная нода на живом туннеле — переподключаем,
   /// иначе выбор вступит в силу при следующем подключении.
   Future<void> setNodeEngineChoice(
-      String profileId, NodeConfig node, EngineChoice choice) async {
+    String profileId,
+    NodeConfig node,
+    EngineChoice choice,
+  ) async {
     final idx = _state.profiles.indexWhere((p) => p.id == profileId);
     if (idx < 0) return;
     final updated = _state.profiles[idx].withEngineChoice(node, choice);
@@ -615,7 +640,8 @@ class AppController extends ChangeNotifier {
     await _persist();
 
     final active = selectedNode;
-    final isActive = active != null &&
+    final isActive =
+        active != null &&
         _state.activeProfileId == profileId &&
         nodeEngineKey(active) == nodeEngineKey(node) &&
         (_status == TunnelStatus.connected ||
@@ -641,7 +667,7 @@ class AppController extends ChangeNotifier {
     final src = _state.routingProfiles.firstWhere((p) => p.id == id);
     final clone = RoutingProfile(
       id: _uuid.v4(),
-      name: '${src.name} (копия)',
+      name: l10n.copyOf(src.name),
       isBuiltIn: false,
       allowRules: List.of(src.allowRules),
       allowAction: src.allowAction,
@@ -651,7 +677,8 @@ class AppController extends ChangeNotifier {
       finalAction: src.finalAction,
     );
     _state = _state.copyWith(
-        routingProfiles: [..._state.routingProfiles, clone]);
+      routingProfiles: [..._state.routingProfiles, clone],
+    );
     await _persist();
     return clone;
   }
@@ -667,14 +694,14 @@ class AppController extends ChangeNotifier {
       finalAction: RoutingFinal.proxy,
     );
     _state = _state.copyWith(
-        routingProfiles: [..._state.routingProfiles, profile]);
+      routingProfiles: [..._state.routingProfiles, profile],
+    );
     await _persist();
     return profile;
   }
 
   Future<void> updateRoutingProfile(RoutingProfile updated) async {
-    final idx =
-        _state.routingProfiles.indexWhere((p) => p.id == updated.id);
+    final idx = _state.routingProfiles.indexWhere((p) => p.id == updated.id);
     if (idx < 0 || _state.routingProfiles[idx].isBuiltIn) return;
     final list = [..._state.routingProfiles]..[idx] = updated;
     _state = _state.copyWith(routingProfiles: list);
@@ -692,9 +719,13 @@ class AppController extends ChangeNotifier {
     if (matches.isEmpty || matches.first.isBuiltIn) return;
     final list = _state.routingProfiles.where((p) => p.id != id).toList();
     final wasActive = _state.activeRoutingProfileId == id;
-    final newActive =
-        wasActive ? 'preset-all-proxy' : _state.activeRoutingProfileId;
-    _state = _state.copyWith(routingProfiles: list, activeRoutingProfileId: newActive);
+    final newActive = wasActive
+        ? 'preset-all-proxy'
+        : _state.activeRoutingProfileId;
+    _state = _state.copyWith(
+      routingProfiles: list,
+      activeRoutingProfileId: newActive,
+    );
     await _persist();
     if (wasActive &&
         (_status == TunnelStatus.connected ||
@@ -706,8 +737,8 @@ class AppController extends ChangeNotifier {
 
   Future<void> updateSettings(AppSettings settings) async {
     final modeChanged = settings.tunnelMode != _state.settings.tunnelMode;
-    final wasActive = _status == TunnelStatus.connected ||
-        _status == TunnelStatus.connecting;
+    final wasActive =
+        _status == TunnelStatus.connected || _status == TunnelStatus.connecting;
     // Смена режима на ходу: гасим туннель СТАРОГО режима до обновления state
     // (disconnect()/_activeTunnel смотрят на текущий tunnelMode), иначе работают
     // два sing-box одновременно — двойной роутинг и конфликт за cache-файл.
@@ -719,6 +750,17 @@ class AppController extends ChangeNotifier {
     _scheduleAutoRefresh();
     _restartGstaticPing();
     if (modeChanged && wasActive) {
+      await connect();
+    }
+  }
+
+  /// Подключить, если VPN выключен, иначе отключить (в том числе прервать
+  /// подключение) — тумблер на главной, в трее и глобальная горячая клавиша.
+  Future<void> toggleConnection() async {
+    if (_status == TunnelStatus.connected ||
+        _status == TunnelStatus.connecting) {
+      await disconnect();
+    } else {
       await connect();
     }
   }
@@ -784,10 +826,9 @@ class AppController extends ChangeNotifier {
   /// поэтому у naive первый замер откладываем, у остальных меряем сразу.
   static const _naiveFirstPingDelay = Duration(seconds: 10);
 
-  Duration get _firstPingDelay =>
-      selectedNode?.protocol == NodeProtocol.naive
-          ? _naiveFirstPingDelay
-          : Duration.zero;
+  Duration get _firstPingDelay => selectedNode?.protocol == NodeProtocol.naive
+      ? _naiveFirstPingDelay
+      : Duration.zero;
 
   void _restartGstaticPing() {
     _gstaticPingTimer?.cancel();
@@ -830,11 +871,17 @@ class AppController extends ChangeNotifier {
       // В TUN обычный запрос ушёл бы внутрь туннеля и мерил бы его, а не
       // доступность интернета — бьём мимо utun нативным TCP-замером.
       final uri = Uri.parse(url);
-      ms = await _bypassProbe(uri.host, uri.port == 0 ? 443 : uri.port,
-          timeout: timeout);
+      ms = await _bypassProbe(
+        uri.host,
+        uri.port == 0 ? 443 : uri.port,
+        timeout: timeout,
+      );
     } else {
-      ms = await _gstaticProbe(url, _state.settings.localPort,
-          timeout: timeout);
+      ms = await _gstaticProbe(
+        url,
+        _state.settings.localPort,
+        timeout: timeout,
+      );
     }
     if (generation != _gstaticPingGeneration) return; // обогнали новым тапом
     _gstaticPingMs = ms;
@@ -853,10 +900,7 @@ class AppController extends ChangeNotifier {
   /// сервера.
   Future<void> refreshHeroPing() async {
     final node = selectedNode;
-    await Future.wait([
-      pingGstatic(),
-      if (node != null) pingNode(node),
-    ]);
+    await Future.wait([pingGstatic(), if (node != null) pingNode(node)]);
   }
 
   /// Мерить ли пинг нод мимо туннеля: в поднятом TUN обычный сокет меряет
@@ -878,25 +922,29 @@ class AppController extends ChangeNotifier {
     _listenTestLogs();
     _healthChecking = true;
     try {
-      final ok = await _nodeTester.check(node,
-          url: _state.autoSelect.testUrl, network: _state.networkSettings);
+      final ok = await _nodeTester.check(
+        node,
+        url: _state.autoSelect.testUrl,
+        network: _state.networkSettings,
+      );
       _lastHealthCheckAt = DateTime.now();
       _lastHealthCheckOk = ok;
       if (ok) {
         _healthFailures = 0;
         // Каждый тик пишем в лог: иначе за всю сессию от фоновой проверки не
         // видно ни строки, и работает она или нет — проверить нечем.
-        _appendLog('Автовыбор: проверка ${node.name} — ok');
+        _appendLog('${l10n.autoSelect}: ${l10n.healthCheckOk(node.name)}');
         notifyListeners();
         return;
       }
       _healthFailures++;
-      _appendLog('Автовыбор: ${node.name} не ответила '
-          '($_healthFailures из $_healthFailuresBeforeSwitch)');
+      _appendLog(
+        '${l10n.autoSelect}: ${l10n.healthCheckFailed(node.name, _healthFailures, _healthFailuresBeforeSwitch)}',
+      );
       notifyListeners();
       if (_healthFailures < _healthFailuresBeforeSwitch) return;
       _healthFailures = 0;
-      _appendLog('Нода ${node.name} не отвечает — подбираем другую');
+      _appendLog(l10n.nodeNotRespondingSwitching(node.name));
     } finally {
       _healthChecking = false;
     }
@@ -924,11 +972,12 @@ class AppController extends ChangeNotifier {
   Future<TunModeResult> requestTunMode() async {
     final status = await _helper.status();
     if (status == 'enabled') {
-      await updateSettings(_state.settings.copyWith(tunnelMode: TunnelMode.tun));
+      await updateSettings(
+        _state.settings.copyWith(tunnelMode: TunnelMode.tun),
+      );
       return TunModeResult.enabled;
     }
-    _alertCtrl.add('Системный сервис не установлен. Переустановите приложение '
-        'через установщик (.pkg).');
+    _alertCtrl.add(l10n.helperNotInstalled);
     return TunModeResult.denied;
   }
 
@@ -942,11 +991,12 @@ class AppController extends ChangeNotifier {
     isCheckingUpdate = true;
     notifyListeners();
     try {
-      availableUpdate =
-          await _update.checkForUpdate(await _platform.appVersion());
+      availableUpdate = await _update.checkForUpdate(
+        await _platform.appVersion(),
+      );
     } catch (e) {
       availableUpdate = null;
-      _alertCtrl.add('Не удалось проверить обновления: $e');
+      _alertCtrl.add(l10n.updateCheckFailed('$e'));
     } finally {
       isCheckingUpdate = false;
       notifyListeners();
@@ -972,7 +1022,8 @@ class AppController extends ChangeNotifier {
     final info = availableUpdate;
     if (info == null) return;
     await updateSettings(
-        _state.settings.copyWith(skippedVersion: info.version));
+      _state.settings.copyWith(skippedVersion: info.version),
+    );
   }
 
   /// Фоновая проверка при старте. В отличие от [checkForUpdate], молчит при
@@ -987,17 +1038,20 @@ class AppController extends ChangeNotifier {
     try {
       final info = await _update.checkForUpdate(await _platform.appVersion());
       availableUpdate = info;
-      _appendLog(info == null
-          ? 'Проверка обновлений: установлена последняя версия'
-          : 'Проверка обновлений: доступна ${info.version}');
+      _appendLog(
+        info == null
+            ? l10n.updateCheckLatest
+            : l10n.updateCheckAvailable(info.version),
+      );
     } catch (e) {
       // Отметку при неудаче не пишем: иначе один запуск без сети затыкает
       // проверку до конца периода, и следующий запуск снова «не проверяет».
-      _appendLog('Проверка обновлений не удалась: $e');
+      _appendLog(l10n.updateCheckFailed('$e'));
       return;
     }
     await updateSettings(
-        _state.settings.copyWith(lastUpdateCheckAt: DateTime.now()));
+      _state.settings.copyWith(lastUpdateCheckAt: DateTime.now()),
+    );
   }
 
   Future<void> downloadAndInstallUpdate() async {
@@ -1008,10 +1062,13 @@ class AppController extends ChangeNotifier {
     updateDownloadProgress = 0;
     notifyListeners();
     try {
-      final path = await _update.downloadPkg(info.pkgUrl, onProgress: (p) {
-        updateDownloadProgress = p;
-        notifyListeners();
-      });
+      final path = await _update.downloadPkg(
+        info.pkgUrl,
+        onProgress: (p) {
+          updateDownloadProgress = p;
+          notifyListeners();
+        },
+      );
       updateDownloadProgress = null;
       isInstallingUpdate = true;
       notifyListeners();
@@ -1026,7 +1083,7 @@ class AppController extends ChangeNotifier {
     } catch (e) {
       // Без «Exception: » — текст уходит пользователю в карточку обновления.
       updateError = '$e'.replaceFirst('Exception: ', '');
-      _alertCtrl.add('Не удалось загрузить обновление: $e');
+      _alertCtrl.add(l10n.updateDownloadFailed('$e'));
     } finally {
       updateDownloadProgress = null;
       isInstallingUpdate = false;
@@ -1059,6 +1116,7 @@ class AppController extends ChangeNotifier {
         await pingNode(node);
       }
     }
+
     await Future.wait(List.generate(concurrency, (_) => worker()));
   }
 
@@ -1069,9 +1127,7 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> pingAll() async {
-    final all = <NodeConfig>[
-      for (final p in _state.profiles) ...p.nodes,
-    ];
+    final all = <NodeConfig>[for (final p in _state.profiles) ...p.nodes];
     await pingNodes(all);
   }
 
@@ -1099,21 +1155,22 @@ class AppController extends ChangeNotifier {
     notifyListeners();
     try {
       final results = await _nodeTester.test(
-          [for (final e in pool) e.node],
-          url: _state.autoSelect.testUrl,
-          network: _state.networkSettings,
-          bypassTunnel: _bypassNodePing);
+        [for (final e in pool) e.node],
+        url: _state.autoSelect.testUrl,
+        network: _state.networkSettings,
+        bypassTunnel: _bypassNodePing,
+      );
       final best = results.isEmpty ? null : results.first;
       if (best == null || (best.latencyMs == null && best.tcpMs == null)) {
-        _setAutoSelectResult('живых нод не найдено, выбор не изменён');
+        _setAutoSelectResult(l10n.noLiveNodes);
         return;
       }
       // Сопоставляем по позиции, а не по самой ноде: один и тот же сервер
       // может лежать сразу в двух профилях.
       final win = pool[best.index];
       final how = best.latencyMs != null
-          ? '${best.latencyMs} мс'
-          : 'TCP ${best.tcpMs} мс (HTTP не прошёл ни у одной ноды)';
+          ? l10n.ms(best.latencyMs!)
+          : l10n.tcpOnlyResult(best.tcpMs!);
       final profile = _state.profiles.firstWhere((p) => p.id == win.profileId);
       _setAutoSelectResult('${win.node.name} · ${profile.name} — $how');
       if (win.profileId != activeProfileId ||
@@ -1150,14 +1207,14 @@ class AppController extends ChangeNotifier {
       if (socksPort == null) {
         if (choice == EngineChoice.auto) {
           // Автовыбор ошибся — молча откатываемся, нода важнее движка.
-          _appendLog('Xray не запустился, откат на sing-box');
+          _appendLog(l10n.xrayFailedFallback);
           engine = NodeEngine.singbox;
         } else {
           // Движок зафиксирован руками — уважаем выбор и показываем ошибку.
-          _appendLog('Xray не запустился, движок выбран вручную — отката нет');
-          _error = 'Xray не запустился';
+          _appendLog(l10n.xrayFailedManual);
+          _error = l10n.xrayFailed;
           _status = TunnelStatus.error;
-          _alertCtrl.add('VPN не подключён: Xray не запустился');
+          _alertCtrl.add(l10n.vpnNotConnectedXray);
           notifyListeners();
           return;
         }
@@ -1180,16 +1237,21 @@ class AppController extends ChangeNotifier {
       // Сервис нужен, чтобы на старте TUN переопределить системный DNS (иначе
       // запросы к LAN-роутеру минуют туннель и hijack-dns не срабатывает).
       final service = await _resolveService();
-      final config = builder.build(node,
-          mode: TunnelMode.tun,
-          serverIp: ip,
-          routing: routing,
-          xraySocksPort: socksPort);
+      final config = builder.build(
+        node,
+        mode: TunnelMode.tun,
+        serverIp: ip,
+        routing: routing,
+        xraySocksPort: socksPort,
+      );
       await _tunTunnel.start(config, port: port, service: service);
     } else {
       final service = await _resolveService();
-      final config =
-          builder.build(node, routing: routing, xraySocksPort: socksPort);
+      final config = builder.build(
+        node,
+        routing: routing,
+        xraySocksPort: socksPort,
+      );
       await _proxyTunnel.start(config, port: port, service: service);
     }
     _clashApi.start(api);
@@ -1200,24 +1262,27 @@ class AppController extends ChangeNotifier {
   /// удалось. Критерий успеха: процесс жив после startup-grace И порт отвечает.
   Future<int?> _startXray(NodeConfig node) async {
     final port = await _pickPort();
-    final config = buildXrayConfig(node,
-        socksPort: port, network: _state.networkSettings);
+    final config = buildXrayConfig(
+      node,
+      socksPort: port,
+      network: _state.networkSettings,
+    );
     if (config == null) {
-      _appendLog('для этой ноды Xray-конфиг не собирается');
+      _appendLog(l10n.xrayConfigUnsupported);
       return null;
     }
     try {
       await _xray.start(config);
     } on PlatformException catch (e) {
-      _appendLog('Xray не стартовал: ${e.message}');
+      _appendLog(l10n.xrayStartFailed('${e.message}'));
       return null;
     } on MissingPluginException {
       // Канал не зарегистрирован (не macOS или тестовая среда).
-      _appendLog('Xray недоступен на этой платформе');
+      _appendLog(l10n.xrayUnavailable);
       return null;
     }
     if (!await _probeSocks(port)) {
-      _appendLog('Xray стартовал, но socks-порт $port не отвечает');
+      _appendLog(l10n.xraySocksNotResponding(port));
       await _stopXray();
       return null;
     }

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import '../models/node_config.dart';
+import '../l10n/l10n.dart';
 
 Map<String, dynamic> _map(Object? v) =>
     (v as Map?)?.cast<String, dynamic>() ?? <String, dynamic>{};
@@ -107,7 +108,7 @@ String nodeToEditableJson(NodeConfig node) {
 NodeConfig nodeFromJson(NodeConfig node, String name, String jsonText) {
   final decoded = jsonDecode(jsonText);
   if (decoded is! Map) {
-    throw const FormatException('Ожидается JSON-объект outbound');
+    throw FormatException(l10n.expectedOutboundObject);
   }
   final out = decoded.cast<String, dynamic>();
   final schema = node.rawSchema;

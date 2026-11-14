@@ -6,6 +6,8 @@ import '../models/routing_rule.dart';
 import '../services/geo_catalog.dart';
 import '../theme/verge_palette.dart';
 import 'widgets/paper.dart';
+import '../l10n/l10n.dart';
+import '../services/routing_presets.dart';
 
 /// Роутинг: карточки профилей сверху, под ними — правила выбранного.
 ///
@@ -39,7 +41,7 @@ class _RoutingScreenState extends State<RoutingScreen> {
   }
 
   Future<void> _add() async {
-    final p = await controller.addRoutingProfile('Новый профиль');
+    final p = await controller.addRoutingProfile(l10n.newProfile);
     if (mounted) setState(() => _viewId = p.id);
   }
 
@@ -65,7 +67,7 @@ class _RoutingScreenState extends State<RoutingScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               ScreenHeader(
-                title: 'Роутинг',
+                title: l10n.routing,
                 subtitle: _geoStatus(context),
                 actions: [
                   if (controller.canUpdateGeo)
@@ -76,12 +78,12 @@ class _RoutingScreenState extends State<RoutingScreen> {
                       leading: controller.isUpdatingGeo
                           ? const Spinner()
                           : const Icon(LucideIcons.cloudDownload, size: 16),
-                      child: const Text('Обновить гео'),
+                      child: Text(l10n.updateGeo),
                     ),
                   ShadButton(
                     onPressed: _add,
                     leading: const Icon(LucideIcons.plus, size: 16),
-                    child: const Text('Профиль'),
+                    child: Text(l10n.profile),
                   ),
                 ],
               ),
@@ -120,17 +122,17 @@ class _RoutingScreenState extends State<RoutingScreen> {
 
   Widget _geoStatus(BuildContext context) {
     if (!controller.canUpdateGeo) {
-      return const Text('Что идёт через VPN, что напрямую, а что блокируется');
+      return Text(l10n.routingSubtitle);
     }
     final at = controller.geoUpdatedAt;
     final err = controller.geoUpdateError;
     final subtitle =
         err ??
         (at == null
-            ? 'ещё не обновлялись — вшитые версии'
-            : 'обновлены ${_ago(at)}');
+            ? l10n.geoNeverUpdated
+            : l10n.geoUpdated(_ago(at)));
     return Text(
-      'Гео-наборы (.srs): $subtitle',
+      l10n.geoSets(subtitle),
       style: err != null
           ? TextStyle(color: VergePalette.of(context).dangerText)
           : null,
@@ -139,10 +141,10 @@ class _RoutingScreenState extends State<RoutingScreen> {
 
   String _ago(DateTime t) {
     final d = DateTime.now().difference(t);
-    if (d.inMinutes < 1) return 'только что';
-    if (d.inHours < 1) return '${d.inMinutes} мин назад';
-    if (d.inDays < 1) return '${d.inHours} ч назад';
-    return '${d.inDays} дн назад';
+    if (d.inMinutes < 1) return l10n.justNow;
+    if (d.inHours < 1) return l10n.minutesAgo(d.inMinutes);
+    if (d.inDays < 1) return l10n.hoursAgo(d.inHours);
+    return l10n.daysAgo(d.inDays);
   }
 }
 
@@ -153,25 +155,15 @@ int _ruleCount(RoutingProfile p) =>
     p.proxyRules.length +
     p.blockRules.length;
 
-String _rulesWord(int n) {
-  final mod10 = n % 10, mod100 = n % 100;
-  if (mod10 == 1 && mod100 != 11) return 'правило';
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
-    return 'правила';
-  }
-  return 'правил';
-}
-
 /// Подпись карточки: чей профиль и что он делает с остальным трафиком.
 String _cardSubtitle(RoutingProfile p) {
   final n = _ruleCount(p);
-  final rest = p.finalAction == RoutingFinal.direct
-      ? 'остальное напрямую'
-      : 'остальное через VPN';
-  final kind = p.isBuiltIn ? 'Встроенный' : 'Свой';
+  final direct = p.finalAction == RoutingFinal.direct;
+  final rest = direct ? l10n.restDirect : l10n.restViaVpn;
+  final kind = p.isBuiltIn ? l10n.builtIn : l10n.custom;
   return n == 0
-      ? '$kind · всё через ${p.finalAction == RoutingFinal.direct ? 'прямое соединение' : 'VPN'}'
-      : '$kind · $n ${_rulesWord(n)} · $rest';
+      ? '$kind · ${direct ? l10n.allDirect : l10n.allViaVpn}'
+      : '$kind · ${l10n.ruleCount(n)} · $rest';
 }
 
 class _ProfileCard extends StatelessWidget {
@@ -221,7 +213,7 @@ class _ProfileCard extends StatelessWidget {
                   children: [
                     Flexible(
                       child: Text(
-                        p.name,
+                        p.displayName,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -277,9 +269,9 @@ class _ActiveBadge extends StatelessWidget {
         color: VergePalette.of(context).accent,
         borderRadius: BorderRadius.circular(999),
       ),
-      child: const Text(
-        'активен',
-        style: TextStyle(
+      child: Text(
+        l10n.active,
+        style: const TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w600,
           color: Color(0xFFFFFFFF),
@@ -320,28 +312,28 @@ class _Editor extends StatelessWidget {
 
     final groups = [
       _RuleGroup(
-        title: 'Через VPN',
+        title: l10n.groupViaVpn,
         color: palette.accent,
         rules: p.proxyRules,
         editable: editable,
         onChanged: (r) => _save(p.copyWith(proxyRules: r)),
       ),
       _RuleGroup(
-        title: 'Напрямую',
+        title: l10n.groupDirect,
         color: palette.success,
         rules: p.directRules,
         editable: editable,
         onChanged: (r) => _save(p.copyWith(directRules: r)),
       ),
       _RuleGroup(
-        title: 'Блокировать',
+        title: l10n.groupBlock,
         color: palette.danger,
         rules: p.blockRules,
         editable: editable,
         onChanged: (r) => _save(p.copyWith(blockRules: r)),
       ),
       _RuleGroup(
-        title: 'Исключения (важнее блока)',
+        title: l10n.groupExceptions,
         color: exceptions,
         rules: p.allowRules,
         editable: editable,
@@ -350,7 +342,7 @@ class _Editor extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                'Исключения идут',
+                l10n.exceptionsGo,
                 style: theme.textTheme.muted.copyWith(fontSize: 12),
               ),
             ),
@@ -362,14 +354,14 @@ class _Editor extends StatelessWidget {
                 onChanged: editable
                     ? (v) => _save(p.copyWith(allowAction: v))
                     : null,
-                options: const [
+                options: [
                   SegmentedOption(
                     value: RoutingFinal.proxy,
-                    label: 'через VPN',
+                    label: l10n.viaVpn,
                   ),
                   SegmentedOption(
                     value: RoutingFinal.direct,
-                    label: 'напрямую',
+                    label: l10n.direct,
                   ),
                 ],
               ),
@@ -386,7 +378,7 @@ class _Editor extends StatelessWidget {
           children: [
             Flexible(
               child: Text(
-                p.name,
+                p.displayName,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
@@ -398,18 +390,18 @@ class _Editor extends StatelessWidget {
             if (editable)
               _HeaderAction(
                 icon: LucideIcons.pencil,
-                tooltip: 'Переименовать',
+                tooltip: l10n.rename,
                 onPressed: () => _rename(context),
               ),
             _HeaderAction(
               icon: LucideIcons.copy,
-              tooltip: 'Дублировать',
+              tooltip: l10n.duplicate,
               onPressed: onClone,
             ),
             if (editable)
               _HeaderAction(
                 icon: LucideIcons.trash2,
-                tooltip: 'Удалить',
+                tooltip: l10n.delete,
                 color: palette.dangerText,
                 onPressed: onRemove,
               ),
@@ -418,15 +410,14 @@ class _Editor extends StatelessWidget {
               ShadButton.outline(
                 size: ShadButtonSize.sm,
                 onPressed: () => controller.selectRoutingProfile(p.id),
-                child: const Text('Использовать'),
+                child: Text(l10n.use),
               ),
           ],
         ),
         if (!editable) ...[
           const SizedBox(height: 6),
           Text(
-            'Встроенный профиль не меняется — дублируйте его, чтобы настроить '
-            'правила под себя.',
+            l10n.builtInProfileReadOnly,
             style: theme.textTheme.muted.copyWith(fontSize: 13),
           ),
         ],
@@ -444,9 +435,9 @@ class _Editor extends StatelessWidget {
           ),
           child: Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'Всё, что не попало в правила',
+                  l10n.everythingElse,
                   style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
               ),
@@ -457,11 +448,11 @@ class _Editor extends StatelessWidget {
                   height: 32,
                   onChanged:
                       editable ? (v) => _save(p.copyWith(finalAction: v)) : null,
-                  options: const [
+                  options: [
                     SegmentedOption(
-                        value: RoutingFinal.proxy, label: 'через VPN'),
+                        value: RoutingFinal.proxy, label: l10n.viaVpn),
                     SegmentedOption(
-                        value: RoutingFinal.direct, label: 'напрямую'),
+                        value: RoutingFinal.direct, label: l10n.direct),
                   ],
                 ),
               ),
@@ -477,15 +468,15 @@ class _Editor extends StatelessWidget {
     final name = await showShadDialog<String>(
       context: context,
       builder: (ctx) => ShadDialog(
-        title: const Text('Переименовать профиль'),
+        title: Text(l10n.renameProfile),
         actions: [
           ShadButton.outline(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Отмена'),
+            child: Text(l10n.cancel),
           ),
           ShadButton(
             onPressed: () => Navigator.of(ctx).pop(ctrl.text.trim()),
-            child: const Text('Сохранить'),
+            child: Text(l10n.save),
           ),
         ],
         child: Padding(
@@ -586,7 +577,7 @@ class _RuleGroup extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           if (rules.isEmpty)
-            Text('Пусто', style: theme.textTheme.muted.copyWith(fontSize: 12))
+            Text(l10n.empty, style: theme.textTheme.muted.copyWith(fontSize: 12))
           else
             Wrap(
               spacing: 6,
@@ -683,7 +674,7 @@ class _AddRuleButtonState extends State<_AddRuleButton> {
     final cat = await showShadDialog<GeoCategory>(
       context: context,
       builder: (ctx) => ShadDialog(
-        title: const Text('Выбрать категорию'),
+        title: Text(l10n.chooseCategory),
         child: SizedBox(
           width: 360,
           child: Column(
@@ -712,15 +703,15 @@ class _AddRuleButtonState extends State<_AddRuleButton> {
     final entry = await showShadDialog<String>(
       context: context,
       builder: (ctx) => ShadDialog(
-        title: const Text('Домен или IP/CIDR'),
+        title: Text(l10n.domainOrCidr),
         actions: [
           ShadButton.outline(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Отмена'),
+            child: Text(l10n.cancel),
           ),
           ShadButton(
             onPressed: () => Navigator.of(ctx).pop(ctrl.text.trim()),
-            child: const Text('Добавить'),
+            child: Text(l10n.add),
           ),
         ],
         child: Padding(
@@ -728,7 +719,7 @@ class _AddRuleButtonState extends State<_AddRuleButton> {
           child: ShadInput(
             controller: ctrl,
             autofocus: true,
-            placeholder: const Text('example.com или 1.2.3.0/24'),
+            placeholder: Text(l10n.domainOrCidrHint),
           ),
         ),
       ),
@@ -753,16 +744,16 @@ class _AddRuleButtonState extends State<_AddRuleButton> {
         ShadContextMenuItem(
           leading: const Icon(LucideIcons.globe, size: 16),
           onPressed: _addGeo,
-          child: const Text('Гео-категория'),
+          child: Text(l10n.geoCategory),
         ),
         ShadContextMenuItem(
           leading: const Icon(LucideIcons.atSign, size: 16),
           onPressed: _addText,
-          child: const Text('Домен или IP'),
+          child: Text(l10n.domainOrIp),
         ),
       ],
       child: ShadTooltip(
-        builder: (_) => const Text('Добавить правило'),
+        builder: (_) => Text(l10n.addRule),
         child: ShadButton.outline(
           width: 26,
           height: 26,

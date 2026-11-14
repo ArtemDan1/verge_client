@@ -4,107 +4,118 @@
 
 # Verge
 
-**Быстрый и понятный прокси-клиент для macOS и Windows**
+**A fast, no-nonsense proxy client for macOS and Windows**
 
-Вставьте подписку — Verge сделает остальное.
+Paste your subscription — Verge takes care of the rest.
 
 [![Release](https://img.shields.io/github/v/release/ArtemDan1/verge_client?style=flat-square&label=release&color=1a1a1a)](https://github.com/ArtemDan1/verge_client/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/ArtemDan1/verge_client/total?style=flat-square&color=1a1a1a)](https://github.com/ArtemDan1/verge_client/releases)
-[![Platforms](https://img.shields.io/badge/macOS%20%7C%20Windows-1a1a1a?style=flat-square)](#-скачать)
+[![Platforms](https://img.shields.io/badge/macOS%20%7C%20Windows-1a1a1a?style=flat-square)](#-download)
 [![License](https://img.shields.io/github/license/ArtemDan1/verge_client?style=flat-square&color=1a1a1a)](LICENSE)
 
 <br>
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/home-dark.png">
-  <img src="docs/screenshots/home-light.png" alt="Главный экран Verge" width="880">
+  <img src="docs/screenshots/home-light.png" alt="Verge main window" width="880">
 </picture>
 
 </div>
 
 <br>
 
-## 📥 Скачать
+## 📥 Download
 
-| Платформа | Загрузка | Требования |
+| Platform | Download | Requirements |
 |---|---|---|
-| **macOS** | [![PKG](https://img.shields.io/badge/PKG-Universal-000000?style=flat-square&logo=apple)](https://github.com/ArtemDan1/verge_client/releases/latest) | Apple Silicon или Intel |
-| **Windows** | [![Setup](https://img.shields.io/badge/Setup-x64-0078d7?style=flat-square&logo=windows)](https://github.com/ArtemDan1/verge_client/releases/latest) | Windows 10 (1809) и новее |
+| **macOS** | [![PKG](https://img.shields.io/badge/PKG-Universal-000000?style=flat-square&logo=apple)](https://github.com/ArtemDan1/verge_client/releases/latest) | Apple Silicon or Intel |
+| **Windows** | [![Setup](https://img.shields.io/badge/Setup-x64-0078d7?style=flat-square&logo=windows)](https://github.com/ArtemDan1/verge_client/releases/latest) | Windows 10 (1809) or later |
 
-> Сборки пока не подписаны. На macOS откройте установщик через **правый клик → Открыть**, на Windows в окне SmartScreen нажмите **Подробнее → Выполнить в любом случае**. Подробнее — [macOS](docs/INSTALL.md), [Windows](docs/WINDOWS.md).
+> Builds are not signed yet. On macOS, open the installer with **right-click → Open**; on Windows, click **More info → Run anyway** in the SmartScreen dialog. Details: [macOS](docs/INSTALL.md), [Windows](docs/WINDOWS.md).
 
-## ✨ Почему Verge
+## ✨ Why Verge
 
-⚡ **Подключение в один клик** — добавьте ссылку на подписку, выберите сервер и нажмите кнопку. Никаких конфигов и терминала.
+⚡ **One-click connect** — add your subscription link, pick a server and press the button. No configs, no terminal.
 
-🎯 **Автовыбор сервера** — Verge сам проверит задержку и подключит самый быстрый.
+🎯 **Server auto-select** — Verge checks latency and connects to the fastest server for you.
 
-🧭 **Умная маршрутизация** — готовые сценарии «Всё через прокси», «Обход РФ» и «Блок рекламы» или свои правила для сайтов и приложений.
+🧭 **Smart routing** — ready-made presets (“Everything via proxy”, “Bypass Russia”, “Ad blocking only”) or your own rules for sites and apps.
 
-🛡 **Прокси или TUN** — только браузер и приложения или весь трафик системы.
+🛡 **Proxy or TUN** — just the browser and apps, or all system traffic.
 
-📊 **Всё под контролем** — скорость, трафик, активные соединения и остаток по подписке.
+⌨️ **Global hotkey** — connect or disconnect from anywhere, even when the window is hidden.
 
-🔌 **Совместим с панелями** — подписки sing-box, Xray и base64, share-ссылки, Remnawave и HWID. VLESS Reality, VMess, Trojan, Shadowsocks, Hysteria2.
+📊 **Everything in sight** — speed, traffic, active connections and the remaining subscription quota.
 
-🌗 **Аккуратный интерфейс** — светлая и тёмная темы, мини-окно в трее, автообновления.
+🔌 **Works with your panel** — sing-box, Xray and base64 subscriptions, share links, Remnawave and HWID. VLESS Reality, VMess, Trojan, Shadowsocks, Hysteria2.
 
-## 📸 Скриншоты
+🌍 **Speaks your language** — English, Русский, 简体中文, فارسی, العربية, Türkçe, Español, Português, Deutsch, Français.
+
+🌗 **Clean interface** — light and dark themes, a tray mini-window, automatic updates; the window reopens where you left it.
+
+## 📸 Screenshots
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/screenshots/connections.png" alt="Соединения"></td>
-    <td width="50%"><img src="docs/screenshots/routing.png" alt="Роутинг"></td>
+    <td width="50%"><img src="docs/screenshots/connections.png" alt="Connections"></td>
+    <td width="50%"><img src="docs/screenshots/routing.png" alt="Routing"></td>
   </tr>
   <tr>
-    <td align="center"><b>Соединения</b> — какое приложение куда ходит</td>
-    <td align="center"><b>Роутинг</b> — что через VPN, что напрямую</td>
+    <td align="center"><b>Connections</b> — which app goes where</td>
+    <td align="center"><b>Routing</b> — what goes via VPN and what goes direct</td>
   </tr>
   <tr>
-    <td width="50%"><img src="docs/screenshots/logs.png" alt="Логи"></td>
-    <td width="50%" align="center"><img src="docs/screenshots/tray.png" alt="Мини-окно в трее" width="300"></td>
+    <td width="50%"><img src="docs/screenshots/logs.png" alt="Logs"></td>
+    <td width="50%" align="center"><img src="docs/screenshots/tray.png" alt="Tray mini-window" width="300"></td>
   </tr>
   <tr>
-    <td align="center"><b>Логи</b> — sing-box, Xray и приложение</td>
-    <td align="center"><b>Трей</b> — сменить сервер, не открывая окно</td>
+    <td align="center"><b>Logs</b> — sing-box, Xray and the app</td>
+    <td align="center"><b>Tray</b> — switch servers without opening the window</td>
   </tr>
 </table>
 
-## 🚀 Как начать
+## 🚀 Getting started
 
-1. Скачайте и установите Verge.
-2. Нажмите **«Добавить подписку»** и вставьте ссылку от вашего провайдера — или откройте ссылку `verge://import/...`.
-3. Выберите сервер и нажмите кнопку подключения.
+1. Download and install Verge.
+2. Click **Add subscription** and paste the link from your provider — or open a `verge://import/...` link.
+3. Pick a server and press the connect button.
 
-## 🔒 Приватность
+**Tips**
 
-Verge не собирает данные: профили и настройки хранятся только на вашем устройстве.
+- **Language:** Settings → General → Interface language. By default Verge follows the system language.
+- **Global hotkey:** Settings → General → Hotkeys → Connect / disconnect. Click the field and press a shortcut, e.g. <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>V</kbd> on Windows or <kbd>⌃</kbd><kbd>⌥</kbd><kbd>V</kbd> on macOS. The shortcut needs <kbd>Ctrl</kbd>, <kbd>Alt</kbd> or <kbd>⌘</kbd>/<kbd>Win</kbd> (F-keys work on their own).
 
-Verge — это клиент, а не VPN-сервис: серверы и подписку нужно получить у своего провайдера. Используйте приложение в соответствии с законами вашей страны.
+## 🔒 Privacy
+
+Verge does not collect any data: profiles and settings are stored only on your device.
+
+Verge is a client, not a VPN service: you get servers and a subscription from your own provider. Use the app in accordance with the laws of your country.
 
 <details>
-<summary><b>🛠 Для разработчиков</b></summary>
+<summary><b>🛠 For developers</b></summary>
 
 <br>
 
-Verge написан на Flutter (UI на `shadcn_ui`), сетевые движки — [sing-box](https://github.com/SagerNet/sing-box) и [Xray](https://github.com/XTLS/Xray-core). Нативная часть macOS и helper для TUN — на Swift, Windows-часть и служба `VergeTunnel` — на C++.
+Verge is built with Flutter (UI on `shadcn_ui`); the network engines are [sing-box](https://github.com/SagerNet/sing-box) and [Xray](https://github.com/XTLS/Xray-core). The native macOS part and the TUN helper are written in Swift, the Windows part and the `VergeTunnel` service in C++.
 
 ```bash
 flutter pub get
-flutter run -d macos     # или: flutter run -d windows
+flutter run -d macos     # or: flutter run -d windows
 flutter test
 ```
 
-Сборка релиза:
+Release builds:
 
 ```bash
 scripts/build_release.sh && scripts/make_pkg.sh              # macOS → .pkg
 flutter build windows --release && pwsh scripts/make_installer.ps1   # Windows → setup.exe
 ```
 
-Для Windows нужны Visual Studio 2022 (Desktop development with C++), Inno Setup 6 и бинарники sing-box, Xray и Wintun — см. [docs/WINDOWS.md](docs/WINDOWS.md).
+Windows builds need Visual Studio 2022 (Desktop development with C++), Inno Setup 6 and the sing-box, Xray and Wintun binaries — see [docs/WINDOWS.md](docs/WINDOWS.md).
 
-Скриншоты для README генерируются из настоящих экранов приложения:
+**Translations** live in `lib/l10n/app_<lang>.arb` (`app_en.arb` is the template); classes are generated by `flutter gen-l10n` on `pub get`. To add a language, add an ARB file, list it in `appLanguages` in `lib/l10n/l10n.dart` and in `CFBundleLocalizations` in `macos/Runner/Info.plist`. Pull requests with new languages and fixes are welcome.
+
+README screenshots are rendered from the real app screens:
 
 ```bash
 VERGE_SCREENSHOTS=1 flutter test --update-goldens test/readme_screenshots
@@ -112,10 +123,10 @@ VERGE_SCREENSHOTS=1 flutter test --update-goldens test/readme_screenshots
 
 </details>
 
-## 💬 Обратная связь
+## 💬 Feedback
 
-Нашли ошибку или есть идея — [создайте Issue](https://github.com/ArtemDan1/verge_client/issues). Звезда ⭐ репозиторию тоже очень помогает.
+Found a bug or have an idea? [Open an issue](https://github.com/ArtemDan1/verge_client/issues). A star ⭐ helps a lot too.
 
 <div align="center">
-<sub>MIT License · Сделано с заботой</sub>
+<sub>MIT License · Made with care</sub>
 </div>

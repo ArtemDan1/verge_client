@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../theme/app_theme.dart';
+import '../../l10n/l10n.dart';
 
 /// Разбирает и форматирует JSON с отступом в 2 пробела, пробрасывая
 /// FormatException наружу. Отдельно от [prettyPrintJson], чтобы вызывающий мог
@@ -25,8 +26,8 @@ String? prettyPrintJson(String source) {
 String jsonErrorMessage(FormatException e) {
   final offset = e.offset;
   return offset == null
-      ? 'Некорректный JSON: ${e.message}'
-      : 'Некорректный JSON: ${e.message} (символ $offset)';
+      ? l10n.invalidJson(e.message)
+      : l10n.invalidJsonAt(e.message, offset);
 }
 
 /// Фолбэк-реализация поверх обычного TextField: flutter_code_editor 0.3.5

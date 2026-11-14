@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../app/app_controller.dart';
 import 'general_section.dart';
+import '../../l10n/l10n.dart';
 
 class DnsSection extends StatelessWidget {
   const DnsSection({super.key, required this.controller});
@@ -15,9 +16,8 @@ class DnsSection extends StatelessWidget {
       title: 'DNS',
       children: [
         SettingsRow(
-          label: 'Перехват DNS в TUN',
-          description: 'Заворачивает весь трафик на порт 53 в DNS-движок. Без '
-              'него запросы уходят на DNS провайдера и цензурируются',
+          label: l10n.dnsHijack,
+          description: l10n.dnsHijackDescription,
           trailing: ShadSwitch(
             key: const Key('dns-hijack-switch'),
             value: n.dnsHijack,
@@ -26,8 +26,8 @@ class DnsSection extends StatelessWidget {
           ),
         ),
         SettingsField(
-          label: 'DNS для прокси',
-          description: 'Разрешает адреса сайтов, которые идут через VPN',
+          label: l10n.dnsProxy,
+          description: l10n.dnsProxyDescription,
           child: ShadInput(
             initialValue: n.proxyDnsServer,
             onSubmitted: (v) => controller.updateNetworkSettings(
@@ -35,8 +35,8 @@ class DnsSection extends StatelessWidget {
           ),
         ),
         SettingsField(
-          label: 'DNS для прямых соединений',
-          description: 'Для сайтов, которые открываются напрямую',
+          label: l10n.dnsDirect,
+          description: l10n.dnsDirectDescription,
           child: ShadInput(
             initialValue: n.directDnsServer,
             onSubmitted: (v) => controller.updateNetworkSettings(

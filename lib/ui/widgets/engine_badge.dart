@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../models/node_engine.dart';
 import '../../theme/app_colors.dart';
+import '../../l10n/l10n.dart';
 
 /// Двухбуквенный индикатор движка ноды. Чистый presentational-виджет.
 ///
@@ -55,8 +56,8 @@ class EngineBadge extends StatelessWidget {
     );
 
     final message = fellBack
-        ? 'Xray не запустился, работаем на sing-box'
-        : (manual ? 'Движок выбран вручную' : 'Движок выбран автоматически');
+        ? l10n.xrayFailedRunningSingbox
+        : (manual ? l10n.engineChosenManually : l10n.engineChosenAutomatically);
     return Tooltip(message: message, child: badge);
   }
 }
